@@ -1,7 +1,11 @@
+import asyncio
+
 from textual.app import App, ComposeResult
 from textual.widgets import Input, RichLog, Footer
+from rich.text import Text
 
 from agent.ollama_client import OllamaClient
+from agent.chat import ChatSession
 
 
 class WardenApp(App):
@@ -15,6 +19,8 @@ class WardenApp(App):
 		self.model = model
 		self.auto_ollama = auto_ollama
 		self.ollama = OllamaClient(model=model)
+		self.chat = ChatSession(model=model)
+		self._streaming = False
 
 	def compose(self) -> ComposeResult:
 		yield RichLog(highlight=False, wrap=True, id="log")
@@ -45,10 +51,31 @@ class WardenApp(App):
 		inp = self.query_one("#input", Input)
 		inp.value = ""
 
+	async def _stream_response(self, prompt: str) -> None:
+		log = self.query_one("#log", RichLog)
+		inp = self.query_one("#input", Input)
+		self._streaming = True
+		inp.disabled = True
+		log.write("[bold cyan]warden >[/bold cyan] ", expand=False)
+		full = ""
+		try:
+			for token in self.chat.stream(prompt):
+				full += token
+				log.write(Text(token), scroll_end=True)
+				await asyncio.sleep(0)
+		except Exception as e:
+			log.write(f"\n[red]ошибка: {e}[/red]")
+		finally:
+			self._streaming = False
+			inp.disabled = False
+			inp.focus()
+
 	async def on_input_submitted(self, event: Input.Submitted) -> None:
-		if not event.value.strip():
+		if not event.value.strip() or self._streaming:
 			return
 		log = self.query_one("#log", RichLog)
 		log.write(f"[bold]you >[/bold] {event.value}")
+		prompt = event.value
 		event.input.value = ""
+		asyncio.create_task(self._stream_response(prompt))
 
