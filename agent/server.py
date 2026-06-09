@@ -39,8 +39,10 @@ async def health(request: web.Request) -> web.Response:
 
 
 async def chat(request: web.Request) -> web.StreamResponse:
+	print(f"[server] received chat request")
 	data = await request.json()
 	text = data.get("text", "")
+	print(f"[server] text: {text[:50]}...")
 
 	response = web.StreamResponse(
 		status=200,
@@ -49,10 +51,14 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	await response.prepare(request)
 
 	try:
+		print("[server] starting chat_stream...")
 		async for msg in backend.chat_stream(text):
 			line = json.dumps(msg) + "\n"
+			print(f"[server] sending: {msg}")
 			await response.write(line.encode())
+		print("[server] stream done")
 	except Exception as e:
+		print(f"[server] error: {e}")
 		line = json.dumps({"type": "error", "text": str(e)}) + "\n"
 		await response.write(line.encode())
 
