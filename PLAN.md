@@ -118,6 +118,53 @@ warden/
 
 ---
 
+## план реализации mvp v1 — чат + tui + ollama
+
+### шаг 1: скелет проекта
+
+- [ ] создать `main.py` — точка входа, парсинг аргументов (`--model`, `--no-auto-ollama`).
+- [ ] создать `tui/app.py` — базовый ` textual.App`, подключить `theme.css`.
+- [ ] создать `tui/theme.css` — тёмная тема, кастомные цвета (cyan, yellow, red, dim).
+- [ ] создать `agent/ollama_client.py` — обёртка над `ollama` sdk: проверка, запуск, pull, chat.
+- [ ] `requirements.txt`: `textual`, `ollama`, `rich`.
+
+### шаг 2: базовый tui
+
+- [ ] layout: `Vertical` → `RichLog` (expand) + `Input` (dock bottom) + `Footer` (dock bottom).
+- [ ] `RichLog` — вывод системных сообщений, приветствие, статус.
+- [ ] `Input` — однострочный, `enter` → отправка, `esc` → очистка.
+- [ ] `Footer` — статус ollama, имя модели, подсказки клавиш.
+- [ ] никаких рамок, панелей, кнопок — только текст + цвет.
+
+### шаг 3: автоподнятие и закрытие ollama
+
+- [ ] при старте: `ollama_client.check()` — subprocess `ollama list`, таймаут 5 сек.
+- [ ] если не отвечает: `subprocess.Popen(["ollama", "serve"], creationflags=CREATE_NEW_PROCESS_GROUP)` (win) или `start_new_session=True` (unix).
+- [ ] пинг в цикле: `ollama.list()`, таймаут 30 сек, прогресс в Footer.
+- [ ] если не поднялось — ошибка в RichLog, exit(1).
+- [ ] если модели нет — `ollama.pull(model)` с индикатором.
+- [ ] при выходе (`ctrl+c` / закрытие) — убивать запущенный `ollama serve` (только если мы сами подняли).
+
+### шаг 4: чат с llm
+
+- [ ] история: `list[dict]` в `agent/chat.py` — `{"role": "user"|"assistant", "content": str}`.
+- [ ] отправка: `ollama.chat(model=..., messages=history, stream=True)` через `asyncio.to_thread` или `async for` если sdk поддерживает.
+- [ ] стриминг: токены накапливаем в строку, пишем в `RichLog` через `rich.Text` с авто-скроллом.
+- [ ] после завершения — финализируем сообщение, добавляем в историю.
+- [ ] состояния: `[idle]` → `[sending]` (блокируем input, показываем "...") → `[streaming]` → `[idle]`.
+
+### шаг 5: полировка
+
+- [ ] форматирование: `Markdown` для ответов ассистента, `Text` для пользователя.
+- [ ] цвета: cyan для "warden >", белый для текста, dim grey для timestamp, red для ошибок.
+- [ ] обработка ошибок: таймаут, ollama не найден, модель не скачалась — красный текст в лог.
+- [ ] scroll-to-bottom при новых сообщениях.
+- [ ] тест: запуск без ollama → ожидание auto-launch → отправка сообщения → стриминг ответа.
+
+**итог mvp v1:** запускаешь `python main.py`, ollama поднимается сама, пишешь промт — получаешь стриминг ответа в минималистичном tui.
+
+---
+
 ## визуальный стиль
 
 - тёмный фон, никаких обводок и панелей с фоном
