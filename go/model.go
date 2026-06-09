@@ -17,6 +17,7 @@ type model struct {
 	messages  []string
 	streaming bool
 	height    int
+	streamCh  chan tea.Msg
 }
 
 func initialModel() model {
@@ -84,7 +85,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 		}
-		return m, nil
+		return m, m.readNextMsg()
+
+	case doneMsg:
+		m.streaming = false
+		m.messages = append(m.messages, "")
+		m.viewport.SetContent(strings.Join(m.messages, "\n"))
+		m.viewport.GotoBottom()
+		m.streamCh = nil
 
 	case toolMsg:
 		m.messages = append(m.messages,
@@ -93,13 +101,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
-		return m, nil
-
-	case doneMsg:
-		m.streaming = false
-		m.messages = append(m.messages, "")
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		return m, m.readNextMsg()
 
 	case backendReadyMsg:
 		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
@@ -156,12 +158,42 @@ func (m model) sendMessage(text string) tea.Cmd {
 	m.viewport.SetContent(strings.Join(m.messages, "\n"))
 	m.viewport.GotoBottom()
 	m.streaming = true
+	m.streamCh = make(chan tea.Msg, 64)
 
-	return func() tea.Msg {
+	go func() {
 		ch := m.client.SendMessage(text)
 		for msg := range ch {
-			return msg
+			m.streamCh <- msg
 		}
-		return doneMsg{}
+		close(m.streamCh)
+	}()
+
+	return func() tea.Msg {
+		select {
+		case msg, ok := <-m.streamCh:
+			if !ok {
+				return doneMsg{}
+			}
+			return msg
+		default:
+			return nil
+		}
+	}
+}
+
+func (m model) readNextMsg() tea.Cmd {
+	if m.streamCh == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		select {
+		case msg, ok := <-m.streamCh:
+			if !ok {
+				return doneMsg{}
+			}
+			return msg
+		default:
+			return nil
+		}
 	}
 }
