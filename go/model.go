@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,7 +17,6 @@ type model struct {
 	messages  []string
 	streaming bool
 	height    int
-	streamCh  <-chan tea.Msg
 }
 
 func initialModel() model {
@@ -81,12 +79,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tokenMsg:
-		fmt.Printf("[model] tokenMsg: streaming=%v, msg.text=%q\n", m.streaming, msg.text)
 		if m.streaming && len(m.messages) > 0 {
 			m.messages[len(m.messages)-1] += msg.text
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
-			fmt.Printf("[model] updated viewport, messages count=%d\n", len(m.messages))
 		}
 		return m, nil
 
@@ -104,7 +100,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, "")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
-		m.streamCh = nil
 
 	case backendReadyMsg:
 		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
