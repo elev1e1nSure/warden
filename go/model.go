@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -186,14 +187,16 @@ func (m model) readNextMsg() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		select {
-		case msg, ok := <-m.streamCh:
-			if !ok {
-				return doneMsg{}
+		for {
+			select {
+			case msg, ok := <-m.streamCh:
+				if !ok {
+					return doneMsg{}
+				}
+				return msg
+			default:
+				time.Sleep(50 * time.Millisecond)
 			}
-			return msg
-		default:
-			return nil
 		}
 	}
 }
