@@ -37,11 +37,11 @@ func KeyStyle() lipgloss.Style {
 }
 
 func AutoStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Red).Background(lipgloss.Color("#330000")).Bold(true)
+	return lipgloss.NewStyle().Foreground(Red).Bold(true)
 }
 
 func SafeStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Blue).Background(lipgloss.Color("#001133")).Bold(true)
+	return lipgloss.NewStyle().Foreground(Blue).Bold(true)
 }
 
 func StatusStyle() lipgloss.Style {

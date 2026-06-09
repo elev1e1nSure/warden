@@ -362,11 +362,11 @@ func (m model) View() string {
 	// статус бар
 	var modeBadge string
 	if m.autoMode {
-		modeBadge = AutoStyle().Render(" AUTO ")
+		modeBadge = AutoStyle().Render(" AUTO")
 	} else {
-		modeBadge = SafeStyle().Render(" SAFE ")
+		modeBadge = SafeStyle().Render(" SAFE")
 	}
-	statusBar := StatusStyle().Render(" " + m.modelInfo + " ") + " " + modeBadge
+	statusBar := modeBadge
 
 	var footer string
 	if m.confirming {
@@ -397,6 +397,9 @@ func (m model) View() string {
 	}
 	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
 	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
+
+	// выравнивание плашки режима справа
+	statusBar := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Right).Render(modeBadge)
 
 	layers := []string{m.viewport.View(), sep1}
 	if m.hintVisible {
