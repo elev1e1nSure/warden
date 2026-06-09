@@ -130,9 +130,11 @@ func (m model) View() string {
 		DimStyle().Render(" to clear, ") +
 		KeyStyle().Render("[Ctrl+C]") +
 		DimStyle().Render(" to quit")
+	separator := DimStyle().Render(strings.Repeat("—", m.width))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.viewport.View(),
 		"",
+		separator,
 		m.textinput.View(),
 		footer,
 	)
