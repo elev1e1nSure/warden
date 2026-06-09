@@ -160,16 +160,13 @@ func (m model) sendMessage(text string) tea.Cmd {
 	m.messages = append(m.messages, WardenStyle().Render("warden")+"  ")
 	m.viewport.SetContent(strings.Join(m.messages, "\n"))
 	m.viewport.GotoBottom()
+	m.streaming = true
 
-	m.streamCh = m.client.SendMessage(text)
-	return m.readStream()
-}
-
-func (m model) readStream() tea.Cmd {
-	if m.streamCh == nil {
-		return nil
-	}
 	return func() tea.Msg {
-		return <-m.streamCh
+		ch := m.client.SendMessage(text)
+		for msg := range ch {
+			return msg
+		}
+		return doneMsg{}
 	}
 }
