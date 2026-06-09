@@ -23,7 +23,8 @@ class ChatSession:
 		try:
 			for chunk in ollama.chat(model=self.model, messages=self.history, stream=True):
 				print(f"[chat] chunk={chunk}", file=sys.stderr)
-				token = chunk.get("message", {}).get("content", "")
+				msg = chunk.get("message", {})
+				token = msg.get("content", "") or msg.get("thinking", "")
 				full += token
 				yield token
 			self.add_assistant(full)
