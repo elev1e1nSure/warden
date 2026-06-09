@@ -1,8 +1,12 @@
 import asyncio
 import json
+import os
+import sys
 from typing import AsyncIterator
 
 from aiohttp import web
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.chat import ChatSession
 from agent.ollama_client import OllamaClient
