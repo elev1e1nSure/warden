@@ -38,6 +38,35 @@ func NewClient(url string) *Client {
 	return &Client{BaseURL: url}
 }
 
+func (c *Client) ResetSession() error {
+	resp, err := http.Post(c.BaseURL+"/reset", "application/json", nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func (c *Client) SetMode(auto bool) error {
+	body, _ := json.Marshal(map[string]any{"auto": auto})
+	resp, err := http.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func (c *Client) SendConfirm(id string, ok bool) error {
+	body, _ := json.Marshal(map[string]any{"id": id, "ok": ok})
+	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 func (c *Client) SendMessage(text string) <-chan tea.Msg {
 	ch := make(chan tea.Msg, 64)
 	go func() {
@@ -64,23 +93,48 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 		scanner.Buffer(buf, 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Bytes()
-			var base struct{ Type string `json:"type"` }
+			var base struct {
+				Type string `json:"type"`
+			}
 			if err := json.Unmarshal(line, &base); err != nil {
 				continue
 			}
 			switch base.Type {
+			case "warden_start":
+				ch <- wardenStartMsg{}
 			case "token":
 				var t TokenMsg
 				json.Unmarshal(line, &t)
 				ch <- tokenMsg{text: t.Text}
+			case "think":
+				var t TokenMsg
+				json.Unmarshal(line, &t)
+				ch <- thinkMsg{text: t.Text}
+			case "tool_start":
+				var t struct {
+					Name string `json:"name"`
+					Args string `json:"args"`
+				}
+				json.Unmarshal(line, &t)
+				ch <- toolStartMsg{name: t.Name, args: t.Args}
 			case "tool":
 				var t ToolMsg
 				json.Unmarshal(line, &t)
 				ch <- toolMsg{tool: t}
+			case "confirm":
+				var t struct {
+					ID   string `json:"id"`
+					Tool string `json:"tool"`
+					Args string `json:"args"`
+				}
+				json.Unmarshal(line, &t)
+				ch <- confirmMsg{id: t.ID, tool: t.Tool, args: t.Args}
 			case "done":
 				ch <- doneMsg{}
 			case "error":
-				var e struct{ Text string `json:"text"` }
+				var e struct {
+					Text string `json:"text"`
+				}
 				json.Unmarshal(line, &e)
 				ch <- tokenMsg{text: e.Text}
 				ch <- doneMsg{}
