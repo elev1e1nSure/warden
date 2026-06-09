@@ -123,7 +123,13 @@ func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
-	footer := DimStyle().Render("enter — send  esc — clear  ctrl+c — quit")
+	footer := DimStyle().Render("Press ") +
+		KeyStyle().Render("[Enter]") +
+		DimStyle().Render(" to send, ") +
+		KeyStyle().Render("[Esc]") +
+		DimStyle().Render(" to clear, ") +
+		KeyStyle().Render("[Ctrl+C]") +
+		DimStyle().Render(" to quit")
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.viewport.View(),
 		"",

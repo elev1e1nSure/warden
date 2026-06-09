@@ -30,3 +30,7 @@ func ErrorStyle() lipgloss.Style {
 func ToolStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Yellow)
 }
+
+func KeyStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Yellow).Bold(true)
+}
