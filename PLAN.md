@@ -145,13 +145,13 @@ warden/
 - [x] если модели нет — `ollama.pull(model)` с индикатором.
 - [x] при выходе (`ctrl+c` / закрытие) — убивать запущенный `ollama serve` (только если мы сами подняли).
 
-### шаг 4: чат с llm
+### ~~шаг 4: чат с llm~~
 
-- [ ] история: `list[dict]` в `agent/chat.py` — `{"role": "user"|"assistant", "content": str}`.
-- [ ] отправка: `ollama.chat(model=..., messages=history, stream=True)` через `asyncio.to_thread` или `async for` если sdk поддерживает.
-- [ ] стриминг: токены накапливаем в строку, пишем в `RichLog` через `rich.Text` с авто-скроллом.
-- [ ] после завершения — финализируем сообщение, добавляем в историю.
-- [ ] состояния: `[idle]` → `[sending]` (блокируем input, показываем "...") → `[streaming]` → `[idle]`.
+- [x] история: `list[dict]` в `agent/chat.py` — `{"role": "user"|"assistant", "content": str}`.
+- [x] отправка: `ollama.chat(model=..., messages=history, stream=True)` через `asyncio.to_thread` или `async for` если sdk поддерживает.
+- [x] стриминг: токены накапливаем в строку, пишем в `RichLog` через `rich.Text` с авто-скроллом.
+- [x] после завершения — финализируем сообщение, добавляем в историю.
+- [x] состояния: `[idle]` → `[sending]` (блокируем input, показываем "...") → `[streaming]` → `[idle]`.
 
 ### шаг 5: полировка
 
