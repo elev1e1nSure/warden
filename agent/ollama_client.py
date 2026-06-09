@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import time
 from typing import Optional
@@ -9,6 +10,7 @@ class OllamaClient:
 	def __init__(self, model: str = "qwen3:8b") -> None:
 		self.model = model
 		self._process: Optional[subprocess.Popen] = None
+		self._we_started = False
 
 	def is_running(self) -> bool:
 		try:
@@ -34,25 +36,41 @@ class OllamaClient:
 				stdout=subprocess.DEVNULL,
 				stderr=subprocess.DEVNULL,
 			)
+		self._we_started = True
 
-	def wait_for_ready(self, timeout: int = 30) -> bool:
+	async def wait_for_ready(self, timeout: int = 30) -> bool:
 		deadline = time.time() + timeout
 		while time.time() < deadline:
 			try:
 				ollama.list()
 				return True
 			except Exception:
-				time.sleep(0.5)
+				await asyncio.sleep(0.5)
 		return False
 
-	def ensure_running(self) -> bool:
+	async def ensure_running(self) -> bool:
 		if self.is_running():
 			return True
 		self.start()
-		return self.wait_for_ready()
+		return await self.wait_for_ready()
+
+	def has_model(self) -> bool:
+		try:
+			models = ollama.list()
+			names = [m.get("model", "") for m in models.get("models", [])]
+			return self.model in names
+		except Exception:
+			return False
+
+	def _pull_sync(self) -> None:
+		ollama.pull(self.model)
+
+	async def pull_model(self) -> None:
+		loop = asyncio.get_event_loop()
+		await loop.run_in_executor(None, self._pull_sync)
 
 	def shutdown(self) -> None:
-		if self._process is not None:
+		if self._we_started and self._process is not None:
 			self._process.terminate()
 			try:
 				self._process.wait(timeout=5)

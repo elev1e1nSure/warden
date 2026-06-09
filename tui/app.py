@@ -1,12 +1,14 @@
 from textual.app import App, ComposeResult
-from textual.containers import Vertical
-from textual.widgets import Input, RichLog, Footer, Static
+from textual.widgets import Input, RichLog, Footer
 
 from agent.ollama_client import OllamaClient
 
 
 class WardenApp(App):
 	CSS_PATH = "theme.css"
+	BINDINGS = [
+		("escape", "clear_input", "очистить"),
+	]
 
 	def __init__(self, model: str, auto_ollama: bool) -> None:
 		super().__init__()
@@ -24,13 +26,24 @@ class WardenApp(App):
 		log.write("[bold cyan]warden[/bold cyan] — готов к работе")
 		if self.auto_ollama:
 			log.write("[dim]проверка ollama...[/dim]")
-			ok = self.ollama.ensure_running()
+			ok = await self.ollama.ensure_running()
 			if ok:
 				log.write(f"[dim]ollama подключена, модель: {self.model}[/dim]")
+				if not self.ollama.has_model():
+					log.write(f"[yellow]модель {self.model} не найдена, скачиваем...[/yellow]")
+					await self.ollama.pull_model()
+					log.write(f"[dim]модель {self.model} готова[/dim]")
 			else:
 				log.write("[red]ошибка: не удалось подключить ollama[/red]")
 		else:
 			log.write("[dim]auto-ollama отключен[/dim]")
+
+	async def on_unmount(self) -> None:
+		self.ollama.shutdown()
+
+	def action_clear_input(self) -> None:
+		inp = self.query_one("#input", Input)
+		inp.value = ""
 
 	async def on_input_submitted(self, event: Input.Submitted) -> None:
 		if not event.value.strip():
