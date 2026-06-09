@@ -25,6 +25,7 @@ func initialModel() model {
 	ti.Placeholder = "prompt..."
 	ti.CharLimit = 0
 	ti.Width = 80
+	ti.Focus()
 
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
@@ -41,7 +42,6 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		textinput.Blink,
 		m.checkBackend(),
-		m.textinput.Focus(),
 	)
 }
 
