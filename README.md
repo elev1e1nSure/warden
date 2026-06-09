@@ -8,7 +8,7 @@
 
 | слой | технология |
 |---|---|
-| tui | python + textual |
+| tui | go + bubbletea |
 | llm | ollama (qwen2.5:7b или qwen3:8b) |
 | computer use | pyautogui, pillow (скрины) |
 | браузер | playwright |
@@ -22,20 +22,18 @@
 ```
 пользователь
     ↓ промт
-tui (textual)
+tui (bubbletea)          ← go, только рендер
+    ↓ http
+backend (aiohttp)        ← python, llm + тулзы
     ↓
-agent loop
-    ↓
-llm (ollama) ← system prompt + история + тулзы
-    ↓
-tool dispatcher
+ollama
     ↓
 [screenshot] [mouse/keyboard] [browser] [terminal] [filesystem]
     ↓
-результат → стриминг обратно в tui
+результат → стриминг токенов → tui
 ```
 
-агент работает в петле: получает задачу → думает → вызывает тул → смотрит результат → думает ещё → отвечает.
+tui и backend общаются по http: ndjson стрим. tui не знает про ollama, backend не знает про ui.
 
 ---
 
@@ -43,14 +41,17 @@ tool dispatcher
 
 ```
 warden/
-├── main.py              # точка входа
-├── requirements.txt     # зависимости
-├── tui/
-│   ├── app.py           # textual app
-│   └── theme.css        # стили
+├── go/
+│   ├── go.mod           # модули go
+│   ├── main.go          # точка входа
+│   ├── model.go         # bubbletea model
+│   ├── client.go        # http клиент к бэкенду
+│   └── styles.go        # lipgloss стили
 ├── agent/
+│   ├── server.py        # aiohttp бэкенд
 │   ├── ollama_client.py # подключение к ollama
 │   └── chat.py          # сессия и стриминг
+├── requirements.txt     # python зависимости
 ├── CLAUDE.md            # инструкции для claude code
 ├── AGENTS.md            # инструкции для агентов
 └── README.md            # этот файл
@@ -187,31 +188,22 @@ warden: задача выполнена.       ← cyan, финальный от
 
 ## роадмап
 
-### mvp scope
+### mvp v2 — go tui + python backend (в работе)
 
-**входит в mvp:**
-- [x] textual tui: поле ввода внизу, лог сверху, стриминг ответа
-- [x] подключение к ollama, стриминг токенов
-- [x] одна петля: промт → llm → ответ
-- [ ] тул: screenshot (скрин + описание что видит)
-- [ ] тул: run_command (запуск команды в терминале)
-- [ ] тул: type_text / move_click (базовое управление мышью/клавой)
-- [x] история диалога в рамках сессии
-- [x] красивый вывод: стриминг, выделение жирным, цвета без вырвиглаза
+- [x] go tui: bubbletea, лог + input, стриминг, цвета
+- [x] python backend: aiohttp, ndjson стрим, ollama, chat
+- [x] протокол: http ndjson между go и python
+- [ ] тул: screenshot
+- [ ] тул: run_command
+- [ ] тул: type_text / move_click
 
-**не входит в mvp:**
-- браузер (playwright) — следующий этап
-- файловый менеджер ui
-- сохранение истории между сессиями
-- несколько агентов / мультитаскинг
+### mvp v1 — чат + tui + ollama (готово, python)
 
-### mvp v1 — чат + tui + ollama (готово)
-
-- [x] скелет проекта: `main.py`, `tui/app.py`, `theme.css`, `agent/ollama_client.py`, `requirements.txt`
-- [x] базовый tui: `RichLog` + `Input` + `Footer`, без рамок и панелей
-- [x] автоподнятие и закрытие ollama: проверка, `Popen`, пинг 30с, pull модели, cleanup
-- [x] чат с llm: `ChatSession` с историей, стриминг токенов, блокировка input
-- [x] полировка: timestamp, разделение сообщений, цвета, авто-скролл
+- [x] скелет проекта
+- [x] базовый tui
+- [x] автоподнятие и закрытие ollama
+- [x] чат с llm
+- [x] полировка
 
 ---
 
