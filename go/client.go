@@ -53,7 +53,15 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode != 200 {
+			ch <- tokenMsg{text: "\nserver error: " + resp.Status}
+			ch <- doneMsg{}
+			return
+		}
+
 		scanner := bufio.NewScanner(resp.Body)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			var base struct{ Type string `json:"type"` }
