@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -12,14 +13,22 @@ import (
 )
 
 type model struct {
-	viewport  viewport.Model
-	textinput textinput.Model
-	client    *Client
-	messages  []string
-	streaming bool
-	height    int
-	loading   bool
-	spinner   int
+	viewport   viewport.Model
+	textinput  textinput.Model
+	client     *Client
+	messages   []string
+	streaming  bool
+	height     int
+	width      int
+	loading    bool
+	spinner    int
+	thinkBuf   string
+	thinkDone  bool
+	wardenTS   string
+	// confirmation
+	confirming bool
+	confirmID  string
+	confirmCh  <-chan tea.Msg
 }
 
 func initialModel() model {
@@ -51,8 +60,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
+		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 3
+		m.viewport.Height = msg.Height - 4
 		m.textinput.Width = msg.Width
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
@@ -62,8 +72,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			return m, tea.Quit
 		case tea.KeyEsc:
+			if m.confirming {
+				// отмена подтверждения
+				m.confirming = false
+				ch := m.confirmCh
+				id := m.confirmID
+				m.confirmID = ""
+				m.confirmCh = nil
+				m.textinput.Placeholder = "prompt..."
+				m.textinput.Reset()
+				return m, tea.Batch(
+					m.sendConfirm(id, false),
+					readNext(ch),
+				)
+			}
 			m.textinput.Reset()
 		case tea.KeyEnter:
+			if m.confirming {
+				val := strings.TrimSpace(m.textinput.Value())
+				ok := val == "y" || val == "Y" || val == "yes"
+				ch := m.confirmCh
+				id := m.confirmID
+				m.confirming = false
+				m.confirmID = ""
+				m.confirmCh = nil
+				m.textinput.Placeholder = "prompt..."
+				m.textinput.Reset()
+				return m, tea.Batch(
+					m.sendConfirm(id, ok),
+					readNext(ch),
+				)
+			}
 			if m.streaming {
 				return m, nil
 			}
@@ -71,7 +110,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if text == "" {
 				return m, nil
 			}
-			m.messages = append(m.messages, UserStyle().Render("you")+"  "+text)
+			ts := DimStyle().Render(time.Now().Format("15:04"))
+			m.messages = append(m.messages, UserStyle().Render("you")+"  "+ts+"  "+text)
 			m.textinput.Reset()
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
@@ -79,36 +119,112 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			m.spinner = 0
 			return m, tea.Batch(m.sendMessage(text), m.tick())
+		}
 
-	case tokenMsg:
-		if m.streaming && len(m.messages) > 0 {
-			m.messages[len(m.messages)-1] += msg.text
+	case startStreamMsg:
+		cmds = append(cmds, readNext(msg.ch))
+
+	case nextMsg:
+		switch inner := msg.inner.(type) {
+		case wardenStartMsg:
+			m.wardenTS = time.Now().Format("15:04")
+			ts := DimStyle().Render(m.wardenTS)
+			m.thinkBuf = ""
+			m.thinkDone = false
+			m.messages = append(m.messages, WardenStyle().Render("warden")+"  "+ts+"  ")
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			cmds = append(cmds, readNext(msg.ch))
+		case thinkMsg:
+			m.thinkBuf += inner.text
+			ts := DimStyle().Render(m.wardenTS)
+			m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  " + m.thinkIndicator()
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			cmds = append(cmds, readNext(msg.ch))
+		case tokenMsg:
+			if !m.thinkDone {
+				ts := DimStyle().Render(m.wardenTS)
+				if m.thinkBuf != "" {
+					words := len(strings.Fields(m.thinkBuf))
+					m.messages[len(m.messages)-1] = DimStyle().Render(fmt.Sprintf("  думал %d слов", words))
+					m.messages = append(m.messages, WardenStyle().Render("warden")+"  "+ts+"  ")
+				} else {
+					m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  "
+				}
+				m.thinkDone = true
+				m.thinkBuf = ""
+			}
+			if len(m.messages) > 0 {
+				m.messages[len(m.messages)-1] += inner.text
+				m.viewport.SetContent(strings.Join(m.messages, "\n"))
+				m.viewport.GotoBottom()
+			}
+			cmds = append(cmds, readNext(msg.ch))
+		case toolStartMsg:
+			m.messages = append(m.messages,
+				ToolStyle().Render("▸ "+inner.name+" ")+DimStyle().Render(inner.args),
+				DimStyle().Render("  ..."),
+			)
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			cmds = append(cmds, readNext(msg.ch))
+		case toolMsg:
+			// заменяем "..." на результат
+			if len(m.messages) > 0 && m.messages[len(m.messages)-1] == DimStyle().Render("  ...") {
+				m.messages[len(m.messages)-1] = DimStyle().Render("  " + inner.tool.Result)
+			} else {
+				m.messages = append(m.messages, DimStyle().Render("  "+inner.tool.Result))
+			}
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			cmds = append(cmds, readNext(msg.ch))
+		case confirmMsg:
+			m.confirming = true
+			m.confirmID = inner.id
+			m.confirmCh = msg.ch
+			m.messages = append(m.messages,
+				ErrorStyle().Render("⚠ опасно")+"  "+ToolStyle().Render(inner.tool)+"  "+DimStyle().Render(inner.args),
+			)
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			m.textinput.Placeholder = "y / enter для отмены..."
+			m.textinput.Reset()
+		case doneMsg:
+			m.streaming = false
+			m.loading = false
+			m.thinkBuf = ""
+			m.thinkDone = false
+			m.messages = append(m.messages, "")
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 		}
 
 	case doneMsg:
-		m.streaming = false
-		m.loading = false
-		m.messages = append(m.messages, "")
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
-
-	case tea.TickMsg:
-		if m.loading {
-			m.spinner = (m.spinner + 1) % 4
-			return m, m.tick()
+		if m.streaming {
+			m.streaming = false
+			m.loading = false
+			m.thinkBuf = ""
+			m.thinkDone = false
+			m.messages = append(m.messages, "")
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
 		}
 
-	case toolMsg:
-		m.messages = append(m.messages,
-			ToolStyle().Render("▸ "+msg.tool.Name+" ")+DimStyle().Render(msg.tool.Args),
-			DimStyle().Render("  "+msg.tool.Result),
-		)
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+	case tickMsg:
+		if m.loading {
+			m.spinner = (m.spinner + 1) % 24
+			if !m.thinkDone && m.streaming && !m.confirming && len(m.messages) > 0 {
+				ts := DimStyle().Render(m.wardenTS)
+				m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  " + m.thinkIndicator()
+				m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			}
+			return m, m.tick()
+		}
+		return m, nil
 
 	case backendReadyMsg:
+		m.client.ResetSession()
 		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
@@ -132,34 +248,69 @@ func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
-	spinner := ""
-	if m.loading {
-		spinners := []string{"◐", "◑", "◒", "◓"}
-		spinner = KeyStyle().Render(spinners[m.spinner]) + " "
+
+	var footer string
+	if m.confirming {
+		footer = KeyStyle().Render("[Y Enter]") +
+			DimStyle().Render(" подтвердить  ") +
+			KeyStyle().Render("[Esc]") +
+			DimStyle().Render(" отменить")
+	} else {
+		footer = KeyStyle().Render("[Enter]") +
+			DimStyle().Render(" отправить  ") +
+			KeyStyle().Render("[Esc]") +
+			DimStyle().Render(" очистить  ") +
+			KeyStyle().Render("[Ctrl+C]") +
+			DimStyle().Render(" выйти")
 	}
-	footer := DimStyle().Render("Press ") +
-		KeyStyle().Render("[Enter]") +
-		DimStyle().Render(" to send, ") +
-		KeyStyle().Render("[Esc]") +
-		DimStyle().Render(" to clear, ") +
-		KeyStyle().Render("[Ctrl+C]") +
-		DimStyle().Render(" to quit")
-	separator := DimStyle().Render(strings.Repeat("—", m.width))
+
+	var scrollTag string
+	if m.viewport.TotalLineCount() > m.viewport.Height {
+		pct := int(m.viewport.ScrollPercent() * 100)
+		if m.viewport.AtBottom() {
+			scrollTag = " конец "
+		} else {
+			scrollTag = fmt.Sprintf(" %d%% ", pct)
+		}
+	}
+	sepWidth := m.width - len(scrollTag)
+	if sepWidth < 0 {
+		sepWidth = 0
+	}
+	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
+	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.viewport.View(),
-		"",
-		separator,
-		spinner+m.textinput.View(),
+		sep1,
+		m.textinput.View(),
+		sep2,
 		footer,
 	)
 }
 
-// messages
+// message types
 type tokenMsg struct{ text string }
+type thinkMsg struct{ text string }
 type toolMsg struct{ tool ToolMsg }
+type toolStartMsg struct {
+	name string
+	args string
+}
+type wardenStartMsg struct{ ch <-chan tea.Msg }
+type confirmMsg struct {
+	id   string
+	tool string
+	args string
+}
 type doneMsg struct{}
 type backendReadyMsg struct{}
 type backendErrorMsg struct{}
+type tickMsg struct{}
+type startStreamMsg struct{ ch <-chan tea.Msg }
+type nextMsg struct {
+	inner tea.Msg
+	ch    <-chan tea.Msg
+}
 
 func (m model) checkBackend() tea.Cmd {
 	return func() tea.Msg {
@@ -172,25 +323,43 @@ func (m model) checkBackend() tea.Cmd {
 }
 
 func (m model) sendMessage(text string) tea.Cmd {
-	m.messages = append(m.messages, WardenStyle().Render("warden")+"  ")
-	m.viewport.SetContent(strings.Join(m.messages, "\n"))
-	m.viewport.GotoBottom()
-	m.streaming = true
-
 	ch := m.client.SendMessage(text)
-	var cmds []tea.Cmd
-	for msg := range ch {
-		cmds = append(cmds, func(msg tea.Msg) tea.Cmd {
-			return func() tea.Msg { return msg }
-		}(msg))
+	return func() tea.Msg {
+		return startStreamMsg{ch: ch}
 	}
-	cmds = append(cmds, func() tea.Msg { return doneMsg{} })
+}
 
-	return tea.Sequence(cmds...)
+func (m model) sendConfirm(id string, ok bool) tea.Cmd {
+	return func() tea.Msg {
+		m.client.SendConfirm(id, ok)
+		return noopMsg{}
+	}
+}
+
+type noopMsg struct{}
+
+func readNext(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		inner, ok := <-ch
+		if !ok {
+			return doneMsg{}
+		}
+		return nextMsg{inner: inner, ch: ch}
+	}
 }
 
 func (m model) tick() tea.Cmd {
 	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
-		return tea.TickMsg(t)
+		return tickMsg{}
 	})
+}
+
+func (m model) thinkIndicator() string {
+	dots := []string{".", "..", "..."}
+	dot := dots[(m.spinner/2)%3]
+	if m.thinkBuf == "" {
+		return DimStyle().Render(dot)
+	}
+	words := len(strings.Fields(m.thinkBuf))
+	return DimStyle().Render(fmt.Sprintf("%s  %d сл", dot, words))
 }
