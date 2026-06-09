@@ -41,6 +41,7 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		textinput.Blink,
 		m.checkBackend(),
+		m.textinput.Focus(),
 	)
 }
 
