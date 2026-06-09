@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type Message struct {
