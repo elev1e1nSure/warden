@@ -25,6 +25,8 @@ type model struct {
 	thinkBuf   string
 	thinkDone  bool
 	wardenTS   string
+	// tool execution
+	toolRunning bool
 	// confirmation
 	confirming bool
 	confirmID  string
@@ -110,8 +112,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if text == "" {
 				return m, nil
 			}
-			ts := DimStyle().Render(time.Now().Format("15:04"))
-			m.messages = append(m.messages, UserStyle().Render("you")+"  "+ts+"  "+text)
+			ts := DimStyle().Render("[" + time.Now().Format("15:04") + "]")
+			m.messages = append(m.messages, ts+"  "+UserStyle().Render("you:")+"  "+text)
 			m.textinput.Reset()
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
@@ -128,46 +130,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch inner := msg.inner.(type) {
 		case wardenStartMsg:
 			m.wardenTS = time.Now().Format("15:04")
-			ts := DimStyle().Render(m.wardenTS)
+			ts := DimStyle().Render("[" + m.wardenTS + "]")
 			m.thinkBuf = ""
 			m.thinkDone = false
-			m.messages = append(m.messages, WardenStyle().Render("warden")+"  "+ts+"  ")
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			m.toolRunning = false
+			m.messages = append(m.messages, ts+"  "+WardenStyle().Render("warden:")+"  ")
+			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 		case thinkMsg:
 			m.thinkBuf += inner.text
-			ts := DimStyle().Render(m.wardenTS)
-			m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  " + m.thinkIndicator()
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			ts := DimStyle().Render("[" + m.wardenTS + "]")
+			m.messages[len(m.messages)-1] = ts + "  " + WardenStyle().Render("warden:") + "  " + m.thinkIndicator()
+			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 		case tokenMsg:
 			if !m.thinkDone {
-				ts := DimStyle().Render(m.wardenTS)
+				ts := DimStyle().Render("[" + m.wardenTS + "]")
 				if m.thinkBuf != "" {
 					words := len(strings.Fields(m.thinkBuf))
 					m.messages[len(m.messages)-1] = DimStyle().Render(fmt.Sprintf("  думал %d слов", words))
-					m.messages = append(m.messages, WardenStyle().Render("warden")+"  "+ts+"  ")
+					m.messages = append(m.messages, ts+"  "+WardenStyle().Render("warden:")+"  ")
 				} else {
-					m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  "
+					m.messages[len(m.messages)-1] = ts + "  " + WardenStyle().Render("warden:") + "  "
 				}
 				m.thinkDone = true
 				m.thinkBuf = ""
 			}
 			if len(m.messages) > 0 {
 				m.messages[len(m.messages)-1] += inner.text
-				m.viewport.SetContent(strings.Join(m.messages, "\n"))
-				m.viewport.GotoBottom()
+				m.viewport = setContent(m.viewport, m.messages)
 			}
 			cmds = append(cmds, readNext(msg.ch))
 		case toolStartMsg:
+			m.toolRunning = true
 			m.messages = append(m.messages,
 				ToolStyle().Render("▸ "+inner.name+" ")+DimStyle().Render(inner.args),
 				DimStyle().Render("  ..."),
 			)
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 		case toolMsg:
 			// заменяем "..." на результат
@@ -176,8 +176,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.messages = append(m.messages, DimStyle().Render("  "+inner.tool.Result))
 			}
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 		case confirmMsg:
 			m.confirming = true
@@ -196,8 +195,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.messages = append(m.messages, "")
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			m.viewport = setContent(m.viewport, m.messages)
 		}
 
 	case doneMsg:
@@ -207,16 +205,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.messages = append(m.messages, "")
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
+			m.viewport = setContent(m.viewport, m.messages)
 		}
 
 	case tickMsg:
 		if m.loading {
 			m.spinner = (m.spinner + 1) % 24
-			if !m.thinkDone && m.streaming && !m.confirming && len(m.messages) > 0 {
-				ts := DimStyle().Render(m.wardenTS)
-				m.messages[len(m.messages)-1] = WardenStyle().Render("warden") + "  " + ts + "  " + m.thinkIndicator()
+			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
+				ts := DimStyle().Render("[" + m.wardenTS + "]")
+				m.messages[len(m.messages)-1] = ts + "  " + WardenStyle().Render("warden:") + "  " + m.thinkIndicator()
 				m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			}
 			return m, m.tick()
@@ -225,7 +222,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case backendReadyMsg:
 		m.client.ResetSession()
-		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
+		m.messages = append(m.messages, WardenStyle().Render("warden:")+"  ready")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 
@@ -252,16 +249,16 @@ func (m model) View() string {
 	var footer string
 	if m.confirming {
 		footer = KeyStyle().Render("[Y Enter]") +
-			DimStyle().Render(" подтвердить  ") +
+			DimStyle().Render(" Подтвердить  ") +
 			KeyStyle().Render("[Esc]") +
-			DimStyle().Render(" отменить")
+			DimStyle().Render(" Отменить")
 	} else {
 		footer = KeyStyle().Render("[Enter]") +
-			DimStyle().Render(" отправить  ") +
+			DimStyle().Render(" Отправить  ") +
 			KeyStyle().Render("[Esc]") +
-			DimStyle().Render(" очистить  ") +
+			DimStyle().Render(" Очистить  ") +
 			KeyStyle().Render("[Ctrl+C]") +
-			DimStyle().Render(" выйти")
+			DimStyle().Render(" Выйти")
 	}
 
 	var scrollTag string
@@ -337,6 +334,16 @@ func (m model) sendConfirm(id string, ok bool) tea.Cmd {
 }
 
 type noopMsg struct{}
+
+// setContent обновляет viewport и скроллит вниз только если пользователь уже был внизу.
+func setContent(vp viewport.Model, lines []string) viewport.Model {
+	atBottom := vp.AtBottom()
+	vp.SetContent(strings.Join(lines, "\n"))
+	if atBottom {
+		vp.GotoBottom()
+	}
+	return vp
+}
 
 func readNext(ch <-chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
