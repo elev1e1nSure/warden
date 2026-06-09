@@ -109,7 +109,7 @@ func (m model) ts() string {
 
 // wardenLine строит строку-хедер warden с опциональным суффиксом.
 func (m model) wardenLine(suffix string) string {
-	return m.ts() + "  " + WardenStyle().Render("warden") + "  " + suffix
+	return m.ts() + "  " + WardenStyle().Render("warden:") + "  " + suffix
 }
 
 // finalizeThink возвращает строку-итог думания (пустую если не думал).
@@ -190,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 			ts := DimStyle().Render("[" + time.Now().Format("15:04") + "]")
-			m.messages = append(m.messages, ts+"  "+UserStyle().Render("you")+"  "+text)
+			m.messages = append(m.messages, ts+"  "+UserStyle().Render("you:")+"  "+text)
 			m.textinput.Reset()
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
