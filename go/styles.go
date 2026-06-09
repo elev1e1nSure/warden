@@ -3,12 +3,13 @@ package main
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Cyan   = lipgloss.Color("#00ffff")
+	Cyan   = lipgloss.Color("#3CBE71")
 	Yellow = lipgloss.Color("#ffcc00")
 	Red    = lipgloss.Color("#ff4444")
 	Dim    = lipgloss.Color("#666666")
 	White  = lipgloss.Color("#ffffff")
 	Bg     = lipgloss.Color("#0d0d0d")
+	Blue   = lipgloss.Color("#4488ff")
 )
 
 func WardenStyle() lipgloss.Style {
@@ -33,4 +34,16 @@ func ToolStyle() lipgloss.Style {
 
 func KeyStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Yellow).Bold(true)
+}
+
+func AutoStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Red).Background(lipgloss.Color("#330000")).Bold(true)
+}
+
+func SafeStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Blue).Background(lipgloss.Color("#001133")).Bold(true)
+}
+
+func StatusStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Dim)
 }

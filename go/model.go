@@ -35,6 +35,8 @@ type model struct {
 	autoMode    bool
 	hintVisible bool
 	hintCount   int
+	// status
+	modelInfo string
 }
 
 func initialModel() model {
@@ -53,6 +55,7 @@ func initialModel() model {
 		viewport:  vp,
 		client:    NewClient("http://localhost:8765"),
 		messages:  []string{},
+		modelInfo: "qwen3:8b",
 	}
 }
 
@@ -356,10 +359,14 @@ func (m model) View() string {
 		return ""
 	}
 
-	var modeTag string
+	// статус бар
+	var modeBadge string
 	if m.autoMode {
-		modeTag = "  " + ToolStyle().Render("[Auto]")
+		modeBadge = AutoStyle().Render(" AUTO ")
+	} else {
+		modeBadge = SafeStyle().Render(" SAFE ")
 	}
+	statusBar := StatusStyle().Render(" " + m.modelInfo + " ") + " " + modeBadge
 
 	var footer string
 	if m.confirming {
@@ -373,8 +380,7 @@ func (m model) View() string {
 			KeyStyle().Render("[Esc]") +
 			DimStyle().Render(" Очистить  ") +
 			KeyStyle().Render("[Ctrl+C]") +
-			DimStyle().Render(" Выйти") +
-			modeTag
+			DimStyle().Render(" Выйти")
 	}
 
 	var scrollTag string
@@ -396,7 +402,7 @@ func (m model) View() string {
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
-	layers = append(layers, m.textinput.View(), sep2, footer)
+	layers = append(layers, m.textinput.View(), sep2, statusBar, footer)
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 
