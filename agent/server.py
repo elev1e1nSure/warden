@@ -21,7 +21,7 @@ class Backend:
 	async def setup(self) -> None:
 		ok = await self.ollama.ensure_running()
 		if not ok:
-			raise RuntimeError("не удалось подключить ollama")
+			raise RuntimeError("failed to connect to ollama")
 		if not self.ollama.has_model():
 			await self.ollama.pull_model()
 
@@ -68,7 +68,7 @@ async def main() -> None:
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)
 	await site.start()
-	print("бэкенд на http://localhost:8765")
+	print("backend on http://localhost:8765")
 	await asyncio.Event().wait()
 
 

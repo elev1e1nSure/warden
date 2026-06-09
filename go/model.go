@@ -22,7 +22,7 @@ type model struct {
 
 func initialModel() model {
 	ta := textarea.New()
-	ta.Placeholder = "promt..."
+	ta.Placeholder = "prompt..."
 	ta.ShowLineNumbers = false
 	ta.Prompt = ""
 	ta.CharLimit = 0
@@ -107,12 +107,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamCh = nil
 
 	case backendReadyMsg:
-		m.messages = append(m.messages, WardenStyle().Render("warden")+"  готов к работе")
+		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 
 	case backendErrorMsg:
-		m.messages = append(m.messages, ErrorStyle().Render("ошибка: бэкенд недоступен"))
+		m.messages = append(m.messages, ErrorStyle().Render("error: backend unavailable"))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 	}
@@ -130,7 +130,7 @@ func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
-	footer := DimStyle().Render("enter — отправить  esc — очистить  ctrl+c — выход")
+	footer := DimStyle().Render("enter — send  esc — clear  ctrl+c — quit")
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.viewport.View(),
 		"",

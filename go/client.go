@@ -46,7 +46,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 
 		resp, err := http.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
 		if err != nil {
-			ch <- tokenMsg{text: "\nошибка сети: " + err.Error()}
+			ch <- tokenMsg{text: "\nnetwork error: " + err.Error()}
 			ch <- doneMsg{}
 			return
 		}
