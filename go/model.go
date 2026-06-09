@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -18,7 +17,6 @@ type model struct {
 	messages  []string
 	streaming bool
 	height    int
-	streamCh  chan tea.Msg
 }
 
 func initialModel() model {
@@ -86,14 +84,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 		}
-		return m, m.readNextMsg()
 
 	case doneMsg:
 		m.streaming = false
 		m.messages = append(m.messages, "")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
-		m.streamCh = nil
 
 	case toolMsg:
 		m.messages = append(m.messages,
@@ -102,7 +98,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
-		return m, m.readNextMsg()
 
 	case backendReadyMsg:
 		m.messages = append(m.messages, WardenStyle().Render("warden")+"  ready")
@@ -159,44 +154,15 @@ func (m model) sendMessage(text string) tea.Cmd {
 	m.viewport.SetContent(strings.Join(m.messages, "\n"))
 	m.viewport.GotoBottom()
 	m.streaming = true
-	m.streamCh = make(chan tea.Msg, 64)
 
-	go func() {
-		ch := m.client.SendMessage(text)
-		for msg := range ch {
-			m.streamCh <- msg
-		}
-		close(m.streamCh)
-	}()
+	ch := m.client.SendMessage(text)
+	var cmds []tea.Cmd
+	for msg := range ch {
+		cmds = append(cmds, func(msg tea.Msg) tea.Cmd {
+			return func() tea.Msg { return msg }
+		}(msg))
+	}
+	cmds = append(cmds, func() tea.Msg { return doneMsg{} })
 
-	return func() tea.Msg {
-		select {
-		case msg, ok := <-m.streamCh:
-			if !ok {
-				return doneMsg{}
-			}
-			return msg
-		default:
-			return nil
-		}
-	}
-}
-
-func (m model) readNextMsg() tea.Cmd {
-	if m.streamCh == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		for {
-			select {
-			case msg, ok := <-m.streamCh:
-				if !ok {
-					return doneMsg{}
-				}
-				return msg
-			default:
-				time.Sleep(50 * time.Millisecond)
-			}
-		}
-	}
+	return tea.Sequence(cmds...)
 }
