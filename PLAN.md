@@ -136,14 +136,14 @@ warden/
 - [x] `Footer` — статус ollama, имя модели, подсказки клавиш.
 - [x] никаких рамок, панелей, кнопок — только текст + цвет.
 
-### шаг 3: автоподнятие и закрытие ollama
+### ~~шаг 3: автоподнятие и закрытие ollama~~
 
-- [ ] при старте: `ollama_client.check()` — subprocess `ollama list`, таймаут 5 сек.
-- [ ] если не отвечает: `subprocess.Popen(["ollama", "serve"], creationflags=CREATE_NEW_PROCESS_GROUP)` (win) или `start_new_session=True` (unix).
-- [ ] пинг в цикле: `ollama.list()`, таймаут 30 сек, прогресс в Footer.
-- [ ] если не поднялось — ошибка в RichLog, exit(1).
-- [ ] если модели нет — `ollama.pull(model)` с индикатором.
-- [ ] при выходе (`ctrl+c` / закрытие) — убивать запущенный `ollama serve` (только если мы сами подняли).
+- [x] при старте: `ollama_client.check()` — subprocess `ollama list`, таймаут 5 сек.
+- [x] если не отвечает: `subprocess.Popen(["ollama", "serve"], creationflags=CREATE_NEW_PROCESS_GROUP)` (win) или `start_new_session=True` (unix).
+- [x] пинг в цикле: `ollama.list()`, таймаут 30 сек, прогресс в Footer.
+- [x] если не поднялось — ошибка в RichLog, exit(1).
+- [x] если модели нет — `ollama.pull(model)` с индикатором.
+- [x] при выходе (`ctrl+c` / закрытие) — убивать запущенный `ollama serve` (только если мы сами подняли).
 
 ### шаг 4: чат с llm
 
