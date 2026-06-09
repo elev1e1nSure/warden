@@ -35,7 +35,7 @@ type model struct {
 
 func initialModel() model {
 	ti := textinput.New()
-	ti.Placeholder = "prompt..."
+	ti.Placeholder = ""
 	ti.CharLimit = 0
 	ti.Width = 80
 	ti.Focus()
