@@ -1,5 +1,4 @@
 from typing import Iterator, List, Dict, Any
-import sys
 
 import ollama
 
@@ -17,17 +16,10 @@ class ChatSession:
 
 	def stream(self, text: str) -> Iterator[str]:
 		self.add_user(text)
-		print(f"[chat] calling ollama with model={self.model}", file=sys.stderr)
-		print(f"[chat] messages={self.history}", file=sys.stderr)
 		full = ""
-		try:
-			for chunk in ollama.chat(model=self.model, messages=self.history, stream=True):
-				print(f"[chat] chunk={chunk}", file=sys.stderr)
-				msg = chunk.get("message", {})
-				token = msg.get("content", "") or msg.get("thinking", "")
-				full += token
-				yield token
-			self.add_assistant(full)
-		except Exception as e:
-			print(f"[chat] error: {e}", file=sys.stderr)
-			raise
+		for chunk in ollama.chat(model=self.model, messages=self.history, stream=True):
+			msg = chunk.get("message", {})
+			token = msg.get("content", "") or msg.get("thinking", "")
+			full += token
+			yield token
+		self.add_assistant(full)
