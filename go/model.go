@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,7 +12,7 @@ import (
 
 type model struct {
 	viewport  viewport.Model
-	textarea  textarea.Model
+	textinput textinput.Model
 	client    *Client
 	messages  []string
 	streaming bool
@@ -21,29 +21,25 @@ type model struct {
 }
 
 func initialModel() model {
-	ta := textarea.New()
-	ta.Placeholder = "prompt..."
-	ta.ShowLineNumbers = false
-	ta.Prompt = ""
-	ta.CharLimit = 0
-	ta.SetHeight(1)
-	ta.SetWidth(80)
-	ta.KeyMap.InsertNewline.SetEnabled(false)
+	ti := textinput.New()
+	ti.Placeholder = "prompt..."
+	ti.CharLimit = 0
+	ti.Width = 80
 
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
 
 	return model{
-		textarea: ta,
-		viewport: vp,
-		client:   NewClient("http://localhost:8765"),
-		messages: []string{},
+		textinput: ti,
+		viewport:  vp,
+		client:    NewClient("http://localhost:8765"),
+		messages:  []string{},
 	}
 }
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
-		textarea.Blink,
+		textinput.Blink,
 		m.checkBackend(),
 	)
 }
@@ -56,7 +52,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.viewport.Width = msg.Width
 		m.viewport.Height = msg.Height - 3
-		m.textarea.SetWidth(msg.Width)
+		m.textinput.Width = msg.Width
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 
@@ -65,17 +61,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			return m, tea.Quit
 		case tea.KeyEsc:
-			m.textarea.Reset()
+			m.textinput.Reset()
 		case tea.KeyEnter:
 			if m.streaming {
 				return m, nil
 			}
-			text := strings.TrimSpace(m.textarea.Value())
+			text := strings.TrimSpace(m.textinput.Value())
 			if text == "" {
 				return m, nil
 			}
 			m.messages = append(m.messages, UserStyle().Render("you")+"  "+text)
-			m.textarea.Reset()
+			m.textinput.Reset()
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 			m.streaming = true
@@ -118,7 +114,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.textarea, cmd = m.textarea.Update(msg)
+	m.textinput, cmd = m.textinput.Update(msg)
 	cmds = append(cmds, cmd)
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
@@ -134,7 +130,7 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.viewport.View(),
 		"",
-		m.textarea.View(),
+		m.textinput.View(),
 		footer,
 	)
 }
