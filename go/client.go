@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -62,22 +63,27 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)
 		scanner.Buffer(buf, 1024*1024)
+		fmt.Println("[client] starting to read stream")
 		for scanner.Scan() {
 			line := scanner.Bytes()
+			fmt.Printf("[client] got line: %s\n", string(line))
 			var base struct{ Type string `json:"type"` }
 			if err := json.Unmarshal(line, &base); err != nil {
+				fmt.Printf("[client] unmarshal error: %v\n", err)
 				continue
 			}
 			switch base.Type {
 			case "token":
 				var t TokenMsg
 				json.Unmarshal(line, &t)
+				fmt.Printf("[client] sending token: %s\n", t.Text)
 				ch <- tokenMsg{text: t.Text}
 			case "tool":
 				var t ToolMsg
 				json.Unmarshal(line, &t)
 				ch <- toolMsg{tool: t}
 			case "done":
+				fmt.Println("[client] got done")
 				ch <- doneMsg{}
 			case "error":
 				var e struct{ Text string `json:"text"` }
@@ -85,6 +91,9 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 				ch <- tokenMsg{text: e.Text}
 				ch <- doneMsg{}
 			}
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Printf("[client] scanner error: %v\n", err)
 		}
 	}()
 	return ch
