@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -17,6 +18,8 @@ type model struct {
 	messages  []string
 	streaming bool
 	height    int
+	loading   bool
+	spinner   int
 }
 
 func initialModel() model {
@@ -25,6 +28,7 @@ func initialModel() model {
 	ti.CharLimit = 0
 	ti.Width = 80
 	ti.Focus()
+	ti.BlinkSpeed = 0
 
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
@@ -38,10 +42,7 @@ func initialModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
-		textinput.Blink,
-		m.checkBackend(),
-	)
+	return m.checkBackend()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -75,8 +76,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 			m.streaming = true
-			return m, m.sendMessage(text)
-		}
+			m.loading = true
+			m.spinner = 0
+			return m, tea.Batch(m.sendMessage(text), m.tick())
 
 	case tokenMsg:
 		if m.streaming && len(m.messages) > 0 {
@@ -87,9 +89,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case doneMsg:
 		m.streaming = false
+		m.loading = false
 		m.messages = append(m.messages, "")
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
+
+	case tea.TickMsg:
+		if m.loading {
+			m.spinner = (m.spinner + 1) % 4
+			return m, m.tick()
+		}
 
 	case toolMsg:
 		m.messages = append(m.messages,
@@ -123,6 +132,11 @@ func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
+	spinner := ""
+	if m.loading {
+		spinners := []string{"◐", "◑", "◒", "◓"}
+		spinner = KeyStyle().Render(spinners[m.spinner]) + " "
+	}
 	footer := DimStyle().Render("Press ") +
 		KeyStyle().Render("[Enter]") +
 		DimStyle().Render(" to send, ") +
@@ -135,7 +149,7 @@ func (m model) View() string {
 		m.viewport.View(),
 		"",
 		separator,
-		m.textinput.View(),
+		spinner+m.textinput.View(),
 		footer,
 	)
 }
@@ -173,4 +187,10 @@ func (m model) sendMessage(text string) tea.Cmd {
 	cmds = append(cmds, func() tea.Msg { return doneMsg{} })
 
 	return tea.Sequence(cmds...)
+}
+
+func (m model) tick() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return tea.TickMsg(t)
+	})
 }
