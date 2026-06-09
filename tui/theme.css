@@ -1,0 +1,24 @@
+Screen {
+	background: #0d0d0d;
+}
+
+Input {
+	border: none;
+	background: transparent;
+	color: #ffffff;
+}
+
+Input:focus {
+	border: none;
+}
+
+RichLog {
+	background: transparent;
+	border: none;
+}
+
+Footer {
+	background: transparent;
+	border: none;
+	color: #666666;
+}
