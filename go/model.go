@@ -399,7 +399,7 @@ func (m model) View() string {
 	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
 
 	// выравнивание плашки режима справа
-	statusBar := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Right).Render(modeBadge)
+	statusBar = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Right).Render(modeBadge)
 
 	layers := []string{m.viewport.View(), sep1}
 	if m.hintVisible {
