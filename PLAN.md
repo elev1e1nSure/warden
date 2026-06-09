@@ -120,13 +120,13 @@ warden/
 
 ## план реализации mvp v1 — чат + tui + ollama
 
-### шаг 1: скелет проекта
+### ~~шаг 1: скелет проекта~~
 
-- [ ] создать `main.py` — точка входа, парсинг аргументов (`--model`, `--no-auto-ollama`).
-- [ ] создать `tui/app.py` — базовый ` textual.App`, подключить `theme.css`.
-- [ ] создать `tui/theme.css` — тёмная тема, кастомные цвета (cyan, yellow, red, dim).
-- [ ] создать `agent/ollama_client.py` — обёртка над `ollama` sdk: проверка, запуск, pull, chat.
-- [ ] `requirements.txt`: `textual`, `ollama`, `rich`.
+- [x] создать `main.py` — точка входа, парсинг аргументов (`--model`, `--no-auto-ollama`).
+- [x] создать `tui/app.py` — базовый ` textual.App`, подключить `theme.css`.
+- [x] создать `tui/theme.css` — тёмная тема, кастомные цвета (cyan, yellow, red, dim).
+- [x] создать `agent/ollama_client.py` — обёртка над `ollama` sdk: проверка, запуск, pull, chat.
+- [x] `requirements.txt`: `textual`, `ollama`, `rich`.
 
 ### шаг 2: базовый tui
 
