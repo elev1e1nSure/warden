@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from textual.app import App, ComposeResult
 from textual.widgets import Input, RichLog, Footer
@@ -51,18 +52,22 @@ class WardenApp(App):
 		inp = self.query_one("#input", Input)
 		inp.value = ""
 
+	def _ts(self) -> str:
+		return datetime.now().strftime("%H:%M")
+
 	async def _stream_response(self, prompt: str) -> None:
 		log = self.query_one("#log", RichLog)
 		inp = self.query_one("#input", Input)
 		self._streaming = True
 		inp.disabled = True
-		log.write("[bold cyan]warden >[/bold cyan] ", expand=False)
+		log.write(f"[bold cyan]warden[/bold cyan] [dim]{self._ts()}[/dim]  ", expand=False)
 		full = ""
 		try:
 			for token in self.chat.stream(prompt):
 				full += token
 				log.write(Text(token), scroll_end=True)
 				await asyncio.sleep(0)
+			log.write("")
 		except Exception as e:
 			log.write(f"\n[red]ошибка: {e}[/red]")
 		finally:
@@ -74,7 +79,7 @@ class WardenApp(App):
 		if not event.value.strip() or self._streaming:
 			return
 		log = self.query_one("#log", RichLog)
-		log.write(f"[bold]you >[/bold] {event.value}")
+		log.write(f"[bold]you[/bold] [dim]{self._ts()}[/dim]  {event.value}\n")
 		prompt = event.value
 		event.input.value = ""
 		asyncio.create_task(self._stream_response(prompt))

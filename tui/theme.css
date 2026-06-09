@@ -10,11 +10,20 @@ Input {
 
 Input:focus {
 	border: none;
+	border-bottom: solid cyan;
 }
 
 RichLog {
 	background: transparent;
 	border: none;
+}
+
+RichLog:focus {
+	border: none;
+}
+
+RichLog .scrollbar--vertical {
+	background: #333333;
 }
 
 Footer {
