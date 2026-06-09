@@ -88,7 +88,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 			fmt.Printf("[model] updated viewport, messages count=%d\n", len(m.messages))
 		}
-		return m, m.readStream()
+		return m, nil
 
 	case toolMsg:
 		m.messages = append(m.messages,
@@ -97,7 +97,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
-		return m, m.readStream()
+		return m, nil
 
 	case doneMsg:
 		m.streaming = false
