@@ -29,11 +29,17 @@ class WardenApp(App):
 		yield Footer()
 
 	async def on_mount(self) -> None:
+		inp = self.query_one("#input", Input)
+		inp.focus()
 		log = self.query_one("#log", RichLog)
 		log.write("[bold cyan]warden[/bold cyan] — готов к работе")
 		if self.auto_ollama:
 			log.write("[dim]проверка ollama...[/dim]")
-			ok = await self.ollama.ensure_running()
+			try:
+				ok = await self.ollama.ensure_running()
+			except FileNotFoundError:
+				log.write("[red]ошибка: ollama не установлена[/red]")
+				return
 			if ok:
 				log.write(f"[dim]ollama подключена, модель: {self.model}[/dim]")
 				if not self.ollama.has_model():

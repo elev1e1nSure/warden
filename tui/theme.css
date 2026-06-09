@@ -10,7 +10,7 @@ Input {
 
 Input:focus {
 	border: none;
-	border-bottom: solid cyan;
+	border-bottom: solid #666666;
 }
 
 RichLog {
