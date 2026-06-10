@@ -12,19 +12,18 @@ import (
 )
 
 type model struct {
-	viewport   viewport.Model
-	textinput  textinput.Model
-	client     *Client
-	messages   []messageEntry
-	streaming  bool
-	height     int
-	width      int
-	loading    bool
-	spinner    int
-	thinkBuf   string
-	thinkDone  bool
-	wardenTS   string
-	modelName  string
+	viewport  viewport.Model
+	textinput textinput.Model
+	client    *Client
+	messages  []messageEntry
+	streaming bool
+	height    int
+	width     int
+	loading   bool
+	spinner   int
+	thinkBuf  string
+	thinkDone bool
+	modelName string
 	// tool execution
 	toolRunning bool
 	// confirmation
@@ -40,7 +39,12 @@ type model struct {
 	thinkingEnabled  bool
 	thinkingExpanded bool
 	// path
-	cwd string
+	cwd          string
+	providerName string
+	// live tool activity line shown during streaming (replaces tool_start/pending in messages)
+	liveActivity string
+	// last raw assistant response (for /copy-last)
+	lastAssistantRaw string
 	// markdown
 	mdRenderer *glamour.TermRenderer
 	mdWidth    int
@@ -49,6 +53,7 @@ type model struct {
 func initialModel(modelName string) model {
 	ti := textinput.New()
 	ti.Placeholder = ""
+	ti.Prompt = "> "
 	ti.CharLimit = 0
 	ti.Width = 80
 	ti.Focus()
@@ -82,7 +87,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		m.textinput.Width = msg.Width
+		m.textinput.Width = msg.Width - 6
 		m.updateViewportHeight()
 		m.syncViewport()
 
@@ -154,8 +159,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.Reset()
 				return m, cmd
 			}
-			ts := DimStyle().Render("[" + time.Now().Format("15:04") + "]")
-			m.appendText(ts + "  " + UserStyle().Render("You:") + "  " + text)
+			m.appendText(DimStyle().Render("  > ") + text)
+			m.appendText("")
 			m.textinput.Reset()
 			m.streaming = true
 			m.loading = true
@@ -170,10 +175,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case nextMsg:
 		switch inner := msg.inner.(type) {
 		case wardenStartMsg:
-			m.wardenTS = time.Now().Format("15:04")
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.toolRunning = false
+			m.liveActivity = ""
+			m.lastAssistantRaw = ""
 			m.appendThink()
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -187,10 +193,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tokenMsg:
 			if !m.thinkDone {
 				m.finishThink()
-				m.appendAssistant(m.wardenLine(""))
+				m.appendAssistant("")
 				m.thinkDone = true
 			}
 			m.appendToLastAssistant(inner.text)
+			m.lastAssistantRaw += inner.text
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
@@ -199,28 +206,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.thinkDone && len(m.messages) > 0 {
 				m.finishThink()
 			}
-			m.appendText(
-				toolStartLine(inner.name, inner.args),
-			)
-			m.appendText(toolPendingLine())
+			m.liveActivity = toolStartLine(inner.name, inner.args)
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case toolMsg:
 			m.toolRunning = false
-			sticky := stickyTool(inner.tool.Name)
-			if len(m.messages) > 0 && m.messages[len(m.messages)-1].text == toolPendingLine() {
-				if sticky {
-					m.messages[len(m.messages)-1].text = toolResultBlock(inner.tool.Result)
-				} else {
-					m.messages = m.messages[:len(m.messages)-1]
-					if len(m.messages) > 0 {
-						m.messages[len(m.messages)-1].text = toolSummaryLine(inner.tool.Name, inner.tool.Result)
-					} else {
-						m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Result))
-					}
-				}
-			} else if sticky {
+			m.liveActivity = ""
+			if stickyTool(inner.tool.Name) {
 				m.appendText(toolResultBlock(inner.tool.Result))
 			} else {
 				m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Result))
@@ -241,6 +234,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
+			m.liveActivity = ""
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
@@ -253,6 +247,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
+			m.liveActivity = ""
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
@@ -262,7 +257,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		if m.loading {
-			m.spinner = (m.spinner + 1) % 24
+			m.spinner += m.advance()
+			m.spinner %= 24
 			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
 				m.syncViewport()
 			}
@@ -279,9 +275,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.appendText(DimStyle().Render("  Mode: " + label))
 		m.syncViewport()
 
+	case statusResultMsg:
+		var line string
+		if msg.brief {
+			line = msg.provider + " · " + msg.model
+		} else {
+			thinkStr := "off"
+			if msg.thinking {
+				thinkStr = "on"
+			}
+			line = "model: " + msg.model + "  provider: " + msg.provider + "  mode: " + msg.mode + "  thinking: " + thinkStr + "  cwd: " + msg.cwd
+		}
+		
+		m.appendText(m.wardenLine(DimStyle().Render(line)))
+		m.syncViewport()
+
+	case toolsResultMsg:
+		
+		m.appendText(m.wardenLine(DimStyle().Render(strings.Join(msg.tools, "  "))))
+		m.syncViewport()
+
+	case clipboardDoneMsg:
+		
+		if msg.err != nil {
+			m.appendText(m.wardenLine(ErrorStyle().Render("clipboard error: " + msg.err.Error())))
+		} else {
+			m.appendText(m.wardenLine(DimStyle().Render("copied")))
+		}
+		m.syncViewport()
+
+	case providerInitMsg:
+		m.providerName = msg.provider
+
 	case backendReadyMsg:
 		m.client.ResetSession()
 		m.syncViewport()
+		cmds = append(cmds, m.initProvider())
 
 	case backendErrorMsg:
 		m.appendText(ErrorStyle().Render("Error: backend unavailable"))
@@ -343,6 +372,17 @@ type nextMsg struct {
 	inner tea.Msg
 	ch    <-chan tea.Msg
 }
+type statusResultMsg struct {
+	model    string
+	provider string
+	mode     string
+	thinking bool
+	cwd      string
+	brief    bool
+}
+type toolsResultMsg struct{ tools []string }
+type clipboardDoneMsg struct{ err error }
+type providerInitMsg struct{ provider string }
 
 type messageKind int
 

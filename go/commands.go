@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -57,6 +60,54 @@ func readNext(ch <-chan tea.Msg) tea.Cmd {
 	}
 }
 
+func (m model) initProvider() tea.Cmd {
+	return func() tea.Msg {
+		s, err := m.client.GetStatus()
+		if err != nil {
+			return providerInitMsg{provider: "ollama"}
+		}
+		return providerInitMsg{provider: s.Provider}
+	}
+}
+
+func (m model) fetchStatus(brief bool) tea.Cmd {
+	return func() tea.Msg {
+		s, err := m.client.GetStatus()
+		if err != nil {
+			return statusResultMsg{model: "error: " + err.Error(), brief: brief}
+		}
+		return statusResultMsg{
+			model:    s.Model,
+			provider: s.Provider,
+			mode:     s.Mode,
+			thinking: s.Thinking,
+			cwd:      s.CWD,
+			brief:    brief,
+		}
+	}
+}
+
+func (m model) fetchTools() tea.Cmd {
+	return func() tea.Msg {
+		tools, err := m.client.GetTools()
+		if err != nil {
+			return toolsResultMsg{tools: []string{"error: " + err.Error()}}
+		}
+		return toolsResultMsg{tools: tools}
+	}
+}
+
+func (m model) copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", "$env:WARDEN_CLIP | Set-Clipboard")
+		cmd.Env = append(os.Environ(), "WARDEN_CLIP="+text)
+		if err := cmd.Run(); err != nil {
+			return clipboardDoneMsg{err: fmt.Errorf("Set-Clipboard: %w", err)}
+		}
+		return clipboardDoneMsg{}
+	}
+}
+
 // setContent updates viewport content without forcing scroll.
 func setContent(vp viewport.Model, lines []string) viewport.Model {
 	vp.SetContent(strings.Join(lines, "\n"))
@@ -64,7 +115,11 @@ func setContent(vp viewport.Model, lines []string) viewport.Model {
 }
 
 func (m model) tick() tea.Cmd {
-	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(120*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
+}
+
+func (m model) advance() int {
+	return 1
 }
