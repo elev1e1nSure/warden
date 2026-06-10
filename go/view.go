@@ -49,16 +49,16 @@ func toolSummaryLine(name string, result string) string {
 	lines := strings.Split(result, "\n")
 	head := strings.TrimSpace(lines[0])
 	if len(lines) > 1 {
-		head += fmt.Sprintf(" · +%d lines", len(lines)-1)
+		head += fmt.Sprintf("  +%d lines", len(lines)-1)
 	}
-	head = truncateRunes(head, 120)
-	prefix := "  ✓ "
-	style := DimStyle()
+	head = truncateRunes(head, 100)
+
+	arrow := ToolStyle().Render("  → ")
+	toolName := ToolStyle().Render(name)
 	if toolResultIsError(result) {
-		prefix = "  ! "
-		style = ErrorStyle()
+		return arrow + ErrorStyle().Render(name) + "  " + ErrorStyle().Render(head)
 	}
-	return style.Render(prefix + name + " → " + head)
+	return arrow + toolName + "  " + DimStyle().Render(head)
 }
 
 func toolResultBlock(result string) string {
@@ -86,20 +86,17 @@ func toolResultBlock(result string) string {
 }
 
 func toolStartLine(name, args string) string {
+	arrow := ToolStyle().Render("  → ")
+	toolName := ToolStyle().Render(name)
 	if args == "" {
-		return ToolStyle().Render("▶ " + name)
+		return arrow + toolName
 	}
-	return ToolStyle().Render("▶ "+name) + "  " + DimStyle().Render(truncateRunes(args, 160))
+	return arrow + toolName + "  " + DimStyle().Render(truncateRunes(args, 140))
 }
 
-// ts returns a rendered timestamp in a unified format.
-func (m model) ts() string {
-	return DimStyle().Render("[" + m.wardenTS + "]")
-}
-
-// wardenLine builds the warden header line with an optional suffix.
+// wardenLine builds a labeled response line (used for slash command output).
 func (m model) wardenLine(suffix string) string {
-	return m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + suffix
+	return WardenStyle().Render("warden") + "  " + suffix
 }
 
 func compactThinkText(text string) string {
@@ -163,12 +160,13 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
+	brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	var summary string
 	if entry.duration == 0 {
-		dots := strings.Repeat(".", (m.spinner/3)%4)
-		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("thinking"+dots)
+		frame := brailleFrames[m.spinner%len(brailleFrames)]
+		summary = DimStyle().Render("  " + frame + "  thinking")
 	} else {
-		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("Thought "+formatThinkDuration(duration))
+		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
 	}
 	if !m.thinkingExpanded {
 		return summary
@@ -194,6 +192,19 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	return strings.Join(lines, "\n")
 }
 
+func indentLines(text string, prefix string) string {
+	if text == "" {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = prefix + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (m *model) renderMessages() []string {
 	m.ensureMarkdownRenderer()
 	out := make([]string, 0, len(m.messages))
@@ -202,7 +213,7 @@ func (m *model) renderMessages() []string {
 		case messageThink:
 			out = append(out, m.renderThinkEntry(entry))
 		case messageAssistant:
-			out = append(out, m.renderMarkdown(entry.text))
+			out = append(out, indentLines(m.renderMarkdown(entry.text), "  "))
 		default:
 			out = append(out, entry.text)
 		}
@@ -244,11 +255,9 @@ func (m *model) syncViewportToLatestThink() {
 func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
 
-	// ⚠  <action title>
-	b.WriteString(ErrorStyle().Bold(true).Render("⚠  ") + TitleStyle().Render(inner.title))
+	b.WriteString(ErrorStyle().Bold(true).Render("⚠  ") + HeaderStyle().Render(inner.title))
 	b.WriteString("\n")
 
-	//   <tool>  ·  <filename>
 	toolPart := "   " + ToolStyle().Bold(true).Render(inner.tool)
 	if inner.preview != "" {
 		sep := DimStyle().Render("  ·  ")
@@ -260,9 +269,7 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	b.WriteString(toolPart)
 	b.WriteString("\n")
 
-	// details: flat, dim, no bullets, no label
 	for _, d := range inner.details {
-		// Replace "path: <filename>" with "path: <full path>" if preview is available
 		detail := d
 		if strings.HasPrefix(d, "path: ") && inner.preview != "" {
 			detail = "path: " + inner.preview
@@ -271,7 +278,6 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 		b.WriteString("\n")
 	}
 
-	// Confirmation buttons: larger, closer together, under the warning
 	b.WriteString("\n")
 	yBtn := ConfirmYStyle().Render("  Y  run  ")
 	nBtn := ConfirmNStyle().Render("  N  cancel  ")
@@ -280,15 +286,132 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	return b.String()
 }
 
-func (m model) footerText() string {
-	if m.confirming {
-		return DimStyle().Render("Press Y to run, N to cancel")
+func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
+	var b strings.Builder
+
+	header := q.Header
+	if total > 1 {
+		header = fmt.Sprintf("%s (%d/%d)", q.Header, idx+1, total)
 	}
-	return KeyStyle().Render("[F2]") +
-		DimStyle().Render(" Thoughts")
+	b.WriteString(AccentStyle().Render("? ") + HeaderStyle().Render(header))
+	b.WriteString("\n")
+	b.WriteString("  " + q.Question)
+	b.WriteString("\n")
+
+	if len(q.Options) > 0 {
+		b.WriteString("\n")
+		for i, opt := range q.Options {
+			num := AccentStyle().Render(fmt.Sprintf("  %d", i+1))
+			label := "  " + opt.Label
+			if opt.Description != "" {
+				sep := DimStyle().Render("  —  ")
+				desc := DimStyle().Render(truncateRunes(opt.Description, width-lipgloss.Width(num)-lipgloss.Width(label)-10))
+				b.WriteString(num + label + sep + desc)
+			} else {
+				b.WriteString(num + label)
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
+		b.WriteString(DimStyle().Render("  press 1–" + fmt.Sprintf("%d", len(q.Options)) + " to select"))
+	} else {
+		b.WriteString("\n")
+		b.WriteString(DimStyle().Render("  type your answer and press enter"))
+	}
+
+	return b.String()
 }
 
-func (m model) layoutViewportHeight() int {
+// renderWaveSpinner renders a smooth bouncing wave that slightly overflows edges.
+func (m model) renderWaveSpinner() string {
+	const n = 7
+	const cycle = (n + 2) * 2 // 18: pos goes -1..n then back
+	if !m.loading {
+		return FaintStyle().Render(strings.Repeat("·", n))
+	}
+	s := m.spinner % cycle
+	// forward: s=0..n+1, backward: s=n+2..cycle-1
+	var pos int
+	half := cycle / 2 // n+1 = 8
+	if s <= half {
+		pos = s - 1 // -1..n
+	} else {
+		pos = cycle - s - 1 // n-1..0 going back, then -1 again at s=cycle
+	}
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		dist := i - pos
+		if dist < 0 {
+			dist = -dist
+		}
+		switch dist {
+		case 0:
+			b.WriteString(lipgloss.NewStyle().Foreground(Green).Render("█"))
+		case 1:
+			b.WriteString(lipgloss.NewStyle().Foreground(GreenMid).Render("▓"))
+		case 2:
+			b.WriteString(lipgloss.NewStyle().Foreground(GreenFaint).Render("▒"))
+		default:
+			b.WriteString(FaintStyle().Render("░"))
+		}
+	}
+	return b.String()
+}
+
+// renderStatusBar renders the 2-line bottom status bar.
+func (m model) renderStatusBar() string {
+	// Line 1: mode · model · provider
+	// Visual hierarchy: green(mode) · white(model) · dim(provider)
+	mode := AccentStyle().Render("ask")
+	if m.autoMode {
+		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("build")
+	}
+	dot := FaintStyle().Render(" · ")
+	provider := m.providerName
+	if provider == "" {
+		provider = "ollama"
+	}
+	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
+	providerPart := DimStyle().Render(provider)
+	line1 := mode + dot + modelPart + dot + providerPart
+
+	// Line 2: wave spinner + hint
+	hint := "  esc interrupt"
+	if m.confirming {
+		hint = "  Y run  N cancel"
+	}
+	line2 := m.renderWaveSpinner() + DimStyle().Render(hint)
+
+	return line1 + "\n" + line2
+}
+
+// renderInput renders the bordered text input.
+func (m model) renderInput() string {
+	borderColor := GreenMid
+	if m.streaming || m.confirming {
+		borderColor = Faint
+	}
+	innerWidth := m.width - 4
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		PaddingLeft(1).
+		Width(innerWidth)
+	return style.Render(m.textinput.View())
+}
+
+// renderLiveActivity shows the current tool/think activity as a single updating line.
+func (m model) renderLiveActivity() string {
+	if m.liveActivity == "" {
+		return ""
+	}
+	return m.liveActivity
+}
+
+func (m *model) layoutViewportHeight() int {
 	if m.height < 1 {
 		return 1
 	}
@@ -298,13 +421,30 @@ func (m model) layoutViewportHeight() int {
 		hintHeight = lipgloss.Height(m.renderHint())
 	}
 
-	reserved := lipgloss.Height(m.renderHeader()) +
-		1 + // scroll separator
-		hintHeight +
-		lipgloss.Height(m.textinput.View()) +
-		1 + // bottom separator
-		lipgloss.Height(m.footerText())
+	confirmHeight := 0
+	if m.confirming {
+		confirmHeight = lipgloss.Height(renderConfirmBlock(confirmMsg{
+			title:   "Dangerous action",
+			tool:    m.confirmTool,
+			details: []string{},
+		}, m.width))
+	}
 
+	liveHeight := 0
+	if m.liveActivity != "" {
+		liveHeight = 1
+	}
+
+	questionHeight := 0
+	if m.questioning && len(m.questionsData) > 0 {
+		questionHeight = lipgloss.Height(renderQuestionBlock(
+			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.width,
+		))
+	}
+
+	// input: 3 (border top + content + border bottom)
+	// status bar: 2 lines
+	reserved := hintHeight + confirmHeight + liveHeight + questionHeight + 3 + 2
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -316,75 +456,36 @@ func (m *model) updateViewportHeight() {
 	m.viewport.Height = m.layoutViewportHeight()
 }
 
-func (m model) renderHeader() string {
-	var b strings.Builder
-
-	b.WriteString("\n\n")
-
-	prefix := "    "
-
-	b.WriteString(prefix)
-	b.WriteString(HeaderStyle().Render("Warden CLI"))
-	b.WriteString(DimStyle().Render(" " + wardenVersion))
-	b.WriteString("\n")
-
-	mode := "Leashed"
-	if m.autoMode {
-		mode = "Unleashed"
-	}
-	reasoning := "On"
-	if !m.thinkingEnabled {
-		reasoning = "Off"
-	}
-	thoughts := "Hidden"
-	if m.thinkingExpanded {
-		thoughts = "Shown"
-	}
-	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render(m.modelName + " · " + mode + " · Thinking " + reasoning + " · Thoughts " + thoughts))
-	b.WriteString("\n")
-
-	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render(m.cwd))
-	b.WriteString("\n")
-
-	sepWidth := m.width - 8
-	if sepWidth < 1 {
-		sepWidth = 1
-	}
-	b.WriteString(prefix)
-	b.WriteString(FaintStyle().Render(strings.Repeat("─", sepWidth)))
-
-	return b.String()
-}
-
 func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
 
-	footer := m.footerText()
+	layers := []string{m.viewport.View()}
 
-	var scrollTag string
-	if m.viewport.TotalLineCount() > m.viewport.Height {
-		if m.viewport.AtBottom() {
-			scrollTag = " end "
-		} else {
-			scrollTag = fmt.Sprintf(" %d%% ", int(m.viewport.ScrollPercent()*100))
-		}
+	if m.confirming {
+		layers = append(layers, renderConfirmBlock(confirmMsg{
+			title:   "Dangerous action",
+			tool:    m.confirmTool,
+			details: []string{},
+		}, m.width))
 	}
-	sepWidth := m.width - len(scrollTag)
-	if sepWidth < 0 {
-		sepWidth = 0
-	}
-	sep1 := FaintStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
-	sep2 := FaintStyle().Render(strings.Repeat("─", m.width))
 
-	layers := []string{m.renderHeader(), m.viewport.View(), sep1}
+	if m.questioning && len(m.questionsData) > 0 {
+		layers = append(layers, renderQuestionBlock(
+			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.width,
+		))
+	}
+
+	if live := m.renderLiveActivity(); live != "" {
+		layers = append(layers, live)
+	}
+
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
-	layers = append(layers, m.textinput.View(), sep2, footer)
+
+	layers = append(layers, m.renderInput(), m.renderStatusBar())
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 
@@ -392,30 +493,10 @@ func (m model) renderHint() string {
 	matches := matchSlash(m.textinput.Value())
 	lines := make([]string, 0, len(matches))
 	for _, cmd := range matches {
+		name := fmt.Sprintf("%-14s", cmd.name)
 		lines = append(lines,
-			"  "+ToolStyle().Render(cmd.name)+"  "+DimStyle().Render(cmd.desc),
+			AccentStyle().Render(name)+"  "+DimStyle().Render(cmd.desc),
 		)
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (m model) renderFooterStatus(footer string) string {
-	mode := SafeStyle().Render("Leashed")
-	if m.autoMode {
-		mode = AutoStyle().Render("Unleashed")
-	}
-
-	reasoning := ThinkingOnStyle().Render("On")
-	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Off")
-	}
-
-	status := StatusStyle().Render("Status: ") + mode +
-		StatusStyle().Render("  Thinking: ") + reasoning
-
-	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
-	if gap < 2 {
-		gap = 2
-	}
-	return footer + strings.Repeat(" ", gap) + status
 }
