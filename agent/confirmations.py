@@ -57,6 +57,18 @@ class ConfirmationManager:
 		for call_id, entry in list(self._pending.items()):
 			self._cancel_entry(call_id)
 
+	async def wait(self, call_id: str) -> bool:
+		"""Wait for confirmation with timeout. Returns True if confirmed, False if cancelled/timed out."""
+		entry = self._pending.get(call_id)
+		if entry is None:
+			return False
+		try:
+			await asyncio.wait_for(entry["event"].wait(), timeout=_TIMEOUT_SECONDS)
+		except asyncio.TimeoutError:
+			self._cancel_entry(call_id)
+		resolved = self._pending.pop(call_id, None)
+		return bool(resolved and resolved.get("ok", False))
+
 	def active_count(self) -> int:
 		now = time.time()
 		expired = [
