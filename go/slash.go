@@ -74,7 +74,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.ResetSession()
-			return noopMsg{}
+			return nil
 		}
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled

@@ -89,14 +89,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 
 	case tea.KeyMsg:
+		if msg.Type != tea.KeyF2 && msg.String() == "f2" {
+			m = m.toggleThinkingExpanded()
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			return m, tea.Quit
 
 		case tea.KeyF2:
-			m.thinkingExpanded = !m.thinkingExpanded
-			m.syncViewport()
-			m.viewport, _ = m.viewport.Update(msg)
+			m = m.toggleThinkingExpanded()
 			return m, nil
 
 		case tea.KeyTab:
@@ -329,7 +331,6 @@ type confirmMsg struct {
 	details       []string
 	args          string
 	preview       string
-	defaultAction string
 }
 type modeMsg struct{ auto bool }
 type doneMsg struct{}
@@ -341,7 +342,6 @@ type nextMsg struct {
 	inner tea.Msg
 	ch    <-chan tea.Msg
 }
-type noopMsg struct{}
 
 type messageKind int
 
@@ -362,31 +362,37 @@ func (m *model) appendText(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
 }
 
+func (m model) toggleThinkingExpanded() model {
+	m.thinkingExpanded = !m.thinkingExpanded
+	if m.thinkingExpanded {
+		m.syncViewportToLatestThink()
+	} else {
+		m.syncViewport()
+	}
+	return m
+}
+
 func (m *model) appendThink() {
 	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
 }
 
 func (m *model) updateThink(text string) {
-	if len(m.messages) == 0 {
-		return
+	for i := len(m.messages) - 1; i >= 0; i-- {
+		if m.messages[i].kind == messageThink {
+			m.messages[i].text += text
+			return
+		}
 	}
-	last := len(m.messages) - 1
-	if m.messages[last].kind != messageThink {
-		return
-	}
-	m.messages[last].text += text
 }
 
 func (m *model) finishThink() {
-	if len(m.messages) == 0 {
-		return
-	}
-	last := len(m.messages) - 1
-	if m.messages[last].kind != messageThink {
-		return
-	}
-	if m.messages[last].duration == 0 {
-		m.messages[last].duration = time.Since(m.messages[last].startedAt)
+	for i := len(m.messages) - 1; i >= 0; i-- {
+		if m.messages[i].kind == messageThink {
+			if m.messages[i].duration == 0 {
+				m.messages[i].duration = time.Since(m.messages[i].startedAt)
+			}
+			return
+		}
 	}
 }
 

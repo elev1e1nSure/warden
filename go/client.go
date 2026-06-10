@@ -162,7 +162,6 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					details: t.Details,
 					args:    t.Args,
 					preview: t.Preview,
-					defaultAction: t.Default,
 				}
 			case "done":
 				ch <- doneMsg{}

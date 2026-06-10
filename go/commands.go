@@ -29,7 +29,7 @@ func (m model) sendMessage(text string) tea.Cmd {
 func (m model) sendConfirm(id string, ok bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendConfirm(id, ok)
-		return noopMsg{}
+		return nil
 	}
 }
 
@@ -43,7 +43,7 @@ func (m model) setMode(auto bool) tea.Cmd {
 func (m model) setThinking(enabled bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SetThinking(enabled)
-		return noopMsg{}
+		return nil
 	}
 }
 

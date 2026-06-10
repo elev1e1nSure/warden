@@ -385,7 +385,7 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None) -> Safe
 		)
 
 	# --- bash / powershell ---
-	if tool_name in ("bash", "powershell", "shell"):
+	if tool_name in ("bash", "powershell"):
 		command = str(normalized.get("command", ""))
 		risk, reason, details = _classify_powershell(command)
 		summary = reason.capitalize()
