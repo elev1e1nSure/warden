@@ -1,45 +1,45 @@
-# warden — инструкции для claude code
+# warden — claude code instructions
 
-## проект
+## project
 
-CLI-агент управления компьютером. Go TUI + Python backend + Ollama. Строгий минимализм.
+CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 
-## правила
+## rules
 
-- язык: русский, неформально, без смайлов
-- не переписывай файлы целиком — только нужное
-- перед большими изменениями спрашивай
-- не добавляй зависимости без причины
-- комментарии в коде на русском, коротко
+- language: English, informal, no emojis
+- don't rewrite entire files — only what's needed
+- ask before large changes
+- don't add dependencies without reason
+- code comments in English, short
 
-## стек
+## stack
 
 - **Go 1.21+** — frontend (bubbletea, lipgloss)
 - **Python 3.11+** — backend (aiohttp, ollama SDK)
-- pyautogui — мышь / клавиатура
-- Pillow — скриншоты
-- playwright — браузер
-- duckduckgo-search — поиск
+- pyautogui — mouse / keyboard
+- Pillow — screenshots
+- playwright — browser
+- duckduckgo-search — search
 
-## стиль кода
+## code style
 
-- tabs, не spaces
-- snake_case везде
-- типизация обязательна (`typing`, `dataclasses`)
-- без лишних абстракций — просто и понятно
-- async где нужен стриминг
+- tabs, not spaces
+- snake_case everywhere
+- typing is mandatory (`typing`, `dataclasses`)
+- no unnecessary abstractions — simple and clear
+- async where streaming is needed
 
-## структура
+## structure
 
 ```
-go/        — frontend на bubbletea
-agent/     — backend: сервер, чат, тулзы, логи
+go/        — bubbletea frontend
+agent/     — backend: server, chat, tools, logs
 ```
 
-## визуал
+## visual
 
-- без цветных бэкграундов у текста. только текст + цвет + жирность
-- цвета: cyan для warden, yellow для тулзов, red для ошибок, dim для метаинфо.
-- управление: стрелки, Enter, Esc, Ctrl+C.
-- никаких кнопок, никаких мышиных кликов в самом tui
-- если есть надобность добавить че то реально новое - сначала обговори с юзером и потом добавь в этот раздел.
+- no colored text backgrounds. only text + color + bold
+- colors: cyan for warden, yellow for tools, red for errors, dim for meta info
+- controls: arrows, Enter, Esc, Ctrl+C
+- no buttons, no mouse clicks in the TUI itself
+- if there's a need to add something truly new — discuss with the user first, then add to this section

@@ -1,86 +1,154 @@
-# Run warden - frontend and backend simultaneously
+# Run warden frontend and backend together.
 
+[CmdletBinding()]
+param(
+	[int]$Port = 8765,
+	[int]$StartupTimeoutSeconds = 60
+)
+
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Save current directory to restore later
-$currentDir = Get-Location
+$OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8
+[Console]::InputEncoding = [Text.Encoding]::UTF8
+chcp.com 65001 | Out-Null
 
-# Set UTF-8 encoding
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$backendDir = Join-Path $scriptDir "agent"
-$frontendDir = Join-Path $scriptDir "go"
-
-Write-Host ""
-Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  WARDEN - starting system" -ForegroundColor Cyan -NoNewline
-Write-Host ""
-Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host ""
-
-# Start backend in background
-Write-Host "[BACKEND]" -ForegroundColor Yellow -NoNewline
-Write-Host " starting Python server..." -ForegroundColor White
-$backendJob = Start-Job -ScriptBlock {
-    param($dir)
-    chcp 65001 | Out-Null
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $OutputEncoding = [System.Text.Encoding]::UTF8
-    python (Join-Path $dir "server.py")
-} -ArgumentList $backendDir
-
-# Wait for backend to start
-Start-Sleep -Seconds 2
-
-# Check if backend started successfully
-if ($backendJob.State -eq "Failed") {
-    Write-Host "[ERROR] Backend failed to start" -ForegroundColor Red
-    $backendError = Receive-Job $backendJob -ErrorAction SilentlyContinue
-    Write-Host $backendError -ForegroundColor Red
-    exit 1
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+	$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
-# Start frontend in foreground (Bubbletea needs terminal access)
-Write-Host "[FRONTEND]" -ForegroundColor Cyan -NoNewline
-Write-Host " starting Go client..." -ForegroundColor White
-Write-Host ""
-Write-Host "System started. Press Ctrl+C to stop." -ForegroundColor Green
-Write-Host ""
+$backendDir = Join-Path $scriptDir "agent"
+$frontendDir = Join-Path $scriptDir "go"
+$runtimeDir = Join-Path $scriptDir ".warden"
+$backendOutLog = Join-Path $runtimeDir "backend.out.log"
+$backendErrLog = Join-Path $runtimeDir "backend.err.log"
+$healthUrl = "http://localhost:$Port/health"
 
-# Start background job to stream backend logs
-$logJob = Start-Job -ScriptBlock {
-    param($job)
-    while ($true) {
-        $output = Receive-Job $job -ErrorAction SilentlyContinue
-        if ($output) {
-            foreach ($line in $output) {
-                Write-Host "[BACKEND] " -ForegroundColor Yellow -NoNewline
-                Write-Host $line -ForegroundColor White
-            }
-        }
-        if ($job.State -ne "Running") {
-            break
-        }
-        Start-Sleep -Milliseconds 100
-    }
-} -ArgumentList $backendJob
+$originalDir = Get-Location
+$backendProcess = $null
+$startedBackend = $false
 
-# Start frontend in foreground
+function Write-Status {
+	param(
+		[Parameter(Mandatory = $true)][string]$Name,
+		[Parameter(Mandatory = $true)][string]$Message,
+		[ConsoleColor]$Color = [ConsoleColor]::White
+	)
+
+	Write-Host "[$Name] " -ForegroundColor $Color -NoNewline
+	Write-Host $Message
+}
+
+function Resolve-CommandPath {
+	param([Parameter(Mandatory = $true)][string]$Name)
+
+	$command = Get-Command $Name -CommandType Application -ErrorAction Stop | Select-Object -First 1
+	return $command.Source
+}
+
+function Test-BackendHealth {
+	try {
+		$response = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -TimeoutSec 2
+		return $response.StatusCode -eq 200 -and $response.Content.Trim() -eq "ok"
+	} catch {
+		return $false
+	}
+}
+
+function Test-PortListening {
+	$connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+	return $null -ne $connection
+}
+
+function Wait-BackendReady {
+	param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process)
+
+	$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
+	while ((Get-Date) -lt $deadline) {
+		if ($Process.HasExited) {
+			throw "Backend exited early with code $($Process.ExitCode). See $backendErrLog"
+		}
+
+		if (Test-BackendHealth) {
+			return
+		}
+
+		Start-Sleep -Milliseconds 500
+	}
+
+	throw "Backend did not become healthy in ${StartupTimeoutSeconds}s. See $backendErrLog"
+}
+
+function Stop-ProcessTree {
+	param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+	$children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue
+	foreach ($child in $children) {
+		Stop-ProcessTree -ProcessId $child.ProcessId
+	}
+
+	Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
 try {
-    chcp 65001 | Out-Null
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $OutputEncoding = [System.Text.Encoding]::UTF8
-    Set-Location $frontendDir
-    go run .
+	if (-not (Test-Path $backendDir -PathType Container)) {
+		throw "Backend directory not found: $backendDir"
+	}
+	if (-not (Test-Path $frontendDir -PathType Container)) {
+		throw "Frontend directory not found: $frontendDir"
+	}
+
+	$python = Resolve-CommandPath "python"
+	$go = Resolve-CommandPath "go"
+
+	New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+	Remove-Item -LiteralPath $backendOutLog, $backendErrLog -Force -ErrorAction SilentlyContinue
+
+	Write-Host ""
+	Write-Host "============================================================" -ForegroundColor Cyan
+	Write-Host "  WARDEN - starting system" -ForegroundColor Cyan
+	Write-Host "============================================================" -ForegroundColor Cyan
+	Write-Host ""
+
+	if (Test-BackendHealth) {
+		Write-Status "BACKEND" "already healthy on $healthUrl" Yellow
+	} elseif (Test-PortListening) {
+		throw "Port $Port is busy, but $healthUrl is not healthy. Stop the old backend and run this script again."
+	} else {
+		Write-Status "BACKEND" "starting Python server..." Yellow
+		$backendProcess = Start-Process `
+			-FilePath $python `
+			-ArgumentList @("server.py") `
+			-WorkingDirectory $backendDir `
+			-RedirectStandardOutput $backendOutLog `
+			-RedirectStandardError $backendErrLog `
+			-WindowStyle Hidden `
+			-PassThru
+		$startedBackend = $true
+		Wait-BackendReady -Process $backendProcess
+		Write-Status "BACKEND" "ready on $healthUrl" Green
+	}
+
+	Write-Status "FRONTEND" "starting Go client..." Cyan
+	Write-Host ""
+	Write-Host "System started. Press Ctrl+C to stop." -ForegroundColor Green
+	Write-Host "Backend logs: $backendOutLog"
+	Write-Host ""
+
+	Set-Location $frontendDir
+	& $go run .
+	if ($LASTEXITCODE -ne 0) {
+		throw "Frontend exited with code $LASTEXITCODE"
+	}
 } finally {
-    # Return to original directory
-    Set-Location $currentDir
-    
-    # Cleanup after frontend exits
-    Stop-Job $logJob -ErrorAction SilentlyContinue
-    Remove-Job $logJob -Force -ErrorAction SilentlyContinue
-    Stop-Job $backendJob -ErrorAction SilentlyContinue
-    Remove-Job $backendJob -Force -ErrorAction SilentlyContinue
+	Set-Location $originalDir
+
+	if ($startedBackend -and $null -ne $backendProcess -and -not $backendProcess.HasExited) {
+		Write-Status "BACKEND" "stopping Python server..." Yellow
+		Stop-ProcessTree -ProcessId $backendProcess.Id
+	}
 }

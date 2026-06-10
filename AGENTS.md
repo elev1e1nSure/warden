@@ -1,3 +1,3 @@
 ﻿# warden
 
-См. [CLAUDE.md](CLAUDE.md) — канонические инструкции для агентов и стиль проекта.
+See [CLAUDE.md](CLAUDE.md) — canonical instructions for agents and project style.

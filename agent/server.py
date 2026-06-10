@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.chat import ChatSession
 from agent.ollama_client import OllamaClient
 from agent.tools import PENDING
-from agent.logger import info, warn, error, success, request, tool
+from agent.logger import info, warn, error, success, request as log_request, tool
 
 
 class Backend:
@@ -33,13 +33,13 @@ backend = Backend()
 
 
 async def health(request: web.Request) -> web.Response:
-	request("GET", "/health", 200)
+	log_request("GET", "/health", 200)
 	return web.Response(text="ok")
 
 
 async def reset(request: web.Request) -> web.Response:
 	backend.chat.reset()
-	request("POST", "/reset", 200)
+	log_request("POST", "/reset", 200)
 	info("session reset")
 	return web.Response(text="ok")
 
@@ -48,7 +48,7 @@ async def set_mode(request: web.Request) -> web.Response:
 	data = await request.json()
 	backend.auto_mode = bool(data.get("auto", False))
 	mode = "AUTO" if backend.auto_mode else "SAFE"
-	request("POST", "/mode", 200)
+	log_request("POST", "/mode", 200)
 	info(f"mode changed to {mode}")
 	return web.Response(text="ok")
 
@@ -57,7 +57,7 @@ async def set_thinking(request: web.Request) -> web.Response:
 	data = await request.json()
 	backend.chat.thinking_enabled = bool(data.get("enabled", True))
 	status = "enabled" if backend.chat.thinking_enabled else "disabled"
-	request("POST", "/thinking", 200)
+	log_request("POST", "/thinking", 200)
 	info(f"thinking {status}")
 	return web.Response(text="ok")
 
@@ -70,11 +70,11 @@ async def confirm(request: web.Request) -> web.Response:
 	if entry:
 		entry["ok"] = ok
 		entry["event"].set()
-		request("POST", "/confirm", 200)
+		log_request("POST", "/confirm", 200)
 		action = "confirmed" if ok else "cancelled"
 		info(f"action {action}")
 		return web.Response(text="ok")
-	request("POST", "/confirm", 404)
+	log_request("POST", "/confirm", 404)
 	warn(f"confirm not found: {call_id}")
 	return web.Response(status=404, text="not found")
 
@@ -82,7 +82,7 @@ async def confirm(request: web.Request) -> web.Response:
 async def chat(request: web.Request) -> web.StreamResponse:
 	data = await request.json()
 	text = data.get("text", "")
-	request("POST", "/chat")
+	log_request("POST", "/chat")
 	info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
 
 	response = web.StreamResponse(

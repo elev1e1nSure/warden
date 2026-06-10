@@ -7,10 +7,10 @@ import (
 
 // ANSI цветовые коды
 const (
-	reset  = "\033[0m"
-	bold   = "\033[1m"
-	dim    = "\033[2m"
-	
+	reset = "\033[0m"
+	bold  = "\033[1m"
+	dim   = "\033[2m"
+
 	red     = "\033[31m"
 	green   = "\033[32m"
 	yellow  = "\033[33m"
@@ -50,9 +50,9 @@ func request(method string, path string, status int) {
 	if status >= 400 {
 		statusColor = red
 	}
-	fmt.Printf("%s[%s]%s %s%s%s %s%s%s → %s%d%s\n", 
-		gray, timestamp(), reset, 
-		magenta+bold, method, reset, 
-		white, path, reset, 
+	fmt.Printf("%s[%s]%s %s%s%s %s%s%s → %s%d%s\n",
+		gray, timestamp(), reset,
+		magenta+bold, method, reset,
+		white, path, reset,
 		statusColor+bold, status, reset)
 }

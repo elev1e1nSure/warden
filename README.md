@@ -1,19 +1,19 @@
 # warden
 
-CLI-агент управления компьютером. Go TUI + Python backend + Ollama.
+CLI computer control agent. Go TUI + Python backend + Ollama.
 
-## стек
+## stack
 
-| слой | технология |
+| layer | technology |
 |---|---|
 | frontend | go 1.21+, bubbletea, lipgloss |
 | backend | python 3.11+, aiohttp |
 | llm | ollama (qwen3:8b) |
 | computer use | pyautogui, pillow |
-| браузер | playwright |
-| поиск | duckduckgo-search |
+| browser | playwright |
+| search | duckduckgo-search |
 
-## архитектура
+## architecture
 
 ```
 go tui (bubbletea)
@@ -25,83 +25,83 @@ ollama
 [bash] [filesystem] [screenshot] [mouse/keyboard] [browser] [search]
 ```
 
-frontend и backend разделены: TUI не знает про Ollama, backend не знает про UI.
+frontend and backend are separated: TUI knows nothing about Ollama, backend knows nothing about UI.
 
-## структура
+## structure
 
 ```
 warden/
 ├── go/
-│   ├── main.go          # точка входа
+│   ├── main.go          # entry point
 │   ├── model.go         # bubbletea model
-│   ├── client.go        # http клиент
-│   ├── styles.go        # lipgloss стили
-│   └── logger.go        # логи frontend
+│   ├── client.go        # http client
+│   ├── styles.go        # lipgloss styles
+│   └── logger.go        # frontend logs
 ├── agent/
 │   ├── server.py        # aiohttp backend
-│   ├── chat.py          # сессия и стриминг
-│   ├── ollama_client.py # управление ollama
-│   ├── tools.py         # инструменты агента
-│   └── logger.py        # цветные логи backend
+│   ├── chat.py          # session and streaming
+│   ├── ollama_client.py # ollama management
+│   ├── tools.py         # agent tools
+│   └── logger.py        # backend colored logs
 ├── requirements.txt
 ├── README.md
 └── CLAUDE.md
 ```
 
-## запуск
+## launch
 
 ```bash
 # 1. backend
 python agent/server.py
 
-# 2. frontend (другой терминал)
+# 2. frontend (another terminal)
 cd go && go run .
-# или
+# or
 ./go/warden.exe
 ```
 
-backend поднимается на `localhost:8765`, сам запускает ollama и качает модель при необходимости.
+backend starts on `localhost:8765`, automatically starts ollama and downloads the model if needed.
 
-## тулзы
+## tools
 
-| имя | описание |
+| name | description |
 |---|---|
-| `bash` | PowerShell команды |
-| `file_read` | чтение файла |
-| `file_write` | запись файла (создаёт папки) |
-| `file_delete` | удаление файла, только внутри cwd |
-| `file_list` | список файлов и папок |
-| `clipboard` | чтение / запись буфера обмена |
-| `screenshot` | скриншот экрана |
+| `bash` | PowerShell commands |
+| `file_read` | read file |
+| `file_write` | write file (creates folders) |
+| `file_delete` | delete file, only within cwd |
+| `file_list` | list files and folders |
+| `clipboard` | read / write clipboard |
+| `screenshot` | take a screenshot |
 | `mouse` | move, click, right_click, double_click, scroll |
 | `keyboard` | type, press (hotkey) |
-| `browser_open` | открыть URL в браузере пользователя |
-| `browser_read` | прочитать текст страницы |
-| `browser_screenshot` | скриншот страницы |
-| `youtube_search` | поиск видео на YouTube |
-| `google_search` | поиск в интернете (DuckDuckGo) |
+| `browser_open` | open URL in user's browser |
+| `browser_read` | read page text |
+| `browser_screenshot` | screenshot page |
+| `youtube_search` | search YouTube videos |
+| `google_search` | web search (DuckDuckGo) |
 
-## slash-команды
+## slash commands
 
-Вводятся в поле сообщения:
+Entered in the message field:
 
-| команда | действие |
+| command | action |
 |---|---|
-| `/auto` | авторежим — опасные команды без подтверждения |
-| `/safe` | безопасный режим — подтверждение на опасные |
-| `/reset` | сбросить сессию |
-| `/thinking` | вкл/выкл размышления модели |
+| `/auto` | auto mode — dangerous commands without confirmation |
+| `/safe` | safe mode — confirmation for dangerous commands |
+| `/reset` | reset session |
+| `/thinking` | toggle model reasoning |
 
-## безопасность
+## security
 
-- `bash`: опасные паттерны (`rm -rf`, `format`, `rmdir` и др.) требуют подтверждения в safe-режиме
-- `file_delete`: только внутри cwd, всегда требует подтверждения
-- `file_write`: за пределами cwd требует подтверждения
-- в TUI: `y` + Enter — подтвердить, Esc — отмена
+- `bash`: dangerous patterns (`rm -rf`, `format`, `rmdir`, etc.) require confirmation in safe mode
+- `file_delete`: only within cwd, always requires confirmation
+- `file_write`: outside cwd requires confirmation
+- in TUI: `y` + Enter — confirm, Esc — cancel
 
-## модель
+## model
 
-Рекомендуется: `qwen3:8b`
+Recommended: `qwen3:8b`
 
 ```bash
 ollama run qwen3:8b
