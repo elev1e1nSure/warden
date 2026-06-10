@@ -293,9 +293,7 @@ func (m model) View() string {
 	if m.confirming {
 		footer = DimStyle().Render("Press Y to run, N to cancel")
 	} else {
-		footer = KeyStyle().Render("[Enter]") +
-			DimStyle().Render(" Send  ") +
-			KeyStyle().Render("[Esc]") +
+		footer = KeyStyle().Render("[Esc]") +
 			DimStyle().Render(" Clear  ") +
 			KeyStyle().Render("[F2]") +
 			DimStyle().Render(" Thoughts  ") +
