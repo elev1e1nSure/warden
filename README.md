@@ -43,6 +43,7 @@ warden/
 │   ├── ollama_client.py # ollama management
 │   ├── tools.py         # agent tools
 │   └── logger.py        # backend colored logs
+├── start.ps1           # launch both backend and frontend
 ├── requirements.txt
 ├── README.md
 └── CLAUDE.md
@@ -58,6 +59,9 @@ python agent/server.py
 cd go && go run .
 # or
 ./go/warden.exe
+
+# or launch both at once (PowerShell)
+./start.ps1
 ```
 
 backend starts on `localhost:8765`, automatically starts ollama and downloads the model if needed.
