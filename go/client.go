@@ -132,6 +132,15 @@ func (c *Client) Compact() (*CompactResult, error) {
 	return &result, nil
 }
 
+func (c *Client) Shutdown() error {
+	resp, err := http.Post(c.BaseURL+"/shutdown", "application/json", nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 func (c *Client) SendMessage(text string) <-chan tea.Msg {
 	ch := make(chan tea.Msg, 64)
 	go func() {

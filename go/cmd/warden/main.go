@@ -24,27 +24,11 @@ const (
 )
 
 var (
-	cyan  = lipgloss.Color("#3CBE71")
-	dim   = lipgloss.Color("#666666")
-	red   = lipgloss.Color("#ff4444")
-	green = lipgloss.Color("#32CD32")
+	amber  = lipgloss.Color("#D4A576")
+	faint  = lipgloss.Color("#555555")
+	subtle = lipgloss.Color("#888888")
+	danger = lipgloss.Color("#cc5555")
 )
-
-func titleStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(cyan).Bold(true)
-}
-
-func dimStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(dim)
-}
-
-func okStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(green).Bold(true)
-}
-
-func errStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(red).Bold(true)
-}
 
 type state int
 
@@ -56,12 +40,13 @@ const (
 )
 
 type launchModel struct {
-	state    state
-	spinner  int
-	backend  *exec.Cmd
-	deadline time.Time
-	ready    bool
-	errMsg   string
+	state     state
+	spinner   int
+	backend   *exec.Cmd
+	deadline  time.Time
+	ready     bool
+	errMsg    string
+	modelName string
 }
 
 type tickMsg struct{}
@@ -129,25 +114,22 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m launchModel) View() string {
+	title := lipgloss.NewStyle().Foreground(amber).Bold(true).Render("warden")
 	var body string
 	switch m.state {
-	case stateBoot:
-		body = "  starting backend... " + spinnerFrames[m.spinner]
-	case stateWaiting:
-		body = "  waiting for backend... " + spinnerFrames[m.spinner]
+	case stateBoot, stateWaiting:
+		frame := spinnerFrames[m.spinner%len(spinnerFrames)]
+		body = lipgloss.NewStyle().Foreground(faint).Render("  " + frame + "  starting...")
 	case stateReady:
-		body = okStyle().Render("  backend ready")
+		label := "  ready"
+		if m.modelName != "" {
+			label += "  " + m.modelName
+		}
+		body = lipgloss.NewStyle().Foreground(subtle).Render(label)
 	case stateFailed:
-		body = errStyle().Render("  error: " + m.errMsg)
+		body = lipgloss.NewStyle().Foreground(danger).Render("  error: " + m.errMsg)
 	}
-
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		titleStyle().Render("warden"),
-		dimStyle().Render("────────────────────────"),
-		body,
-		"",
-	)
+	return lipgloss.JoinVertical(lipgloss.Left, title, "", body, "")
 }
 
 func findProjectRoot() (string, error) {
@@ -239,11 +221,12 @@ func killBackendByPort() {
 	}
 }
 
-func runLauncher(alreadyRunning bool) (ready bool, backend *exec.Cmd) {
+func runLauncher(alreadyRunning bool, modelName string) (ready bool, backend *exec.Cmd) {
 	m := launchModel{
-		state:    stateBoot,
-		deadline: time.Now().Add(startupTimeout),
-		ready:    alreadyRunning,
+		state:     stateBoot,
+		deadline:  time.Now().Add(startupTimeout),
+		ready:     alreadyRunning,
+		modelName: modelName,
 	}
 	if alreadyRunning {
 		m.state = stateReady
@@ -288,7 +271,7 @@ func main() {
 		}
 	}
 
-	ready, _ := runLauncher(alreadyRunning)
+	ready, _ := runLauncher(alreadyRunning, *modelFlag)
 	if !ready {
 		if backend != nil {
 			stopBackend(backend)
@@ -300,6 +283,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}
+
+	client := tui.NewClient(fmt.Sprintf("http://localhost:%d", port))
+	client.Shutdown()
 
 	if backend != nil {
 		stopBackend(backend)
