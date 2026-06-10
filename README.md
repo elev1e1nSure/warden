@@ -41,7 +41,10 @@ warden/
 │   ├── slash.go         # slash command handling
 │   ├── commands.go      # bubbletea cmds (backend check, send, confirm)
 │   ├── styles.go        # lipgloss styles
-│   └── logger.go        # frontend logs
+│   ├── logger.go        # frontend logs
+│   ├── markdown.go      # markdown rendering
+│   ├── go.mod           # Go dependencies
+│   └── go.sum
 ├── agent/
 │   ├── server.py          # aiohttp backend
 │   ├── chat.py            # session and streaming
@@ -55,7 +58,8 @@ warden/
 │   └── powershell-reference.md  # command reference with risk markers
 ├── requirements.txt
 ├── README.md
-└── CLAUDE.md
+├── CLAUDE.md
+└── AGENTS.md
 ```
 
 ## launch
