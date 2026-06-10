@@ -166,7 +166,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	}
 	var summary string
 	if entry.duration == 0 {
-		dots := strings.Repeat(".", m.spinner%4)
+		dots := strings.Repeat(".", (m.spinner/3)%4)
 		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("thinking"+dots)
 	} else {
 		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("Thought "+formatThinkDuration(duration))
