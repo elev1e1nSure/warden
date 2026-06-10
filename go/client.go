@@ -41,9 +41,12 @@ func NewClient(url string) *Client {
 func (c *Client) ResetSession() error {
 	resp, err := http.Post(c.BaseURL+"/reset", "application/json", nil)
 	if err != nil {
+		error("reset failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
+	request("POST", "/reset", resp.StatusCode)
+	info("сессия сброшена")
 	return nil
 }
 
@@ -51,9 +54,16 @@ func (c *Client) SetMode(auto bool) error {
 	body, _ := json.Marshal(map[string]any{"auto": auto})
 	resp, err := http.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
 	if err != nil {
+		error("set mode failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
+	request("POST", "/mode", resp.StatusCode)
+	mode := "AUTO"
+	if !auto {
+		mode = "SAFE"
+	}
+	info("режим: " + mode)
 	return nil
 }
 
@@ -61,9 +71,16 @@ func (c *Client) SetThinking(enabled bool) error {
 	body, _ := json.Marshal(map[string]any{"enabled": enabled})
 	resp, err := http.Post(c.BaseURL+"/thinking", "application/json", bytes.NewReader(body))
 	if err != nil {
+		error("set thinking failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
+	request("POST", "/thinking", resp.StatusCode)
+	status := "включены"
+	if !enabled {
+		status = "выключены"
+	}
+	info("размышления: " + status)
 	return nil
 }
 
@@ -71,9 +88,16 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	body, _ := json.Marshal(map[string]any{"id": id, "ok": ok})
 	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
 	if err != nil {
+		error("send confirm failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
+	request("POST", "/confirm", resp.StatusCode)
+	action := "подтверждено"
+	if !ok {
+		action = "отменено"
+	}
+	info("действие: " + action)
 	return nil
 }
 
