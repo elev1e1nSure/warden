@@ -36,7 +36,8 @@ type model struct {
 	hintVisible bool
 	hintCount   int
 	// status
-	modelInfo string
+	modelInfo       string
+	thinkingEnabled bool
 }
 
 func initialModel() model {
@@ -51,11 +52,12 @@ func initialModel() model {
 	vp.SetContent("")
 
 	return model{
-		textinput: ti,
-		viewport:  vp,
-		client:    NewClient("http://localhost:8765"),
-		messages:  []string{},
-		modelInfo: "qwen3:8b",
+		textinput:       ti,
+		viewport:        vp,
+		client:          NewClient("http://localhost:8765"),
+		messages:        []string{},
+		modelInfo:       "qwen3:8b",
+		thinkingEnabled: true,
 	}
 }
 
@@ -74,6 +76,7 @@ var slashCommands = []slashCmd{
 	{"/auto", "Авторежим — опасные команды без подтверждения"},
 	{"/safe", "Безопасный режим — подтверждение на опасные команды"},
 	{"/reset", "Сбросить историю сессии"},
+	{"/thinking", "Включить/выключить размышления модели"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -366,7 +369,15 @@ func (m model) View() string {
 	} else {
 		modeBadge = SafeStyle().Render(" SAFE")
 	}
-	statusBar := modeBadge
+
+	var thinkingBadge string
+	if m.thinkingEnabled {
+		thinkingBadge = ThinkingOnStyle().Render(" THINK")
+	} else {
+		thinkingBadge = ThinkingOffStyle().Render(" -think")
+	}
+
+	statusBar := modeBadge + " " + thinkingBadge
 
 	var footer string
 	if m.confirming {
@@ -429,6 +440,17 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			m.client.ResetSession()
 			return noopMsg{}
 		}
+	case "/thinking":
+		m.thinkingEnabled = !m.thinkingEnabled
+		status := "включены"
+		if !m.thinkingEnabled {
+			status = "выключены"
+		}
+		m.wardenTS = time.Now().Format("15:04")
+		m.messages = append(m.messages, m.wardenLine("Размышления "+status))
+		m.viewport.SetContent(strings.Join(m.messages, "\n"))
+		m.viewport.GotoBottom()
+		return true, m.setThinking(m.thinkingEnabled)
 	}
 	return false, nil
 }
@@ -487,6 +509,13 @@ func (m model) setMode(auto bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SetMode(auto)
 		return modeMsg{auto: auto}
+	}
+}
+
+func (m model) setThinking(enabled bool) tea.Cmd {
+	return func() tea.Msg {
+		m.client.SetThinking(enabled)
+		return noopMsg{}
 	}
 }
 

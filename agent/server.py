@@ -46,6 +46,12 @@ async def set_mode(request: web.Request) -> web.Response:
 	return web.Response(text="ok")
 
 
+async def set_thinking(request: web.Request) -> web.Response:
+	data = await request.json()
+	backend.chat.thinking_enabled = bool(data.get("enabled", True))
+	return web.Response(text="ok")
+
+
 async def confirm(request: web.Request) -> web.Response:
 	data = await request.json()
 	call_id = data.get("id", "")
@@ -110,6 +116,7 @@ async def main() -> None:
 	app.router.add_post("/chat", chat)
 	app.router.add_post("/confirm", confirm)
 	app.router.add_post("/mode", set_mode)
+	app.router.add_post("/thinking", set_thinking)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)

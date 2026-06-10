@@ -45,6 +45,7 @@ class ChatSession:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
 		self._client = ollama.AsyncClient()
+		self.thinking_enabled: bool = True
 
 	def reset(self) -> None:
 		self.history = []
@@ -89,7 +90,8 @@ class ChatSession:
 					thinking, content = _chunk_parts(chunk)
 
 					if thinking:
-						yield ("think", thinking)
+						if self.thinking_enabled:
+							yield ("think", thinking)
 						continue
 
 					if not content:
