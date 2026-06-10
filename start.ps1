@@ -66,11 +66,15 @@ $logJob = Start-Job -ScriptBlock {
 } -ArgumentList $backendJob
 
 # Start frontend in foreground
+$originalDir = Get-Location
 Set-Location $frontendDir
 chcp 65001 | Out-Null
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 go run .
+
+# Return to original directory
+Set-Location $originalDir
 
 # Cleanup after frontend exits
 Stop-Job $logJob -ErrorAction SilentlyContinue
