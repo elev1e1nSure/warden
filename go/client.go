@@ -41,7 +41,7 @@ func NewClient(url string) *Client {
 func (c *Client) ResetSession() error {
 	resp, err := http.Post(c.BaseURL+"/reset", "application/json", nil)
 	if err != nil {
-		error("reset failed: " + err.Error())
+		logError("reset failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
@@ -54,7 +54,7 @@ func (c *Client) SetMode(auto bool) error {
 	body, _ := json.Marshal(map[string]any{"auto": auto})
 	resp, err := http.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
 	if err != nil {
-		error("set mode failed: " + err.Error())
+		logError("set mode failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
@@ -71,7 +71,7 @@ func (c *Client) SetThinking(enabled bool) error {
 	body, _ := json.Marshal(map[string]any{"enabled": enabled})
 	resp, err := http.Post(c.BaseURL+"/thinking", "application/json", bytes.NewReader(body))
 	if err != nil {
-		error("set thinking failed: " + err.Error())
+		logError("set thinking failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
@@ -88,7 +88,7 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	body, _ := json.Marshal(map[string]any{"id": id, "ok": ok})
 	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
 	if err != nil {
-		error("send confirm failed: " + err.Error())
+		logError("send confirm failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()

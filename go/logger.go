@@ -33,7 +33,7 @@ func warn(msg string) {
 	fmt.Printf("%s[%s]%s %s[WARN]%s %s\n", gray, timestamp(), reset, yellow+bold, reset, msg)
 }
 
-func error(msg string) {
+func logError(msg string) {
 	fmt.Printf("%s[%s]%s %s[ERROR]%s %s\n", gray, timestamp(), reset, red+bold, reset, msg)
 }
 
