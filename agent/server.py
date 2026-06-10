@@ -5,7 +5,7 @@ from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
 
 from agent.chat import ChatSession
-from agent.ollama_client import OllamaClient
+from agent.ollama_process import OllamaProcessManager
 from agent.confirmations import ConfirmationManager
 from agent.logger import info, warn, error, success, request as log_request
 
@@ -15,7 +15,7 @@ _backend: Backend | None = None
 class Backend:
 	def __init__(self, model: str = "qwen3:8b") -> None:
 		self.model = model
-		self.ollama = OllamaClient(model=model)
+		self.ollama = OllamaProcessManager(model=model)
 		self.confirmation_manager = ConfirmationManager()
 		self.chat = ChatSession(model=model, confirmation_manager=self.confirmation_manager)
 		self.auto_mode: bool = False

@@ -6,7 +6,7 @@ from typing import Optional
 import ollama
 
 
-class OllamaClient:
+class OllamaProcessManager:
 	def __init__(self, model: str = "qwen3:8b") -> None:
 		self.model = model
 		self._process: Optional[subprocess.Popen] = None
