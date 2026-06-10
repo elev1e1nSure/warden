@@ -21,7 +21,7 @@ func HeaderStyle() lipgloss.Style {
 }
 
 func UserStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(White).Bold(true)
+	return lipgloss.NewStyle().Foreground(Dim)
 }
 
 func DimStyle() lipgloss.Style {
