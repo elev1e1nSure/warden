@@ -38,7 +38,12 @@ func (m *model) renderMarkdown(text string) string {
 	out = strings.Trim(out, "\n")
 	lines := strings.Split(out, "\n")
 	for i, line := range lines {
-		lines[i] = strings.TrimLeft(line, " ")
+		// Only trim glamour's default 2-space margin, preserve code indentation
+		if len(line) >= 2 && line[:2] == "  " {
+			lines[i] = line[2:]
+		} else {
+			lines[i] = line
+		}
 	}
 	return strings.Join(lines, "\n")
 }

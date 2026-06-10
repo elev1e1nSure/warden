@@ -16,8 +16,12 @@ func (m model) checkBackend() tea.Cmd {
 	return func() tea.Msg {
 		resp, err := http.Get(m.client.BaseURL + "/health")
 		if err != nil || resp.StatusCode != 200 {
+			if resp != nil {
+				resp.Body.Close()
+			}
 			return backendErrorMsg{}
 		}
+		resp.Body.Close()
 		return backendReadyMsg{}
 	}
 }

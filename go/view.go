@@ -37,7 +37,9 @@ func truncateRunes(text string, limit int) string {
 
 func toolResultIsError(result string) bool {
 	lower := strings.ToLower(strings.TrimSpace(result))
-	return strings.HasPrefix(lower, "error") ||
+	// Check for "error:" or "error " with word boundary to avoid false positives like "error123"
+	return strings.HasPrefix(lower, "error:") ||
+		strings.HasPrefix(lower, "error ") ||
 		strings.HasPrefix(lower, "stderr")
 }
 
@@ -321,13 +323,13 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 	return b.String()
 }
 
-// renderWaveSpinner renders a smooth bouncing wave that slightly overflows edges.
-// pos triangle-wave: -1, 0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0, repeat
-// -1 and 7 are overflow positions (peak offscreen), giving a clean soft bounce.
+// renderWaveSpinner renders a smooth bouncing wave with pulsing background dots.
+// Triangle-wave pos: -1..7 (overflows both edges for soft bounce).
+// Background dots (outside wave tail) slowly pulse for a "breathing" effect.
 func (m model) renderWaveSpinner() string {
 	const n = 7
-	const lo = -1       // one past left edge
-	const hi = n        // one past right edge (=7)
+	const lo = -1
+	const hi = n        // =7
 	const span = hi - lo // 8
 	const cycle = span * 2 // 16
 	if !m.loading {
@@ -336,25 +338,33 @@ func (m model) renderWaveSpinner() string {
 	s := m.spinner % cycle
 	var pos int
 	if s < span {
-		pos = lo + s // -1..6
+		pos = lo + s
 	} else {
-		pos = hi - (s - span) // 7..0
+		pos = hi - (s - span)
 	}
+	// Background dots pulse: bright for 3 ticks out of every 20 (~210ms flash each 1.4s)
+	bgBright := m.spinner%20 < 3
 	var b strings.Builder
 	for i := 0; i < n; i++ {
 		dist := i - pos
 		if dist < 0 {
 			dist = -dist
 		}
-		switch dist {
-		case 0:
+		switch {
+		case dist == 0:
 			b.WriteString(lipgloss.NewStyle().Foreground(Green).Render("█"))
-		case 1:
+		case dist == 1:
 			b.WriteString(lipgloss.NewStyle().Foreground(GreenMid).Render("▓"))
-		case 2:
+		case dist == 2:
 			b.WriteString(lipgloss.NewStyle().Foreground(GreenFaint).Render("▒"))
-		default:
+		case dist == 3:
 			b.WriteString(FaintStyle().Render("░"))
+		default:
+			if bgBright {
+				b.WriteString(lipgloss.NewStyle().Foreground(GreenFaint).Render("·"))
+			} else {
+				b.WriteString(FaintStyle().Render("·"))
+			}
 		}
 	}
 	return b.String()
@@ -481,9 +491,12 @@ func (m model) View() string {
 
 	if m.confirming {
 		layers = append(layers, renderConfirmBlock(confirmMsg{
-			title:   "Dangerous action",
+			title:   m.confirmTitle,
 			tool:    m.confirmTool,
-			details: []string{},
+			risk:    m.confirmRisk,
+			summary: m.confirmSummary,
+			details: m.confirmDetails,
+			preview: m.confirmPreview,
 		}, m.width))
 	}
 

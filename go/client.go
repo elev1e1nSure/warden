@@ -201,22 +201,34 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 				ch <- wardenStartMsg{}
 			case "token":
 				var t TokenMsg
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal token error: " + err.Error())
+					continue
+				}
 				ch <- tokenMsg{text: t.Text}
 			case "think":
 				var t TokenMsg
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal think error: " + err.Error())
+					continue
+				}
 				ch <- thinkMsg{text: t.Text}
 			case "tool_start":
 				var t struct {
 					Name string `json:"name"`
 					Args string `json:"args"`
 				}
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal tool_start error: " + err.Error())
+					continue
+				}
 				ch <- toolStartMsg{name: t.Name, args: t.Args}
 			case "tool":
 				var t ToolMsg
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal tool error: " + err.Error())
+					continue
+				}
 				ch <- toolMsg{tool: t}
 			case "confirm":
 				var t struct {
@@ -230,7 +242,10 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					Preview string   `json:"preview"`
 					Default string   `json:"default"`
 				}
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal confirm error: " + err.Error())
+					continue
+				}
 				ch <- confirmMsg{
 					id:      t.ID,
 					tool:    t.Tool,
@@ -254,7 +269,10 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 						} `json:"options"`
 					} `json:"questions"`
 				}
-				json.Unmarshal(line, &t)
+				if err := json.Unmarshal(line, &t); err != nil {
+					logError("json unmarshal question error: " + err.Error())
+					continue
+				}
 				items := make([]QuestionItem, len(t.Questions))
 				for i, q := range t.Questions {
 					opts := make([]QuestionOption, len(q.Options))

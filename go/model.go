@@ -60,6 +60,12 @@ type model struct {
 	// token tracking
 	tokenCount int
 	tokenLimit int
+	// confirm dialog data
+	confirmRisk    string
+	confirmTitle   string
+	confirmSummary string
+	confirmDetails []string
+	confirmPreview string
 	// input history
 	history    []string
 	historyIdx int
@@ -384,6 +390,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
 			m.confirmTool = inner.tool
+			m.confirmRisk = inner.risk
+			m.confirmTitle = inner.title
+			m.confirmSummary = inner.summary
+			m.confirmDetails = inner.details
+			m.confirmPreview = inner.preview
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()

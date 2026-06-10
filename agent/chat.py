@@ -212,10 +212,8 @@ class ChatSession:
 					thinking = chunk.thinking
 					content = chunk.content
 
-					if thinking:
-						if self.thinking_enabled:
-							yield ("think", thinking)
-						continue
+					if thinking and self.thinking_enabled:
+						yield ("think", thinking)
 
 					if chunk.reasoning:
 						full_reasoning += chunk.reasoning
