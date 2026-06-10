@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict
 
 _ANSI = re.compile(r'\x1b\[[0-9;]*[mGKHFJABCDsu]|\x1b\][^\x07]*\x07|\x1b=|\x1b>')
@@ -44,7 +45,7 @@ class Tool(ABC):
 	def is_dangerous(self, args: Dict[str, Any]) -> bool:
 		return False
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -113,7 +114,7 @@ class FileReadTool(Tool):
 		"limit": {"type": "integer", "description": "Max lines to return (optional)"},
 	}
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -164,7 +165,7 @@ class GlobTool(Tool):
 		"path": {"type": "string", "description": "Base directory (default: current)"},
 	}
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -208,7 +209,7 @@ class GrepTool(Tool):
 		"case_insensitive": {"type": "boolean", "description": "Ignore case (default false)"},
 	}
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -385,22 +386,85 @@ class FileListTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		path = args.get("path", ".")
 		try:
-			entries = sorted(os.listdir(path))
+			with os.scandir(path) as entries_iter:
+				entries = sorted(entries_iter, key=lambda e: e.name.lower())
 			dirs, files = [], []
 			for e in entries:
-				full = os.path.join(path, e)
-				if os.path.isdir(full):
-					dirs.append(f"[{e}]")
+				if e.is_dir():
+					dirs.append(f"[{e.name}]")
 				else:
-					size = os.path.getsize(full)
+					size = e.stat().st_size
 					kb = size / 1024
-					files.append(f"{e} ({kb:.1f}KB)" if kb >= 1 else f"{e} ({size}B)")
+					files.append(f"{e.name} ({kb:.1f}KB)" if kb >= 1 else f"{e.name} ({size}B)")
 			parts = []
 			if dirs:
 				parts.append("dirs: " + "  ".join(dirs))
 			if files:
 				parts.append("files: " + "  ".join(files))
 			return "\n".join(parts) if parts else "(empty)"
+		except Exception as e:
+			return f"error: {e}"
+
+
+class SkillTool(Tool):
+	name = "skill"
+	description = "Load a local skill file and a small sample of nearby files."
+	params = {"name": {"type": "string", "description": "Skill name or path"}}
+
+	def _skill_roots(self) -> list[Path]:
+		home = Path.home()
+		return [
+			Path.cwd() / "skills",
+			Path.cwd() / ".claude" / "skills",
+			home / ".codex" / "skills",
+			home / ".agents" / "skills",
+		]
+
+	def _resolve_skill_dir(self, name: str) -> Path | None:
+		candidate = Path(name)
+		if candidate.is_absolute():
+			if candidate.is_dir():
+				return candidate
+			if candidate.is_file():
+				return candidate.parent
+		for root in self._skill_roots():
+			direct = root / name
+			if (direct / "SKILL.md").is_file():
+				return direct
+			if root.is_dir():
+				for path in root.rglob("SKILL.md"):
+					if path.parent.name == name:
+						return path.parent
+		return None
+
+	async def execute(self, args: Dict[str, Any]) -> str:
+		name = str(args.get("name", "")).strip()
+		if not name:
+			return "error: name is required"
+		try:
+			skill_dir = self._resolve_skill_dir(name)
+			if skill_dir is None:
+				return f"error: skill not found: {name}"
+			skill_file = skill_dir / "SKILL.md"
+			content = skill_file.read_text(encoding="utf-8")
+			files = []
+			for entry in sorted(skill_dir.iterdir(), key=lambda p: p.name.lower()):
+				if entry.name == "SKILL.md":
+					continue
+				if entry.is_file():
+					files.append(str(entry.name))
+				elif entry.is_dir():
+					files.append(f"{entry.name}/")
+				if len(files) >= 10:
+					break
+			return (
+				f'<skill_content name="{skill_dir.name}">\n'
+				f"{content.strip()}\n\n"
+				f"<skill_files>\n"
+				f"{chr(10).join(files) if files else '(no extra files)'}\n"
+				f"</skill_files>\n"
+				f"</skill_content>"
+			)
 		except Exception as e:
 			return f"error: {e}"
 
@@ -417,7 +481,7 @@ class ClipboardTool(Tool):
 		"text": {"type": "string", "description": "Text to write (write only)"},
 	}
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -493,7 +557,7 @@ class MouseTool(Tool):
 		"amount": {"type": "integer", "description": "For scroll: scroll steps"},
 	}
 
-	def to_ollama(self) -> dict:
+	def tool_definition(self) -> dict:
 		return {
 			"type": "function",
 			"function": {
@@ -931,17 +995,21 @@ class ApplyPatchTool(Tool):
 			elif l[0] == "+":
 				new_lines.append(l[1:])
 
-		# Find matching location
+		# Pure addition: no old lines to match — trust old_start hint directly
+		if not old_lines:
+			insert_at = min(old_start, len(lines))
+			result = lines[:insert_at] + new_lines + lines[insert_at:]
+			return "\n".join(result)
+
+		# Find matching location starting near old_start, then scan entire file
+		search_order = list(range(len(lines) + 1))
+		# prioritise positions close to the hinted old_start
+		search_order.sort(key=lambda i: abs(i - old_start))
 		match_start = None
-		for i in range(len(lines)):
+		for i in search_order:
 			if i + len(old_lines) > len(lines):
-				break
-			match = True
-			for j, ol in enumerate(old_lines):
-				if lines[i + j] != ol:
-					match = False
-					break
-			if match:
+				continue
+			if all(lines[i + j] == ol for j, ol in enumerate(old_lines)):
 				match_start = i
 				break
 
@@ -1146,6 +1214,8 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	FileWriteTool(),
 	FileDeleteTool(),
 	FileListTool(),
+	TodoWriteTool(),
+	SkillTool(),
 	ClipboardTool(),
 	ScreenshotTool(),
 	MouseTool(),
@@ -1156,7 +1226,6 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	GoogleSearchTool(),
 	BrowserScreenshotTool(),
 	ApplyPatchTool(),
-	TodoWriteTool(),
 	WebFetchTool(),
 	QuestionTool(),
 ]}

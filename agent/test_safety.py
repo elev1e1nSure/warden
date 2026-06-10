@@ -24,21 +24,25 @@ def _decision(tool: str, args: dict, cwd: str = r"D:\Projects\warden") -> Safety
 # ---------------------------------------------------------------------------
 
 class TestPathSafety:
-	def test_path_within_workspace(self, tmp_path: Path) -> None:
-		workspace = tmp_path
+	def test_path_within_workspace(self) -> None:
+		workspace = (Path.cwd() / ".tmp" / "test_safety_workspace").resolve()
+		workspace.mkdir(parents=True, exist_ok=True)
 		assert _is_path_within_workspace(str(workspace / "foo.txt"), workspace)
 		assert _is_path_within_workspace(str(workspace / "sub" / "bar.txt"), workspace)
 
-	def test_path_outside_workspace(self, tmp_path: Path) -> None:
-		workspace = tmp_path
-		other = tmp_path.parent / "other"
+	def test_path_outside_workspace(self) -> None:
+		workspace = (Path.cwd() / ".tmp" / "test_safety_workspace_outside").resolve()
+		workspace.mkdir(parents=True, exist_ok=True)
+		other = (Path.cwd() / ".tmp" / "test_safety_other").resolve()
+		other.mkdir(parents=True, exist_ok=True)
 		assert not _is_path_within_workspace(str(other / "file.txt"), workspace)
 
-	def test_sibling_prefix_not_confused(self, tmp_path: Path) -> None:
-		workspace = tmp_path / "warden"
-		sibling = tmp_path / "warden2"
-		workspace.mkdir()
-		sibling.mkdir()
+	def test_sibling_prefix_not_confused(self) -> None:
+		base = (Path.cwd() / ".tmp" / "test_safety_prefix").resolve()
+		workspace = base / "warden"
+		sibling = base / "warden2"
+		workspace.mkdir(parents=True, exist_ok=True)
+		sibling.mkdir(parents=True, exist_ok=True)
 		assert _is_path_within_workspace(str(workspace / "file.txt"), workspace)
 		assert not _is_path_within_workspace(str(sibling / "file.txt"), workspace)
 
@@ -266,3 +270,12 @@ class TestToolAssessment:
 	def test_unknown_tool_confirm(self) -> None:
 		d = _decision("unknown_tool", {})
 		assert d.risk == "confirm"
+
+	def test_new_tools_safe(self) -> None:
+		for tool, args in [
+			("file_list", {"path": "."}),
+			("todowrite", {"todos": [{"content": "x", "status": "pending", "priority": "low"}]}),
+			("skill", {"name": "demo"}),
+		]:
+			d = _decision(tool, args)
+			assert d.risk == "safe", f"{tool}: expected safe, got {d.risk}"
