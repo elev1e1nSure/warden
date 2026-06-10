@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 from typing import AsyncIterator, List, Dict, Any
 
@@ -8,14 +9,16 @@ from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
 
 SYSTEM = (
-	"You are warden, the user's companion living inside their computer. "
-	"Respond in the user's language. Keep it short and punchy. "
-	"Tone: relaxed, easy-going, a bit cheeky if the moment calls for it. "
-	"Be direct, but sound like a person, not a manual. "
-	"Use contractions, throw in the occasional light remark. "
-	"No corporate speak, no essays, no customer-service fluff. "
-	"Skip the self-introductions, meta-commentary and step-by-step narration. "
-	"Just do the thing, say what matters, and move on. "
+	"You are Warden, a calm local computer-control assistant. "
+	"Respond in the user's language and address the user informally when the language supports it. "
+	"Keep replies short unless the task genuinely needs detail. "
+	"Tone: calm, direct, plain, and respectful. No roleplay, mascot behavior, catchphrases, emojis, or theatrical persona. "
+	"Do not use playful hype, gaming slang, adventure metaphors, or lines like 'what drive today', 'digital forest', or 'personal guide'. "
+	"Do not pretend to be alive, lonely, custom-trained, or more than the model and tools you are running through. "
+	"If asked what model you are, answer with the configured model name if you know it; otherwise say that the app did not expose the exact model name. "
+	"Do not call yourself a wrapper when the user asks about the model; distinguish Warden as the app/assistant from the underlying model. "
+	"Skip self-introductions, meta-commentary and step-by-step narration. "
+	"Do the task, say what matters, and move on. "
 	"Use tools when needed and keep going until the task is done. "
 	"For screen work: take a screenshot first, then act on coordinates. Never click blindly. "
 	"Do not claim you pressed, opened or typed something unless the matching tool was used. "
@@ -29,8 +32,22 @@ SYSTEM = (
 	"For syntax, operators and safe command patterns read `.warden/powershell-reference.md` via file_read."
 )
 
+_EMOJI_RE = re.compile(
+	"["
+	"\U0001F1E6-\U0001F1FF"
+	"\U0001F300-\U0001FAFF"
+	"\U00002700-\U000027BF"
+	"\U00002600-\U000026FF"
+	"]+",
+	flags=re.UNICODE,
+)
+
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
 MAX_ITER = 20
+
+
+def _clean_visible_text(text: str) -> str:
+	return _EMOJI_RE.sub("", text)
 
 
 def _resolve_preview(args: dict, fallback: str) -> str:
@@ -82,7 +99,8 @@ class ChatSession:
 			iter_count += 1
 			yield ("warden_start", {})
 
-			messages = [{"role": "system", "content": SYSTEM}] + self.history
+			system = SYSTEM + f" Configured model name: {self.model}."
+			messages = [{"role": "system", "content": system}] + self.history
 			full_content = ""
 			in_think = False
 			collected_tool_calls: list = []
@@ -113,13 +131,15 @@ class ChatSession:
 						if not in_think:
 							idx = text_chunk.find("<think>")
 							if idx == -1:
-								yield ("token", text_chunk)
-								full_content += text_chunk
+								clean = _clean_visible_text(text_chunk)
+								yield ("token", clean)
+								full_content += clean
 								text_chunk = ""
 							else:
 								if idx > 0:
-									yield ("token", text_chunk[:idx])
-									full_content += text_chunk[:idx]
+									clean = _clean_visible_text(text_chunk[:idx])
+									yield ("token", clean)
+									full_content += clean
 								text_chunk = text_chunk[idx + 7:]
 								in_think = True
 						else:
