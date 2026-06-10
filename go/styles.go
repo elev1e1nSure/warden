@@ -3,7 +3,7 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Cyan   = lipgloss.Color("#3CBE71")
+	Spruce = lipgloss.Color("#3B6B54")
 	Yellow = lipgloss.Color("#ffcc00")
 	Red    = lipgloss.Color("#ff4444")
 	Dim    = lipgloss.Color("#666666")
@@ -12,7 +12,7 @@ var (
 )
 
 func WardenStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(White).Bold(true)
+	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
 }
 
 func UserStyle() lipgloss.Style {
@@ -40,7 +40,7 @@ func AutoStyle() lipgloss.Style {
 }
 
 func SafeStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Blue).Bold(true)
+	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
 }
 
 func StatusStyle() lipgloss.Style {

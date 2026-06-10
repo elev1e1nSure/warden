@@ -10,15 +10,7 @@ import (
 )
 
 const wardenVersion = "v0.1.0"
-
-var wardenLogo = `
-██╗    ██╗ █████╗ ██████╗ ██████╗ ███████╗███╗   ██╗
-██║    ██║██╔══██╗██╔══██╗██╔══██╗██╔════╝████╗  ██║
-██║ █╗ ██║███████║██████╔╝██║  ██║█████╗  ██╔██╗ ██║
-██║███╗██║██╔══██║██╔══██╗██║  ██║██╔══╝  ██║╚██╗██║
-╚███╔███╔╝██║  ██║██║  ██║██████╔╝███████╗██║ ╚████║
- ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝
-`
+const wardenModel = "qwen3:8b"
 
 func stickyTool(name string) bool {
 	switch name {
@@ -254,40 +246,43 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 }
 
 func (m model) renderHeader() string {
-	var b strings.Builder
+	// Line 1: warden + version | right block
+	name := WardenStyle().Render("warden")
+	version := DimStyle().Render(" " + wardenVersion)
+	left1 := name + version
 
-	// Logo in Cyan
-	logoLines := strings.Split(strings.Trim(wardenLogo, "\n"), "\n")
-	for _, line := range logoLines {
-		if line != "" {
-			b.WriteString(WardenStyle().Render(line))
-			b.WriteString("\n")
+	sep := DimStyle().Render("│")
+	rightText := "  /unleash · /leash · /reset · /thinking"
+	right := DimStyle().Render(rightText)
+
+	gap := m.width - lipgloss.Width(left1) - lipgloss.Width(sep) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = m.width - lipgloss.Width(left1)
+		if gap < 1 {
+			gap = 1
 		}
+		right = ""
 	}
+	line1 := left1 + strings.Repeat(" ", gap) + sep + right
 
-	// Version line
-	b.WriteString(DimStyle().Render("  v" + wardenVersion))
-	b.WriteString("\n")
-
-	// Status badges row
-	modeBadge := DimStyle().Render("Status: ") + SafeStyle().Render("Leashed")
+	// Line 2: model · mode · thinking
+	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
-		modeBadge = DimStyle().Render("Status: ") + AutoStyle().Render("Unleashed")
+		mode = AutoStyle().Render("Unleashed")
 	}
-
-	reasoningBadge := DimStyle().Render("Размышления: ") + ThinkingOnStyle().Render("Вкл")
+	reasoning := ThinkingOnStyle().Render("Вкл")
 	if !m.thinkingEnabled {
-		reasoningBadge = DimStyle().Render("Размышления: ") + ThinkingOffStyle().Render("Выкл")
+		reasoning = ThinkingOffStyle().Render("Выкл")
 	}
+	line2 := DimStyle().Render(wardenModel+" · ") + mode + DimStyle().Render(" · Размышления: ") + reasoning
 
-	b.WriteString("  " + modeBadge + "  " + reasoningBadge)
-	b.WriteString("\n")
+	// Line 3: working directory
+	line3 := DimStyle().Render(m.cwd)
 
-	// Separator line
-	b.WriteString(DimStyle().Render(strings.Repeat("─", m.width)))
-	b.WriteString("\n")
+	// Separator
+	sepLine := DimStyle().Render(strings.Repeat("─", m.width))
 
-	return b.String()
+	return strings.Join([]string{line1, line2, line3, sepLine}, "\n")
 }
 
 func (m model) View() string {

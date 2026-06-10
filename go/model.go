@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -35,6 +36,8 @@ type model struct {
 	// status
 	thinkingEnabled  bool
 	thinkingExpanded bool
+	// path
+	cwd string
 }
 
 func initialModel() model {
@@ -49,12 +52,14 @@ func initialModel() model {
 	vp.SetContent("")
 	vp.GotoTop()
 
+	cwd, _ := os.Getwd()
 	return model{
 		textinput:       ti,
 		viewport:        vp,
 		client:          NewClient("http://localhost:8765"),
 		messages:        []messageEntry{},
 		thinkingEnabled: true,
+		cwd:             cwd,
 	}
 }
 
