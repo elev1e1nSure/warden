@@ -75,7 +75,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		viewportHeight := msg.Height - 13 - m.hintCount
+		viewportHeight := msg.Height - 8 - m.hintCount
 		if viewportHeight < 1 {
 			viewportHeight = 1
 		}
@@ -296,7 +296,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.hintCount = newCount
 		m.hintVisible = newCount > 0
 		if m.height > 0 {
-			m.viewport.Height = m.height - 13 - newCount
+			m.viewport.Height = m.height - 8 - newCount
 		}
 	}
 

@@ -248,6 +248,11 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 func (m model) renderHeader() string {
 	var b strings.Builder
 
+	b.WriteString("\n")
+
+	prefix := "    "
+
+	b.WriteString(prefix)
 	b.WriteString(WardenStyle().Render("Warden"))
 	b.WriteString(DimStyle().Render(" " + wardenVersion + " · " + wardenModel))
 	b.WriteString("\n")
@@ -260,16 +265,23 @@ func (m model) renderHeader() string {
 	if !m.thinkingEnabled {
 		reasoning = ThinkingOffStyle().Render("Off")
 	}
+	b.WriteString(prefix)
 	b.WriteString(DimStyle().Render("Status: "))
 	b.WriteString(mode)
 	b.WriteString(DimStyle().Render(" · Thinking "))
 	b.WriteString(reasoning)
 	b.WriteString("\n")
 
+	b.WriteString(prefix)
 	b.WriteString(DimStyle().Render(m.cwd))
 	b.WriteString("\n")
 
-	b.WriteString(DimStyle().Render(strings.Repeat("─", m.width)))
+	sepWidth := m.width - 8
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	b.WriteString(prefix)
+	b.WriteString(FaintStyle().Render(strings.Repeat("─", sepWidth)))
 	b.WriteString("\n")
 
 	return b.String()
@@ -306,13 +318,14 @@ func (m model) View() string {
 	if sepWidth < 0 {
 		sepWidth = 0
 	}
-	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
+	sep1 := FaintStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
+	sep2 := FaintStyle().Render(strings.Repeat("─", m.width))
 
 	layers := []string{m.renderHeader(), m.viewport.View(), sep1}
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
-	layers = append(layers, m.textinput.View(), footer)
+	layers = append(layers, m.textinput.View(), sep2, footer)
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 

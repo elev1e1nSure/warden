@@ -6,7 +6,8 @@ var (
 	Spruce = lipgloss.Color("#3B6B54")
 	Yellow = lipgloss.Color("#ffcc00")
 	Red    = lipgloss.Color("#ff4444")
-	Dim    = lipgloss.Color("#666666")
+	Dim   = lipgloss.Color("#666666")
+	Faint = lipgloss.Color("#444444")
 	White  = lipgloss.Color("#ffffff")
 	Blue   = lipgloss.Color("#4488ff")
 )
@@ -21,6 +22,10 @@ func UserStyle() lipgloss.Style {
 
 func DimStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Dim)
+}
+
+func FaintStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Faint)
 }
 
 func ErrorStyle() lipgloss.Style {
