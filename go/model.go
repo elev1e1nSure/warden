@@ -65,7 +65,7 @@ func (m model) Init() tea.Cmd {
 	return m.checkBackend()
 }
 
-// ── slash-команды ─────────────────────────────────────────────────────────────
+// ── slash commands ──────────────────────────────────────────────────────────
 
 type slashCmd struct {
 	name string
@@ -106,25 +106,85 @@ func slashCommonPrefix(matches []slashCmd) string {
 	return prefix
 }
 
-// ── вспомогательные методы ─────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-// ts возвращает отрендеренную метку времени в едином формате.
+// ts returns a rendered timestamp in a unified format.
 func (m model) ts() string {
 	return DimStyle().Render("[" + m.wardenTS + "]")
 }
 
-// wardenLine строит строку-хедер warden с опциональным суффиксом.
+// wardenLine builds the warden header line with an optional suffix.
 func (m model) wardenLine(suffix string) string {
 	return m.ts() + "  " + WardenStyle().Render("warden:") + "  " + suffix
 }
 
-// finalizeThink возвращает строку-итог думания (пустую если не думал).
-func (m model) finalizeThink() string {
-	if m.thinkBuf != "" {
-		words := len(strings.Fields(m.thinkBuf))
-		return DimStyle().Render(fmt.Sprintf("  думал %d слов", words))
+func compactThinkText(text string) string {
+	return strings.Join(strings.Fields(text), " ")
+}
+
+func wrapWords(text string, width int) []string {
+	if width < 1 {
+		width = 1
 	}
-	return ""
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+
+	lines := make([]string, 0, len(words))
+	current := words[0]
+	currentWidth := lipgloss.Width(current)
+
+	for _, word := range words[1:] {
+		wordWidth := lipgloss.Width(word)
+		if currentWidth+1+wordWidth <= width {
+			current += " " + word
+			currentWidth += 1 + wordWidth
+			continue
+		}
+
+		lines = append(lines, current)
+		current = word
+		currentWidth = wordWidth
+	}
+
+	lines = append(lines, current)
+	return lines
+}
+
+func (m model) renderThinkLine() string {
+	think := compactThinkText(m.thinkBuf)
+	if think == "" {
+		think = "..."
+	}
+
+	prefix := m.ts() + "  " + WardenStyle().Render("warden:") + "  "
+	firstWidth := m.width - lipgloss.Width(prefix)
+	if firstWidth < 1 {
+		firstWidth = 1
+	}
+
+	parts := wrapWords(think, firstWidth)
+	if len(parts) == 0 {
+		return m.wardenLine(DimStyle().Render(think))
+	}
+
+	lines := make([]string, 0, len(parts))
+	lines = append(lines, prefix+DimStyle().Render(parts[0]))
+	for _, part := range parts[1:] {
+		lines = append(lines, DimStyle().Render(part))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *model) clearThinkLine() {
+	if len(m.messages) == 0 {
+		return
+	}
+	last := len(m.messages) - 1
+	if strings.HasPrefix(m.messages[last], m.ts()+"  "+WardenStyle().Render("warden:")) {
+		m.messages = append(m.messages[:last], m.messages[last+1:]...)
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -222,18 +282,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case thinkMsg:
 			m.thinkBuf += inner.text
-			m.messages[len(m.messages)-1] = m.wardenLine(m.thinkIndicator())
+			m.messages[len(m.messages)-1] = m.renderThinkLine()
 			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 
 		case tokenMsg:
 			if !m.thinkDone {
-				if summary := m.finalizeThink(); summary != "" {
-					m.messages[len(m.messages)-1] = summary
-					m.messages = append(m.messages, m.wardenLine(""))
-				} else {
-					m.messages[len(m.messages)-1] = m.wardenLine("")
-				}
+				m.clearThinkLine()
+				m.messages = append(m.messages, m.wardenLine(""))
 				m.thinkDone = true
 				m.thinkBuf = ""
 			}
@@ -246,11 +302,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case toolStartMsg:
 			m.toolRunning = true
 			if !m.thinkDone && len(m.messages) > 0 {
-				if summary := m.finalizeThink(); summary != "" {
-					m.messages[len(m.messages)-1] = summary
-				} else {
-					m.messages = m.messages[:len(m.messages)-1]
-				}
+				m.clearThinkLine()
 				m.thinkDone = true
 				m.thinkBuf = ""
 			}
@@ -305,7 +357,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.loading {
 			m.spinner = (m.spinner + 1) % 24
 			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
-				m.messages[len(m.messages)-1] = m.wardenLine(m.thinkIndicator())
+				m.messages[len(m.messages)-1] = m.renderThinkLine()
 				m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			}
 			return m, m.tick()
@@ -324,7 +376,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case backendReadyMsg:
 		m.client.ResetSession()
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Ready"))
+		m.messages = append(m.messages, m.wardenLine("На месте"))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 
@@ -340,7 +392,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
-	// синхронизируем видимость подсказки и высоту вьюпорта
+	// sync hint visibility and viewport height
 	matches := matchSlash(m.textinput.Value())
 	newCount := 0
 	if !m.streaming {
@@ -361,23 +413,6 @@ func (m model) View() string {
 	if m.height == 0 {
 		return ""
 	}
-
-	// статус бар
-	var modeBadge string
-	if m.autoMode {
-		modeBadge = AutoStyle().Render(" AUTO")
-	} else {
-		modeBadge = SafeStyle().Render(" SAFE")
-	}
-
-	var thinkingBadge string
-	if m.thinkingEnabled {
-		thinkingBadge = ThinkingOnStyle().Render(" THINK")
-	} else {
-		thinkingBadge = ThinkingOffStyle().Render(" -think")
-	}
-
-	statusBar := modeBadge + " " + thinkingBadge
 
 	var footer string
 	if m.confirming {
@@ -409,18 +444,17 @@ func (m model) View() string {
 	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
 	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
 
-	// выравнивание плашки режима справа
-	statusBar = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Right).Render(modeBadge)
+	footer = m.renderFooterStatus(footer)
 
 	layers := []string{m.viewport.View(), sep1}
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
-	layers = append(layers, m.textinput.View(), sep2, statusBar, footer)
+	layers = append(layers, m.textinput.View(), sep2, footer)
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 
-// handleSlash обрабатывает /команды перед отправкой.
+// handleSlash processes /commands before sending.
 func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(text)) {
 	case "/auto":
@@ -433,7 +467,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.messages = []string{}
 		m.viewport.SetContent("")
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Сессия сброшена"))
+		m.messages = append(m.messages, m.wardenLine("Сброшено"))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 		return true, func() tea.Msg {
@@ -442,9 +476,9 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		}
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
-		status := "включены"
+		status := "вкл"
 		if !m.thinkingEnabled {
-			status = "выключены"
+			status = "выкл"
 		}
 		m.wardenTS = time.Now().Format("15:04")
 		m.messages = append(m.messages, m.wardenLine("Размышления "+status))
@@ -529,7 +563,7 @@ func readNext(ch <-chan tea.Msg) tea.Cmd {
 	}
 }
 
-// setContent обновляет viewport и скроллит вниз только если пользователь уже был внизу.
+// setContent updates viewport and scrolls down only if user was already at the bottom.
 func setContent(vp viewport.Model, lines []string) viewport.Model {
 	atBottom := vp.AtBottom()
 	vp.SetContent(strings.Join(lines, "\n"))
@@ -556,12 +590,23 @@ func (m model) renderHint() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m model) thinkIndicator() string {
-	dots := []string{".", "..", "..."}
-	dot := dots[(m.spinner/2)%3]
-	if m.thinkBuf == "" {
-		return DimStyle().Render(dot)
+func (m model) renderFooterStatus(footer string) string {
+	mode := SafeStyle().Render("Safe")
+	if m.autoMode {
+		mode = AutoStyle().Render("Auto")
 	}
-	words := len(strings.Fields(m.thinkBuf))
-	return DimStyle().Render(fmt.Sprintf("%s  %d сл", dot, words))
+
+	thinking := ThinkingOnStyle().Render("On")
+	if !m.thinkingEnabled {
+		thinking = ThinkingOffStyle().Render("Off")
+	}
+
+	status := StatusStyle().Render("Status: ") + mode +
+		StatusStyle().Render("  Thinking: ") + thinking
+
+	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
+	if gap < 2 {
+		gap = 2
+	}
+	return footer + strings.Repeat(" ", gap) + status
 }

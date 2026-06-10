@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// ANSI цветовые коды
+// ANSI color codes
 const (
 	reset = "\033[0m"
 	bold  = "\033[1m"

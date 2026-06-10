@@ -129,7 +129,7 @@ async def main() -> None:
 	info("starting backend...")
 	await backend.setup()
 	success("ollama ready")
-	
+
 	app = web.Application()
 	app.router.add_get("/health", health)
 	app.router.add_post("/reset", reset)

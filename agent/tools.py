@@ -11,7 +11,7 @@ _ANSI = re.compile(r'\x1b\[[0-9;]*[mGKHFJABCDsu]|\x1b\][^\x07]*\x07|\x1b=|\x1b>'
 
 
 def _clean(text: str) -> str:
-	"""Убирает ANSI-коды и схлопывает \r-перезаписи"""
+	"""Strip ANSI codes and collapse \r-overwrites"""
 	text = _ANSI.sub('', text)
 	lines = []
 	for line in text.split('\n'):
@@ -29,7 +29,7 @@ def _in_cwd(path: str) -> bool:
 		return False
 
 
-# ── база ──────────────────────────────────────────────────────────────────────
+# ── base ─────────────────────────────────────────────────────────────────────
 
 class Tool(ABC):
 	name: str
@@ -57,7 +57,7 @@ class Tool(ABC):
 		}
 
 
-# ── опасные паттерны для bash ─────────────────────────────────────────────────
+# ── dangerous bash patterns ─────────────────────────────────────────────────
 
 _DANGER = re.compile(
 	r"\b(rmdir\b|rd\b|format\b|Clear-Content|deltree\b|DROP\s+TABLE|TRUNCATE\s+TABLE|mkfs)\b"
@@ -66,7 +66,7 @@ _DANGER = re.compile(
 )
 
 
-# ── инструменты ───────────────────────────────────────────────────────────────
+# ── tools ────────────────────────────────────────────────────────────────────
 
 class BashTool(Tool):
 	name = "bash"
@@ -532,7 +532,7 @@ class BrowserScreenshotTool(Tool):
 			return f"ошибка: {e}"
 
 
-# ── реестр и ожидающие подтверждения ─────────────────────────────────────────
+# ── registry and pending confirmations ─────────────────────────────────────
 
 REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	BashTool(),

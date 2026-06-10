@@ -19,7 +19,7 @@ class Colors:
 	RESET = "\033[0m"
 	BOLD = "\033[1m"
 	DIM = "\033[2m"
-	
+
 	# Colors
 	CYAN = "\033[36m"
 	YELLOW = "\033[33m"
@@ -84,7 +84,7 @@ def request(method: str, path: str, status: Optional[int] = None) -> None:
 	ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
 	method_colored = _colorize(method, Colors.MAGENTA, bold=True)
 	path_colored = _colorize(path, Colors.WHITE)
-	
+
 	if status:
 		status_color = Colors.GREEN if 200 <= status < 300 else Colors.RED
 		status_colored = _colorize(str(status), status_color, bold=True)
@@ -98,7 +98,7 @@ def tool(name: str, args: str, result: Optional[str] = None) -> None:
 	ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
 	name_colored = _colorize(name, Colors.YELLOW, bold=True)
 	args_colored = _colorize(args, Colors.DIM)
-	
+
 	if result:
 		print(f"{ts} TOOL {name_colored} {args_colored}")
 		print(f"{ts}      → {result}")
