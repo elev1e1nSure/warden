@@ -62,7 +62,11 @@ func (m *model) clearHintState() {
 
 // handleSlash processes /commands before sending.
 func (m *model) handleSlash(text string) (bool, tea.Cmd) {
-	switch strings.ToLower(strings.TrimSpace(text)) {
+	trimmed := strings.ToLower(strings.TrimSpace(text))
+	if !strings.HasPrefix(trimmed, "/") {
+		return false, nil
+	}
+	switch trimmed {
 	case "/build":
 		m.autoMode = true
 		m.clearHintState()
