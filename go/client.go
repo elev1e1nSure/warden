@@ -52,7 +52,6 @@ func (c *Client) ResetSession() error {
 		return err
 	}
 	resp.Body.Close()
-	request("POST", "/reset", resp.StatusCode)
 	info("session reset")
 	return nil
 }
@@ -69,7 +68,6 @@ func (c *Client) SetMode(auto bool) error {
 		return err
 	}
 	resp.Body.Close()
-	request("POST", "/mode", resp.StatusCode)
 	mode := "AUTO"
 	if !auto {
 		mode = "SAFE"
@@ -90,7 +88,6 @@ func (c *Client) SetThinking(enabled bool) error {
 		return err
 	}
 	resp.Body.Close()
-	request("POST", "/thinking", resp.StatusCode)
 	status := "enabled"
 	if !enabled {
 		status = "disabled"
@@ -111,7 +108,6 @@ func (c *Client) SendQuestion(id string, answers [][]string) error {
 		return err
 	}
 	resp.Body.Close()
-	request("POST", "/question", resp.StatusCode)
 	info("question sent")
 	return nil
 }
@@ -138,7 +134,6 @@ func (c *Client) GetStatus() (*StatusResult, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	request("GET", "/status", resp.StatusCode)
 	var result StatusResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
@@ -153,7 +148,6 @@ func (c *Client) Compact() (*CompactResult, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	request("POST", "/compact", resp.StatusCode)
 	var result CompactResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
@@ -187,7 +181,6 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 			ch <- doneMsg{}
 			return
 		}
-		request("POST", "/chat", resp.StatusCode)
 
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)
