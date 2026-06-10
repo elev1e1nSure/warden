@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 venv/
 .warden/
+!.warden/powershell-reference.md
