@@ -183,7 +183,7 @@ class ChatSession:
 						self.add_tool_result(name, "cancelled: no confirmation manager")
 						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
 						continue
-					call_id, event = self.confirmation_manager.register()
+					call_id, _ = self.confirmation_manager.register()
 					confirm_payload = {
 						"id": call_id,
 						"tool": name,
@@ -196,17 +196,10 @@ class ChatSession:
 						"default": "cancel",
 					}
 					yield ("confirm", confirm_payload)
-					await event.wait()
-					resolved = self.confirmation_manager.pop(call_id)
-					if resolved is None or not resolved.get("ok", False):
+					ok = await self.confirmation_manager.wait(call_id)
+					if not ok:
 						self.add_tool_result(name, "cancelled by user")
 						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
-						continue
-					# Re-verify after confirm: tool name + args must still match
-					post_decision = assess_tool_call(name, args)
-					if post_decision.risk == "blocked":
-						self.add_tool_result(name, f"blocked after confirm: {post_decision.reason}")
-						yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {post_decision.reason}"})
 						continue
 
 				yield ("tool_start", {"name": name, "args": args_str})

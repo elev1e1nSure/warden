@@ -22,7 +22,7 @@ python backend (aiohttp, localhost:8765)
     ↓
 ollama
     ↓
-[bash] [filesystem] [screenshot] [mouse/keyboard] [browser] [search]
+[powershell] [filesystem] [screenshot] [mouse/keyboard] [browser] [search]
 ```
 
 frontend and backend are separated: TUI knows nothing about Ollama, backend knows nothing about UI.
@@ -47,8 +47,12 @@ warden/
 │   ├── chat.py            # session and streaming
 │   ├── ollama_process.py  # ollama management
 │   ├── confirmations.py   # dangerous tool confirmation manager
+│   ├── safety.py          # risk classification (safe / confirm / blocked)
+│   ├── test_safety.py     # safety tests (pytest)
 │   ├── tools.py           # agent tools
 │   └── logger.py          # backend colored logs
+├── .warden/
+│   └── powershell-reference.md  # command reference with risk markers
 ├── requirements.txt
 ├── README.md
 └── CLAUDE.md
@@ -64,7 +68,8 @@ cd go
 go run ./cmd/warden
 
 # or build and run
-go build -o warden.exe ./cmd/warden && ./warden.exe
+go build -o warden.exe ./cmd/warden
+./warden.exe
 ```
 
 backend starts on `localhost:8765`, automatically starts ollama and downloads the model if needed.
@@ -94,7 +99,7 @@ backend starts on `localhost:8765`, automatically starts ollama and downloads th
 | mode | behavior |
 |---|---|
 | **Leashed** (`/leash`) | Every tool call is classified by `agent/safety.py`. Safe commands run immediately. Confirm commands require user approval. Blocked commands are rejected and the model sees the block as a tool result. |
-| **Unleashed** (`/unleash`) | All commands run without confirmation. Use with caution. |
+| **Unleashed** (`/unleash`) | Safe and confirm-level commands run without confirmation. Blocked commands are still rejected. Use with caution. |
 
 ## confirmation
 
@@ -127,6 +132,15 @@ Risk classification is done by `agent/safety.py`, not the model:
 Path safety uses `Path.resolve()` with containment checks. UNC paths, device paths (`\\.\`, `\\?\`), and traversal (`../`) are blocked.
 
 PowerShell reference with risk markers: `.warden/powershell-reference.md`
+
+## tests
+
+```bash
+pip install pytest
+pytest agent/
+```
+
+Safety classification is covered by `agent/test_safety.py` — run it after any change to `agent/safety.py`.
 
 ## model
 

@@ -408,7 +408,9 @@ systeminfo | findstr /C:"OS Name" /C:"Total Physical Memory"
 # shutdown
 shutdown /s /t 0                       # BLOCKED — system shutdown
 shutdown /r /t 0                       # BLOCKED — system restart
-shutdown /r /t 60                      # restart in 60 seconds
+shutdown /r /t 60                      # BLOCKED — restart (any timer)
+shutdown /p                            # BLOCKED — immediate power off
+shutdown /h                            # BLOCKED — hibernate
 shutdown /a                            # abort pending shutdown
 shutdown /l                            # log off current user
 ```
