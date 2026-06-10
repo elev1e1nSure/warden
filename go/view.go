@@ -250,6 +250,8 @@ func (m model) renderHeader() string {
 	version := DimStyle().Render(" " + wardenVersion)
 	line1 := name + version
 
+	line2 := TitleStyle().Render(wardenModel)
+
 	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
 		mode = AutoStyle().Render("Unleashed")
@@ -258,13 +260,13 @@ func (m model) renderHeader() string {
 	if !m.thinkingEnabled {
 		reasoning = ThinkingOffStyle().Render("Off")
 	}
-	line2 := DimStyle().Render(wardenModel+" · ") + mode + DimStyle().Render(" · Thinking: ") + reasoning
+	line3 := DimStyle().Render("Status: ") + mode + DimStyle().Render(" | Thinking: ") + reasoning
 
-	line3 := DimStyle().Render(m.cwd)
+	line4 := DimStyle().Render(m.cwd)
 
 	sepLine := DimStyle().Render(strings.Repeat("─", m.width))
 
-	return strings.Join([]string{line1, line2, line3, sepLine}, "\n")
+	return strings.Join([]string{line1, line2, line3, line4, sepLine}, "\n")
 }
 
 func (m model) View() string {
