@@ -164,7 +164,13 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
-	summary := m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("Thought "+formatThinkDuration(duration))
+	var summary string
+	if entry.duration == 0 {
+		dots := strings.Repeat(".", m.spinner%4)
+		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("thinking"+dots)
+	} else {
+		summary = m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("Thought "+formatThinkDuration(duration))
+	}
 	if !m.thinkingExpanded {
 		return summary
 	}
@@ -282,7 +288,6 @@ func (m model) renderHeader() string {
 	}
 	b.WriteString(prefix)
 	b.WriteString(FaintStyle().Render(strings.Repeat("─", sepWidth)))
-	b.WriteString("\n")
 
 	return b.String()
 }
