@@ -10,6 +10,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const wardenVersion = "v0.1.0"
+
+var wardenLogo = `
+██     ██  █████  ██████  ██████  ███████ ███    ██
+██     ██ ██   ██ ██   ██ ██   ██ ██      ████   ██
+██  █  ██ ███████ ██████  ██   ██ █████   ██ ██  ██
+██ ███ ██ ██   ██ ██   ██ ██   ██ ██      ██  ██ ██
+ ███ ███  ██   ██ ██   ██ ██████  ███████ ██   ████
+`
+
 var presenceRng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 var wardenPresencePhrases = []string{
@@ -302,6 +312,43 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	return b.String()
 }
 
+func (m model) renderHeader() string {
+	var b strings.Builder
+
+	// Logo in Cyan
+	logoLines := strings.Split(strings.Trim(wardenLogo, "\n"), "\n")
+	for _, line := range logoLines {
+		if line != "" {
+			b.WriteString(WardenStyle().Render(line))
+			b.WriteString("\n")
+		}
+	}
+
+	// Version line
+	b.WriteString(DimStyle().Render("  v" + wardenVersion))
+	b.WriteString("\n")
+
+	// Status badges row
+	modeBadge := SafeStyle().Render("  Leashed  ")
+	if m.autoMode {
+		modeBadge = AutoStyle().Render("  Unleashed  ")
+	}
+
+	reasoningBadge := ThinkingOnStyle().Render("  Размышления: Вкл  ")
+	if !m.thinkingEnabled {
+		reasoningBadge = ThinkingOffStyle().Render("  Размышления: Выкл  ")
+	}
+
+	b.WriteString(modeBadge + "  " + reasoningBadge)
+	b.WriteString("\n")
+
+	// Separator line
+	b.WriteString(DimStyle().Render(strings.Repeat("─", m.width)))
+	b.WriteString("\n")
+
+	return b.String()
+}
+
 func (m model) View() string {
 	if m.height == 0 {
 		return ""
@@ -316,7 +363,7 @@ func (m model) View() string {
 			KeyStyle().Render("[Esc]") +
 			DimStyle().Render(" Clear  ") +
 			KeyStyle().Render("[F2]") +
-			DimStyle().Render(" Thoughts  ") +
+			DimStyle().Render(" Мысли  ") +
 			KeyStyle().Render("[Ctrl+C]") +
 			DimStyle().Render(" Exit")
 	}
@@ -338,7 +385,7 @@ func (m model) View() string {
 
 	footer = m.renderFooterStatus(footer)
 
-	layers := []string{m.viewport.View(), sep1}
+	layers := []string{m.renderHeader(), m.viewport.View(), sep1}
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
@@ -363,13 +410,13 @@ func (m model) renderFooterStatus(footer string) string {
 		mode = AutoStyle().Render("Unleashed")
 	}
 
-	reasoning := ThinkingOnStyle().Render("On")
+	reasoning := ThinkingOnStyle().Render("Вкл")
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Off")
+		reasoning = ThinkingOffStyle().Render("Выкл")
 	}
 
-	status := StatusStyle().Render("Status: ") + mode +
-		StatusStyle().Render("  Reasoning: ") + reasoning
+	status := StatusStyle().Render("Статус: ") + mode +
+		StatusStyle().Render("  Размышления: ") + reasoning
 
 	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
 	if gap < 2 {

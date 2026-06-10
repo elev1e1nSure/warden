@@ -79,12 +79,12 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
 		m.clearHintState()
-		status := "on"
+		status := "вкл"
 		if !m.thinkingEnabled {
-			status = "off"
+			status = "выкл"
 		}
 		m.wardenTS = time.Now().Format("15:04")
-		m.appendText(m.wardenLine("Thinking " + status))
+		m.appendText(m.wardenLine("Размышления " + status))
 		m.syncViewport()
 		return true, m.setThinking(m.thinkingEnabled)
 	}
