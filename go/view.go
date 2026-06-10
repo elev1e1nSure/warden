@@ -12,6 +12,14 @@ import (
 const wardenVersion = "v0.1.0"
 const wardenModel = "qwen3:8b"
 
+var wardenMascot = `
+     ██████████
+     ██   ████   ██
+██████████████
+     ██████████
+     █           █
+`
+
 func stickyTool(name string) bool {
 	switch name {
 	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search":
@@ -246,11 +254,21 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 }
 
 func (m model) renderHeader() string {
+	var b strings.Builder
+	for _, line := range strings.Split(strings.Trim(wardenMascot, "\n"), "\n") {
+		if line != "" {
+			b.WriteString(WardenStyle().Render(line))
+			b.WriteString("\n")
+		}
+	}
+
 	name := WardenStyle().Render("warden")
 	version := DimStyle().Render(" " + wardenVersion)
-	line1 := name + version
+	b.WriteString(name + version)
+	b.WriteString("\n")
 
-	line2 := ModelStyle().Render(wardenModel)
+	b.WriteString(ModelStyle().Render(wardenModel))
+	b.WriteString("\n")
 
 	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
@@ -260,13 +278,16 @@ func (m model) renderHeader() string {
 	if !m.thinkingEnabled {
 		reasoning = ThinkingOffStyle().Render("Off")
 	}
-	line3 := DimStyle().Render("Status: ") + mode + DimStyle().Render(" | Thinking: ") + reasoning
+	b.WriteString(DimStyle().Render("Status: ") + mode + DimStyle().Render(" | Thinking: ") + reasoning)
+	b.WriteString("\n")
 
-	line4 := DimStyle().Render(m.cwd)
+	b.WriteString(DimStyle().Render(m.cwd))
+	b.WriteString("\n")
 
-	sepLine := DimStyle().Render(strings.Repeat("─", m.width))
+	b.WriteString(DimStyle().Render(strings.Repeat("─", m.width)))
+	b.WriteString("\n")
 
-	return strings.Join([]string{line1, line2, line3, line4, sepLine}, "\n")
+	return b.String()
 }
 
 func (m model) View() string {

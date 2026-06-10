@@ -50,7 +50,7 @@ func (m *model) clearHintState() {
 	m.hintCount = 0
 	m.hintVisible = false
 	if m.height > 0 {
-		m.viewport.Height = m.height - 9
+		m.viewport.Height = m.height - 13
 	}
 }
 
