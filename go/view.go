@@ -12,14 +12,6 @@ import (
 const wardenVersion = "v0.1.0"
 const wardenModel = "qwen3:8b"
 
-var wardenMascot = `
-     ██████████
-     ██   ████   ██
-██████████████
-     ██████████
-     █           █
-`
-
 func stickyTool(name string) bool {
 	switch name {
 	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search":
@@ -255,12 +247,6 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 
 func (m model) renderHeader() string {
 	var b strings.Builder
-	for _, line := range strings.Split(strings.Trim(wardenMascot, "\n"), "\n") {
-		if line != "" {
-			b.WriteString(WardenStyle().Render(line))
-			b.WriteString("\n")
-		}
-	}
 
 	name := WardenStyle().Render("warden")
 	version := DimStyle().Render(" " + wardenVersion)
