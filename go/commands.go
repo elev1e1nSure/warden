@@ -68,7 +68,7 @@ func setContent(vp viewport.Model, lines []string, forceBottom bool) viewport.Mo
 }
 
 func (m model) tick() tea.Cmd {
-	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
