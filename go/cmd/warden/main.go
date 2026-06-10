@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -177,7 +178,12 @@ func preCheck() (alreadyRunning bool, err error) {
 	return false, nil
 }
 
-func startBackend(root string) (*exec.Cmd, error) {
+var (
+	apiURLFlag = flag.String("api", "", "API base URL (e.g. https://openrouter.ai/api/v1). If empty, uses local Ollama.")
+	modelFlag  = flag.String("model", "qwen3:8b", "Model name (e.g. qwen/qwen3-coder:free)")
+)
+
+func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {
 	runtimeDir := filepath.Join(root, ".warden")
 	os.MkdirAll(runtimeDir, 0755)
 
@@ -195,7 +201,15 @@ func startBackend(root string) (*exec.Cmd, error) {
 
 	cmd := exec.Command("python", "-m", "agent.server")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+root, "PYTHONUTF8=1", "PYTHONIOENCODING=utf-8")
+	cmd.Env = append(os.Environ(),
+		"PYTHONPATH="+root,
+		"PYTHONUTF8=1",
+		"PYTHONIOENCODING=utf-8",
+		"WARDEN_MODEL="+model,
+	)
+	if apiURL != "" {
+		cmd.Env = append(cmd.Env, "WARDEN_API_URL="+apiURL)
+	}
 	cmd.Stdout = outFile
 	cmd.Stderr = errFile
 
@@ -238,6 +252,8 @@ func runLauncher(alreadyRunning bool) (ready bool, backend *exec.Cmd) {
 }
 
 func main() {
+	flag.Parse()
+
 	alreadyRunning, err := preCheck()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "precheck failed:", err)
@@ -251,7 +267,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "find root failed:", err)
 			os.Exit(1)
 		}
-		backend, err = startBackend(root)
+		backend, err = startBackend(root, *apiURLFlag, *modelFlag)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start backend failed:", err)
 			os.Exit(1)

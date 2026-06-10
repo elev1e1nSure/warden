@@ -2,9 +2,8 @@ import asyncio
 from pathlib import Path
 from typing import AsyncIterator, List, Dict, Any
 
-import ollama
-
 from agent.confirmations import ConfirmationManager
+from agent.llm_client import LLMChunk, LLMClient
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
 
@@ -46,37 +45,11 @@ def _resolve_preview(args: dict, fallback: str) -> str:
 	return fallback
 
 
-def _extract_message(chunk: Any) -> dict:
-	try:
-		msg = chunk.message
-		return {
-			"thinking": getattr(msg, "thinking", None) or "",
-			"content": getattr(msg, "content", None) or "",
-			"tool_calls": getattr(msg, "tool_calls", None) or [],
-		}
-	except AttributeError:
-		msg = chunk.get("message") or {}
-		return {
-			"thinking": msg.get("thinking") or "",
-			"content": msg.get("content") or "",
-			"tool_calls": msg.get("tool_calls") or [],
-		}
-
-
-def _chunk_parts(chunk: Any) -> tuple[str, str]:
-	msg = _extract_message(chunk)
-	return msg["thinking"], msg["content"]
-
-
-def _get_tool_calls(chunk: Any) -> list:
-	return _extract_message(chunk)["tool_calls"]
-
-
 class ChatSession:
-	def __init__(self, model: str, confirmation_manager: ConfirmationManager | None = None) -> None:
+	def __init__(self, model: str, client: LLMClient, confirmation_manager: ConfirmationManager | None = None) -> None:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
-		self._client = ollama.AsyncClient()
+		self._client = client
 		self.thinking_enabled: bool = True
 		self.confirmation_manager = confirmation_manager
 
@@ -95,8 +68,11 @@ class ChatSession:
 			msg["tool_calls"] = tool_calls
 		self.history.append(msg)
 
-	def add_tool_result(self, tool_name: str, result: str) -> None:
-		self.history.append({"role": "tool", "content": result, "name": tool_name})
+	def add_tool_result(self, tool_name: str, result: str, tool_call_id: str = "") -> None:
+		entry: Dict[str, Any] = {"role": "tool", "content": result, "name": tool_name}
+		if tool_call_id:
+			entry["tool_call_id"] = tool_call_id
+		self.history.append(entry)
 
 	async def stream(self, text: str, auto_mode: bool = False) -> AsyncIterator[tuple[str, Any]]:
 		self.add_user(text)
@@ -112,18 +88,17 @@ class ChatSession:
 			collected_tool_calls: list = []
 
 			try:
-				async for chunk in await self._client.chat(
+				async for chunk in self._client.chat(
 					model=self.model,
 					messages=messages,
 					tools=_TOOLS,
-					stream=True,
 				):
-					tcs = _get_tool_calls(chunk)
-					if tcs:
-						collected_tool_calls.extend(tcs)
+					if chunk.tool_calls:
+						collected_tool_calls.extend(chunk.tool_calls)
 						continue
 
-					thinking, content = _chunk_parts(chunk)
+					thinking = chunk.thinking
+					content = chunk.content
 
 					if thinking:
 						if self.thinking_enabled:
@@ -170,9 +145,12 @@ class ChatSession:
 				try:
 					name = tc.function.name
 					raw_args = tc.function.arguments
+					tool_call_id = tc.id
 				except AttributeError:
-					name = tc.get("function", {}).get("name", "")
-					raw_args = tc.get("function", {}).get("arguments", {})
+					func = tc.get("function", {})
+					name = func.get("name", "")
+					raw_args = func.get("arguments", {})
+					tool_call_id = tc.get("id", "")
 
 				tool = REGISTRY.get(name)
 				if not tool:
@@ -221,7 +199,7 @@ class ChatSession:
 				except Exception as e:
 					result = f"error: {e}"
 				yield ("tool", {"name": name, "args": args_str, "result": result})
-				self.add_tool_result(name, result)
+				self.add_tool_result(name, result, tool_call_id)
 
 		if iter_count >= MAX_ITER:
 			yield ("token", "\n[iteration limit reached]")

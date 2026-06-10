@@ -1,10 +1,12 @@
 import asyncio
 import json
+import os
 
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
 
 from agent.chat import ChatSession
+from agent.llm_client import OllamaClient, OpenAIClient
 from agent.ollama_process import OllamaProcessManager
 from agent.confirmations import ConfirmationManager
 from agent.logger import info, warn, error, success, request as log_request
@@ -13,19 +15,27 @@ _backend: Backend | None = None
 
 
 class Backend:
-	def __init__(self, model: str = "qwen3:8b") -> None:
-		self.model = model
-		self.ollama = OllamaProcessManager(model=model)
+	def __init__(self) -> None:
+		self.model = os.environ.get("WARDEN_MODEL", "qwen3:8b")
+		self.api_url = os.environ.get("WARDEN_API_URL", "")
+		if self.api_url:
+			self.llm = OpenAIClient(self.api_url)
+			self.ollama: OllamaProcessManager | None = None
+			info(f"using remote API: {self.api_url}")
+		else:
+			self.llm = OllamaClient()
+			self.ollama = OllamaProcessManager(model=self.model)
 		self.confirmation_manager = ConfirmationManager()
-		self.chat = ChatSession(model=model, confirmation_manager=self.confirmation_manager)
+		self.chat = ChatSession(model=self.model, client=self.llm, confirmation_manager=self.confirmation_manager)
 		self.auto_mode: bool = False
 
 	async def setup(self) -> None:
-		ok = await self.ollama.ensure_running()
-		if not ok:
-			raise RuntimeError("failed to connect to ollama")
-		if not self.ollama.has_model():
-			await self.ollama.pull_model()
+		if self.ollama is not None:
+			ok = await self.ollama.ensure_running()
+			if not ok:
+				raise RuntimeError("failed to connect to ollama")
+			if not self.ollama.has_model():
+				await self.ollama.pull_model()
 
 	def set_auto_mode(self, enabled: bool) -> None:
 		self.auto_mode = enabled
@@ -160,7 +170,10 @@ async def main() -> None:
 	backend = Backend()
 	_backend = backend
 	await backend.setup()
-	success("ollama ready")
+	if backend.ollama is not None:
+		success("ollama ready")
+	else:
+		success("remote API ready")
 
 	app = web.Application()
 	app["backend"] = backend
@@ -182,5 +195,5 @@ if __name__ == "__main__":
 	try:
 		asyncio.run(main())
 	except KeyboardInterrupt:
-		if _backend is not None:
+		if _backend is not None and _backend.ollama is not None:
 			_backend.ollama.shutdown()

@@ -8,7 +8,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama.
 |---|---|
 | frontend | go 1.23+, bubbletea, lipgloss |
 | backend | python 3.11+, aiohttp |
-| llm | ollama (qwen3:8b) |
+| llm | ollama (qwen3:8b) or remote OpenAI-compatible API (OpenRouter) |
 | computer use | pyautogui, pillow |
 | browser | playwright |
 | search | duckduckgo-search |
@@ -48,6 +48,7 @@ warden/
 ├── agent/
 │   ├── server.py          # aiohttp backend
 │   ├── chat.py            # session and streaming
+│   ├── llm_client.py      # LLM abstraction (Ollama / OpenAI-compatible)
 │   ├── ollama_process.py  # ollama management
 │   ├── confirmations.py   # dangerous tool confirmation manager
 │   ├── safety.py          # risk classification (safe / confirm / blocked)
@@ -77,6 +78,21 @@ go build -o warden.exe ./cmd/warden
 ```
 
 backend starts on `localhost:8765`, automatically starts ollama and downloads the model if needed.
+
+### remote API (OpenRouter)
+
+```bash
+# Set your API key
+$env:OPENROUTER_API_KEY="sk-or-v1-..."
+
+# Launch with a remote model
+.\warden.exe --api https://openrouter.ai/api/v1 --model qwen/qwen3-coder:free
+```
+
+| flag | description |
+|---|---|
+| `--api` | Base URL of an OpenAI-compatible API (e.g. `https://openrouter.ai/api/v1`). If omitted, uses local Ollama. |
+| `--model` | Model name. Default: `qwen3:8b`. For OpenRouter: e.g. `qwen/qwen3-coder:free`. |
 
 ## tools
 
@@ -148,8 +164,16 @@ Safety classification is covered by `agent/test_safety.py` — run it after any 
 
 ## model
 
+### local (Ollama)
+
 Recommended: `qwen3:8b`
 
 ```bash
 ollama run qwen3:8b
 ```
+
+### remote (OpenRouter)
+
+Set `OPENROUTER_API_KEY` and launch with `--api` and `--model`.
+
+Example free model: `qwen/qwen3-coder:free`
