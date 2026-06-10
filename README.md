@@ -85,14 +85,19 @@ backend starts on `localhost:8765`, automatically starts ollama and downloads th
 # Set your API key
 $env:OPENROUTER_API_KEY="sk-or-v1-..."
 
-# Launch with a remote model
+# Launch with OpenRouter — provider auto-sets the API URL
+.\warden.exe --provider openrouter --model qwen/qwen3-coder:free
+.\warden.exe --provider openrouter --model poolside/laguna-m.1:free
+
+# Or set the API URL explicitly
 .\warden.exe --api https://openrouter.ai/api/v1 --model qwen/qwen3-coder:free
 ```
 
 | flag | description |
 |---|---|
-| `--api` | Base URL of an OpenAI-compatible API (e.g. `https://openrouter.ai/api/v1`). If omitted, uses local Ollama. |
-| `--model` | Model name. Default: `qwen3:8b`. For OpenRouter: e.g. `qwen/qwen3-coder:free`. |
+| `--provider` | `ollama` (default) or `openrouter`. Auto-sets `--api` for known providers. |
+| `--api` | Override API base URL. Used when `--provider` is not enough. |
+| `--model` | Model name. Default: `qwen3:8b`. |
 
 ## tools
 

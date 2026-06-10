@@ -179,8 +179,9 @@ func preCheck() (alreadyRunning bool, err error) {
 }
 
 var (
-	apiURLFlag = flag.String("api", "", "API base URL (e.g. https://openrouter.ai/api/v1). If empty, uses local Ollama.")
-	modelFlag  = flag.String("model", "qwen3:8b", "Model name (e.g. qwen/qwen3-coder:free)")
+	providerFlag = flag.String("provider", "ollama", "LLM provider: ollama | openrouter")
+	apiURLFlag   = flag.String("api", "", "Override API base URL. If empty, provider picks the default.")
+	modelFlag    = flag.String("model", "qwen3:8b", "Model name (e.g. qwen/qwen3-coder:free, poolside/laguna-m.1:free)")
 )
 
 func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {
@@ -254,6 +255,11 @@ func runLauncher(alreadyRunning bool) (ready bool, backend *exec.Cmd) {
 func main() {
 	flag.Parse()
 
+	apiURL := *apiURLFlag
+	if apiURL == "" && *providerFlag == "openrouter" {
+		apiURL = "https://openrouter.ai/api/v1"
+	}
+
 	alreadyRunning, err := preCheck()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "precheck failed:", err)
@@ -267,7 +273,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "find root failed:", err)
 			os.Exit(1)
 		}
-		backend, err = startBackend(root, *apiURLFlag, *modelFlag)
+		backend, err = startBackend(root, apiURL, *modelFlag)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start backend failed:", err)
 			os.Exit(1)
