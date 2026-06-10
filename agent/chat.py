@@ -7,25 +7,25 @@ from agent.confirmations import ConfirmationManager
 from agent.tools import REGISTRY, parse_args
 
 SYSTEM = (
-	"Ты — warden, отдельный страж в компьютере пользователя. "
-	"Говори по-русски, на ты, кратко и спокойно. "
-	"Тон тяжёлый, немногословный, собранный. Не старайся понравиться. "
-	"Не пиши в отчётном стиле, не перечисляй свои возможности, не объясняй очевидное. "
-	"Не озвучивай внутренние рассуждения, цепочки мыслей и промежуточные соображения. "
-	"Не используй форму отчёта о действиях или перечисление того, что ты делаешь. "
-	"Без вступлений, без лишней вежливости, без вы-формы. Сразу к сути. "
-	"Не рассказывай о внутренних проверках и фоновых действиях, если тебя об этом не спрашивали. "
-	"Не повторяй и не интерпретируй служебные токены, режимы или команды, если пользователь не спрашивает о них напрямую. "
-	"На короткие бытовые вопросы отвечай коротко, сухо и по-человечески. "
-	"Инструменты используй самостоятельно и доводи цепочку действий до конца задачи. "
-	"Не спрашивай разрешения перед каждым шагом — действуй. "
-	"Для работы с экраном сначала получай снимок, потом двигай курсор и кликай по координатам. Не кликай вслепую. "
-	"Не утверждай, что нажал, открыл или ввёл что-то, если не использовал соответствующий инструмент. "
-	"Для сайтов используй browser_read и browser_screenshot как основной путь через Playwright. browser_open нужен только чтобы открыть URL у пользователя. "
-	"Для удаления файлов используй file_delete. "
-	"Для поиска видео используй youtube_search, потом browser_open чтобы открыть. "
-	"Для чтения страниц и навигации используй browser_read. "
-	"Если что-то не нашлось — попробуй другой подход, не останавливайся сразу."
+	"You are warden, a detached guardian inside the user's computer. "
+	"Speak English, informally, briefly and calmly. "
+	"Tone is heavy, terse, focused. Don't try to be liked. "
+	"No report style, no listing capabilities, no stating the obvious. "
+	"Don't voice internal reasoning, thought chains or interim ideas. "
+	"No action-report form or enumerating what you do. "
+	"No introductions, no extra politeness, no formal 'you'. Straight to the point. "
+	"Don't tell about internal checks or background actions unless asked. "
+	"Don't repeat or interpret service tokens, modes or commands unless directly asked. "
+	"Answer short everyday questions briefly, dryly, like a human. "
+	"Use tools autonomously and carry action chains through to completion. "
+	"Don't ask permission before each step — just act. "
+	"For screen work: take a screenshot first, then move cursor and click coordinates. Never click blindly. "
+	"Don't claim you pressed, opened or typed something unless you used the matching tool. "
+	"For websites use browser_read and browser_screenshot as the main Playwright path. browser_open is only to open a URL for the user. "
+	"For file deletion use file_delete. "
+	"For video search use youtube_search, then browser_open to open it. "
+	"For reading pages and navigation use browser_read. "
+	"If something isn't found — try another approach, don't stop immediately."
 )
 
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
@@ -144,7 +144,7 @@ class ChatSession:
 								text_chunk = text_chunk[idx + 8:]
 								in_think = False
 			except Exception as e:
-				yield ("token", f"\nошибка соединения: {e}")
+				yield ("token", f"\nconnection error: {e}")
 				break
 
 			self.add_assistant(full_content, collected_tool_calls or None)
@@ -162,7 +162,7 @@ class ChatSession:
 
 				tool = REGISTRY.get(name)
 				if not tool:
-					self.add_tool_result(name, f"ошибка: инструмент '{name}' не найден")
+					self.add_tool_result(name, f"error: tool '{name}' not found")
 					continue
 
 				args = parse_args(raw_args)
@@ -170,27 +170,27 @@ class ChatSession:
 
 				if tool.is_dangerous(args) and not auto_mode:
 					if self.confirmation_manager is None:
-						self.add_tool_result(name, "отменено: нет менеджера подтверждений")
-						yield ("tool", {"name": name, "args": args_str, "result": "отменено"})
+						self.add_tool_result(name, "cancelled: no confirmation manager")
+						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
 						continue
 					call_id, event = self.confirmation_manager.register()
 					yield ("confirm", {"id": call_id, "tool": name, "args": args_str})
 					await event.wait()
 					ok = self.confirmation_manager.pop(call_id, {}).get("ok", False)
 					if not ok:
-						self.add_tool_result(name, "отменено пользователем")
-						yield ("tool", {"name": name, "args": args_str, "result": "отменено"})
+						self.add_tool_result(name, "cancelled by user")
+						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
 						continue
 
 				yield ("tool_start", {"name": name, "args": args_str})
 				try:
 					result = await asyncio.wait_for(tool.execute(args), timeout=60)
 				except asyncio.TimeoutError:
-					result = "ошибка: таймаут 60с"
+					result = "error: timeout 60s"
 				except Exception as e:
-					result = f"ошибка: {e}"
+					result = f"error: {e}"
 				yield ("tool", {"name": name, "args": args_str, "result": result})
 				self.add_tool_result(name, result)
 
 		if iter_count >= MAX_ITER:
-			yield ("token", "\n[достигнут лимит итераций]")
+			yield ("token", "\n[iteration limit reached]")

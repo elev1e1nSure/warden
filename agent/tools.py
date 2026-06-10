@@ -69,8 +69,8 @@ _DANGER = re.compile(
 
 class BashTool(Tool):
 	name = "bash"
-	description = "Выполнить команду PowerShell. Для файлов, процессов, системы."
-	params = {"command": {"type": "string", "description": "Команда PowerShell"}}
+	description = "Run a PowerShell command. For files, processes, system."
+	params = {"command": {"type": "string", "description": "PowerShell command"}}
 
 	def is_dangerous(self, args: Dict[str, Any]) -> bool:
 		return bool(_DANGER.search(args.get("command", "")))
@@ -88,18 +88,18 @@ class BashTool(Tool):
 			if not out and err:
 				return f"stderr: {err[:500]}"
 			if not out:
-				return "(нет вывода)"
+				return "(no output)"
 			return out[:1000] + (f"\nstderr: {err[:200]}" if err else "")
 		except subprocess.TimeoutExpired:
-			return "ошибка: таймаут 30с"
+			return "error: timeout 30s"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class FileReadTool(Tool):
 	name = "file_read"
-	description = "Прочитать файл."
-	params = {"path": {"type": "string", "description": "Путь к файлу"}}
+	description = "Read a file."
+	params = {"path": {"type": "string", "description": "File path"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
 		path = args.get("path", "")
@@ -107,18 +107,18 @@ class FileReadTool(Tool):
 			with open(path, encoding="utf-8") as f:
 				content = f.read()
 			if len(content) > 4000:
-				return content[:4000] + "\n...(обрезано)"
+				return content[:4000] + "\n...(truncated)"
 			return content
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class FileWriteTool(Tool):
 	name = "file_write"
-	description = "Записать текст в файл. Создаёт папки если нужно."
+	description = "Write text to a file. Creates directories if needed."
 	params = {
-		"path": {"type": "string", "description": "Путь к файлу"},
-		"content": {"type": "string", "description": "Содержимое"},
+		"path": {"type": "string", "description": "File path"},
+		"content": {"type": "string", "description": "Content"},
 	}
 
 	def is_dangerous(self, args: Dict[str, Any]) -> bool:
@@ -133,15 +133,15 @@ class FileWriteTool(Tool):
 				os.makedirs(d, exist_ok=True)
 			with open(path, "w", encoding="utf-8") as f:
 				f.write(content)
-			return f"записано {len(content)} символов → {path}"
+			return f"wrote {len(content)} chars → {path}"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class FileDeleteTool(Tool):
 	name = "file_delete"
-	description = "Удалить файл. Работает только внутри текущей директории."
-	params = {"path": {"type": "string", "description": "Путь к файлу"}}
+	description = "Delete a file. Only works inside the current directory."
+	params = {"path": {"type": "string", "description": "File path"}}
 
 	def is_dangerous(self, args: Dict[str, Any]) -> bool:
 		return True
@@ -151,21 +151,21 @@ class FileDeleteTool(Tool):
 		try:
 			abs_path = os.path.abspath(path)
 			if not abs_path.startswith(os.getcwd()):
-				return "ошибка: нельзя удалять файлы вне текущей директории"
+				return "error: cannot delete files outside current directory"
 			if not os.path.exists(abs_path):
-				return f"ошибка: не найден: {path}"
+				return f"error: not found: {path}"
 			if os.path.isdir(abs_path):
-				return "ошибка: это директория — используй bash rmdir"
+				return "error: this is a directory — use bash rmdir"
 			os.remove(abs_path)
-			return f"удалён: {path}"
+			return f"deleted: {path}"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class FileListTool(Tool):
 	name = "file_list"
-	description = "Список файлов и папок в директории."
-	params = {"path": {"type": "string", "description": "Директория (. для текущей)"}}
+	description = "List files and directories."
+	params = {"path": {"type": "string", "description": "Directory (. for current)"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
 		path = args.get("path", ".")
@@ -182,20 +182,20 @@ class FileListTool(Tool):
 					files.append(f"{e} ({kb:.1f}KB)" if kb >= 1 else f"{e} ({size}B)")
 			parts = []
 			if dirs:
-				parts.append("папки: " + "  ".join(dirs))
+				parts.append("dirs: " + "  ".join(dirs))
 			if files:
-				parts.append("файлы: " + "  ".join(files))
-			return "\n".join(parts) if parts else "(пусто)"
+				parts.append("files: " + "  ".join(files))
+			return "\n".join(parts) if parts else "(empty)"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class ClipboardTool(Tool):
 	name = "clipboard"
-	description = "Читать или записывать буфер обмена."
+	description = "Read or write the clipboard."
 	params = {
 		"action": {"type": "string", "description": "read | write"},
-		"text": {"type": "string", "description": "Текст для записи (только для write)"},
+		"text": {"type": "string", "description": "Text to write (write only)"},
 	}
 
 	def to_ollama(self) -> dict:
@@ -221,7 +221,7 @@ class ClipboardTool(Tool):
 					["powershell", "-NoProfile", "-Command", "Get-Clipboard"],
 					capture_output=True, text=True, timeout=5,
 				)
-				return (proc.stdout or "").strip() or "(пусто)"
+				return (proc.stdout or "").strip() or "(empty)"
 			elif action == "write":
 				text = args.get("text", "")
 				escaped = text.replace("'", "''")
@@ -231,17 +231,17 @@ class ClipboardTool(Tool):
 					["powershell", "-NoProfile", "-Command", cmd],
 					capture_output=True, timeout=5,
 				)
-				return f"скопировано в буфер: {text[:60]}"
-			return "ошибка: action должен быть read или write"
+				return f"copied to clipboard: {text[:60]}"
+			return "error: action must be read or write"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class ScreenshotTool(Tool):
 	name = "screenshot"
 	description = (
-		"Сделать скриншот экрана. Возвращает путь к файлу. "
-		"Используй чтобы увидеть что на экране, потом mouse/keyboard для взаимодействия."
+		"Take a screenshot. Returns the file path. "
+		"Use to see what's on screen, then mouse/keyboard to interact."
 	)
 	params = {}
 
@@ -252,26 +252,26 @@ class ScreenshotTool(Tool):
 			name = f"screenshot_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
 			img = await asyncio.to_thread(ImageGrab.grab)
 			await asyncio.to_thread(img.save, name)
-			return f"сохранён: {name} ({img.width}×{img.height})"
+			return f"saved: {name} ({img.width}x{img.height})"
 		except ImportError:
-			return "ошибка: pip install Pillow"
+			return "error: pip install Pillow"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class MouseTool(Tool):
 	name = "mouse"
 	description = (
-		"Управлять мышью по координатам экрана: двигать, кликать, скроллить. "
-		"Если координаты неизвестны, сначала используй screenshot и найди цель на снимке. "
+		"Control the mouse by screen coordinates: move, click, scroll. "
+		"If coordinates are unknown, use screenshot first and find the target. "
 		"action: move | click | right_click | double_click | scroll. "
-		"Для scroll: amount — шаги (+ вниз, - вверх)."
+		"For scroll: amount — steps (+ down, - up)."
 	)
 	params = {
 		"action": {"type": "string", "description": "move | click | right_click | double_click | scroll"},
-		"x": {"type": "integer", "description": "X координата"},
-		"y": {"type": "integer", "description": "Y координата"},
-		"amount": {"type": "integer", "description": "Для scroll: шаги прокрутки"},
+		"x": {"type": "integer", "description": "X coordinate"},
+		"y": {"type": "integer", "description": "Y coordinate"},
+		"amount": {"type": "integer", "description": "For scroll: scroll steps"},
 	}
 
 	def to_ollama(self) -> dict:
@@ -298,37 +298,37 @@ class MouseTool(Tool):
 			pyautogui.FAILSAFE = True
 			if action == "move":
 				await asyncio.to_thread(pyautogui.moveTo, x, y, duration=0.2)
-				return f"курсор → ({x}, {y})"
+				return f"cursor → ({x}, {y})"
 			elif action == "click":
 				await asyncio.to_thread(pyautogui.click, x, y)
-				return f"клик ({x}, {y})"
+				return f"click ({x}, {y})"
 			elif action == "right_click":
 				await asyncio.to_thread(pyautogui.rightClick, x, y)
-				return f"правый клик ({x}, {y})"
+				return f"right click ({x}, {y})"
 			elif action == "double_click":
 				await asyncio.to_thread(pyautogui.doubleClick, x, y)
-				return f"двойной клик ({x}, {y})"
+				return f"double click ({x}, {y})"
 			elif action == "scroll":
 				await asyncio.to_thread(pyautogui.scroll, amount, x, y)
-				return f"скролл {amount} @ ({x}, {y})"
-			return f"ошибка: неизвестный action '{action}'"
+				return f"scroll {amount} @ ({x}, {y})"
+			return f"error: unknown action '{action}'"
 		except ImportError:
-			return "ошибка: pip install pyautogui"
+			return "error: pip install pyautogui"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class KeyboardTool(Tool):
 	name = "keyboard"
 	description = (
-		"Управлять клавиатурой. "
-		"action: type — напечатать текст, press — нажать клавишу/комбинацию. "
-		"Используй после клика в нужное поле или активное окно. "
-		"Для press ключи через + (ctrl+c, alt+f4, win+d, enter, escape)."
+		"Control the keyboard. "
+		"action: type — type text, press — press a key or combination. "
+		"Use after clicking the needed field or active window. "
+		"For press: keys separated by + (ctrl+c, alt+f4, win+d, enter, escape)."
 	)
 	params = {
 		"action": {"type": "string", "description": "type | press"},
-		"text": {"type": "string", "description": "Текст для type или клавиши для press"},
+		"text": {"type": "string", "description": "Text for type or keys for press"},
 	}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
@@ -338,26 +338,26 @@ class KeyboardTool(Tool):
 			import pyautogui
 			if action == "type":
 				await asyncio.to_thread(pyautogui.write, text, interval=0.03)
-				return f"напечатано: {text[:60]}"
+				return f"typed: {text[:60]}"
 			elif action == "press":
 				keys = [k.strip() for k in text.split("+")]
 				if len(keys) == 1:
 					await asyncio.to_thread(pyautogui.press, keys[0])
 				else:
 					await asyncio.to_thread(pyautogui.hotkey, *keys)
-				return f"нажато: {text}"
-			return f"ошибка: action должен быть type или press"
+				return f"pressed: {text}"
+			return f"error: action must be type or press"
 		except ImportError:
-			return "ошибка: pip install pyautogui"
+			return "error: pip install pyautogui"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class BrowserOpenTool(Tool):
 	name = "browser_open"
 	description = (
-		"Открыть URL в браузере пользователя. "
-		"Не читает страницу и не управляет ею. Для чтения и проверки веб-страниц используй browser_read или browser_screenshot."
+		"Open a URL in the user's browser. "
+		"Does not read or control the page. For reading and checking web pages use browser_read or browser_screenshot."
 	)
 	params = {"url": {"type": "string", "description": "URL"}}
 
@@ -366,16 +366,16 @@ class BrowserOpenTool(Tool):
 		try:
 			import webbrowser
 			await asyncio.to_thread(webbrowser.open, url)
-			return f"открыт: {url}"
+			return f"opened: {url}"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class BrowserReadTool(Tool):
 	name = "browser_read"
 	description = (
-		"Через Playwright прочитать содержимое страницы: текст и список ссылок. "
-		"Используй для навигации по сайтам, проверки страниц и извлечения данных без открытия окна пользователю."
+		"Read page content via Playwright: text and list of links. "
+		"Use for site navigation, page checks and data extraction without opening a window for the user."
 	)
 	params = {"url": {"type": "string", "description": "URL"}}
 
@@ -417,21 +417,21 @@ class BrowserReadTool(Tool):
 				await browser.close()
 			out = data["text"]
 			if data["links"]:
-				out += "\n\nСсылки:\n" + "\n".join(f"• {l['text']}: {l['url']}" for l in data["links"])
+				out += "\n\nLinks:\n" + "\n".join(f"• {l['text']}: {l['url']}" for l in data["links"])
 			return out[:3000]
 		except ImportError:
-			return "ошибка: pip install playwright && playwright install chromium"
+			return "error: pip install playwright && playwright install chromium"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class YouTubeSearchTool(Tool):
 	name = "youtube_search"
 	description = (
-		"Искать видео на YouTube. Возвращает список видео с прямыми ссылками. "
-		"Используй вместо google_search для поиска видео."
+		"Search for videos on YouTube. Returns a list of videos with direct links. "
+		"Use instead of google_search for video search."
 	)
-	params = {"query": {"type": "string", "description": "Поисковый запрос"}}
+	params = {"query": {"type": "string", "description": "Search query"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
 		import urllib.parse
@@ -476,21 +476,21 @@ class YouTubeSearchTool(Tool):
 				""")
 				await browser.close()
 			if not results:
-				return "нет результатов"
+				return "no results"
 			return "\n".join(
 				f"{i+1}. {r['title']}{(' · ' + r['meta']) if r['meta'] else ''}\n   {r['url']}"
 				for i, r in enumerate(results)
 			)
 		except ImportError:
-			return "ошибка: pip install playwright && playwright install chromium"
+			return "error: pip install playwright && playwright install chromium"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class GoogleSearchTool(Tool):
 	name = "google_search"
-	description = "Поиск в интернете. Возвращает топ-5 результатов. Не открывает браузер пользователю."
-	params = {"query": {"type": "string", "description": "Поисковый запрос"}}
+	description = "Search the web. Returns top-5 results. Does not open the user's browser."
+	params = {"query": {"type": "string", "description": "Search query"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
 		query = args.get("query", "")
@@ -500,20 +500,20 @@ class GoogleSearchTool(Tool):
 				lambda: list(DDGS().text(query, max_results=5))
 			)
 			if not results:
-				return "нет результатов"
+				return "no results"
 			return "\n".join(
 				f"• {r['title']}\n  {r['href']}\n  {r.get('body', '')[:200]}"
 				for r in results
 			)
 		except ImportError:
-			return "ошибка: pip install duckduckgo-search"
+			return "error: pip install duckduckgo-search"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 class BrowserScreenshotTool(Tool):
 	name = "browser_screenshot"
-	description = "Через Playwright сделать скриншот веб-страницы в фоне и вернуть путь к файлу."
+	description = "Take a screenshot of a web page in the background via Playwright and return the file path."
 	params = {"url": {"type": "string", "description": "URL"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
@@ -528,11 +528,11 @@ class BrowserScreenshotTool(Tool):
 				await page.goto(url, timeout=20000)
 				await page.screenshot(path=name, full_page=True)
 				await browser.close()
-			return f"сохранён: {name}"
+			return f"saved: {name}"
 		except ImportError:
-			return "ошибка: pip install playwright && playwright install chromium"
+			return "error: pip install playwright && playwright install chromium"
 		except Exception as e:
-			return f"ошибка: {e}"
+			return f"error: {e}"
 
 
 # ── registry ───────────────────────────────────────────────────────────────
