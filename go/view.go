@@ -232,6 +232,34 @@ func (m *model) syncViewport() {
 	m.viewport = setContent(m.viewport, m.messages, m.streaming || m.loading)
 }
 
+func renderConfirmBlock(inner confirmMsg, width int) string {
+	var b strings.Builder
+	b.WriteString(ErrorStyle().Render("⚠ " + inner.title))
+	b.WriteString("\n")
+	b.WriteString(ToolStyle().Render("  " + inner.tool))
+	b.WriteString("\n")
+	if inner.preview != "" {
+		b.WriteString(DimStyle().Render("  will run:"))
+		b.WriteString("\n")
+		preview := inner.preview
+		if len(preview) > width-6 {
+			preview = preview[:width-7] + "…"
+		}
+		b.WriteString("    " + preview)
+		b.WriteString("\n")
+	}
+	if len(inner.details) > 0 {
+		b.WriteString(DimStyle().Render("  why:"))
+		b.WriteString("\n")
+		for _, d := range inner.details {
+			b.WriteString("    • " + d)
+			b.WriteString("\n")
+		}
+	}
+	b.WriteString(DimStyle().Render("  [Y] run    [Enter/Esc/N] cancel"))
+	return b.String()
+}
+
 func (m model) View() string {
 	if m.height == 0 {
 		return ""
@@ -239,9 +267,9 @@ func (m model) View() string {
 
 	var footer string
 	if m.confirming {
-		footer = KeyStyle().Render("[Y Enter]") +
-			DimStyle().Render(" Confirm  ") +
-			KeyStyle().Render("[Esc]") +
+		footer = KeyStyle().Render("[Y]") +
+			DimStyle().Render(" Run  ") +
+			KeyStyle().Render("[Enter/Esc/N]") +
 			DimStyle().Render(" Cancel")
 	} else {
 		footer = KeyStyle().Render("[Enter]") +

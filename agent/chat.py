@@ -4,6 +4,7 @@ from typing import AsyncIterator, List, Dict, Any
 import ollama
 
 from agent.confirmations import ConfirmationManager
+from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
 
 SYSTEM = (
@@ -26,12 +27,8 @@ SYSTEM = (
 	"For video search use youtube_search, then browser_open to open it. "
 	"For reading pages and navigation use browser_read. "
 	"If something isn't found — try another approach, don't stop immediately. "
-	"PowerShell 7 cheat-sheet: $env:V, $?, $LASTEXITCODE, $null; "
-	"-eq -ne -gt -lt -like -match -replace; arrays @(1,2,3); hashtables @{}; "
-	"foreach ($x in $arr) { ... } | Where-Object { ... } | ForEach-Object { ... }; "
-	"splatting: $params = @{ ... }; Cmdlet @params; Write-Output (pipeline) vs Write-Host (screen); "
-	"try { ... } catch { ... } finally { ... }; Test-Path, Get-Content, Set-Content, Remove-Item -Recurse -Force. "
-	"For full syntax, operators, and examples read `.warden/powershell-reference.md` via file_read."
+	"Shell runtime: PowerShell (Windows PowerShell). Use the 'powershell' tool. "
+	"For syntax, operators, and safe command patterns read `.warden/powershell-reference.md` via file_read."
 )
 
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
@@ -174,18 +171,42 @@ class ChatSession:
 				args = parse_args(raw_args)
 				args_str = ", ".join(f"{k}={v}" for k, v in args.items())
 
-				if tool.is_dangerous(args) and not auto_mode:
+				# Safety assessment — the model proposes, the policy decides
+				decision = assess_tool_call(name, args)
+				if decision.risk == "blocked":
+					self.add_tool_result(name, f"blocked: {decision.reason}")
+					yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {decision.reason}"})
+					continue
+
+				if decision.risk == "confirm" and not auto_mode:
 					if self.confirmation_manager is None:
 						self.add_tool_result(name, "cancelled: no confirmation manager")
 						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
 						continue
 					call_id, event = self.confirmation_manager.register()
-					yield ("confirm", {"id": call_id, "tool": name, "args": args_str})
+					confirm_payload = {
+						"id": call_id,
+						"tool": name,
+						"risk": decision.risk,
+						"title": decision.summary,
+						"summary": decision.reason,
+						"details": decision.details,
+						"args": args_str,
+						"preview": str(args.get("command", args.get("path", args_str))),
+						"default": "cancel",
+					}
+					yield ("confirm", confirm_payload)
 					await event.wait()
-					ok = self.confirmation_manager.pop(call_id, {}).get("ok", False)
-					if not ok:
+					resolved = self.confirmation_manager.pop(call_id)
+					if resolved is None or not resolved.get("ok", False):
 						self.add_tool_result(name, "cancelled by user")
 						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
+						continue
+					# Re-verify after confirm: tool name + args must still match
+					post_decision = assess_tool_call(name, args)
+					if post_decision.risk == "blocked":
+						self.add_tool_result(name, f"blocked after confirm: {post_decision.reason}")
+						yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {post_decision.reason}"})
 						continue
 
 				yield ("tool_start", {"name": name, "args": args_str})

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from typing import Any, Dict
@@ -56,31 +57,27 @@ class Tool(ABC):
 		}
 
 
-# ── dangerous bash patterns ─────────────────────────────────────────────────
-
-_DANGER = re.compile(
-	r"\b(rmdir\b|rd\b|format\b|Clear-Content|deltree\b|DROP\s+TABLE|TRUNCATE\s+TABLE|mkfs)\b"
-	r"|(-[rR][fF]|-Force\b|/[Ff]\b|--force\b|-Recurse\b)",
-	re.IGNORECASE,
-)
-
-
 # ── tools ────────────────────────────────────────────────────────────────────
 
-class BashTool(Tool):
-	name = "bash"
+def _shell_executable() -> str:
+	"""Return pwsh if available, otherwise powershell."""
+	if shutil.which("pwsh"):
+		return "pwsh"
+	return "powershell"
+
+
+class PowerShellTool(Tool):
+	name = "powershell"
 	description = "Run a PowerShell command. For files, processes, system."
 	params = {"command": {"type": "string", "description": "PowerShell command"}}
 
-	def is_dangerous(self, args: Dict[str, Any]) -> bool:
-		return bool(_DANGER.search(args.get("command", "")))
-
 	async def execute(self, args: Dict[str, Any]) -> str:
 		cmd = args.get("command", "")
+		shell = _shell_executable()
 		try:
 			proc = await asyncio.to_thread(
 				subprocess.run,
-				["powershell", "-NonInteractive", "-NoProfile", "-Command", cmd],
+				[shell, "-NonInteractive", "-NoProfile", "-Command", cmd],
 				capture_output=True, text=True, timeout=30,
 			)
 			out = _clean((proc.stdout or "").strip())
@@ -94,6 +91,11 @@ class BashTool(Tool):
 			return "error: timeout 30s"
 		except Exception as e:
 			return f"error: {e}"
+
+
+class BashTool(PowerShellTool):
+	"""Deprecated alias — kept for backward compatibility."""
+	name = "bash"
 
 
 class FileReadTool(Tool):
@@ -538,6 +540,7 @@ class BrowserScreenshotTool(Tool):
 # ── registry ───────────────────────────────────────────────────────────────
 
 REGISTRY: Dict[str, Tool] = {t.name: t for t in [
+	PowerShellTool(),
 	BashTool(),
 	FileReadTool(),
 	FileWriteTool(),

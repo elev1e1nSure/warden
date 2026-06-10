@@ -47,6 +47,7 @@ async def health(request: web.Request) -> web.Response:
 
 async def reset(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
+	backend.confirmation_manager.cancel_all()
 	backend.chat.reset()
 	log_request("POST", "/reset", 200)
 	info("session reset")
@@ -105,6 +106,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	try:
 		async for type_, payload in backend.chat.stream(text, auto_mode=backend.auto_mode):
 			if request.transport.is_closing():
+				backend.confirmation_manager.cancel_all()
 				break
 			if type_ == "warden_start":
 				msg: dict = {"type": "warden_start"}
@@ -115,7 +117,18 @@ async def chat(request: web.Request) -> web.StreamResponse:
 			elif type_ == "tool":
 				msg = {"type": "tool", "name": payload["name"], "args": payload["args"], "result": payload["result"]}
 			elif type_ == "confirm":
-				msg = {"type": "confirm", "id": payload["id"], "tool": payload["tool"], "args": payload["args"]}
+				msg = {
+					"type": "confirm",
+					"id": payload["id"],
+					"tool": payload["tool"],
+					"risk": payload.get("risk", "confirm"),
+					"title": payload.get("title", "Dangerous action"),
+					"summary": payload.get("summary", ""),
+					"details": payload.get("details", []),
+					"args": payload["args"],
+					"preview": payload.get("preview", ""),
+					"default": payload.get("default", "cancel"),
+				}
 			else:
 				continue
 			try:

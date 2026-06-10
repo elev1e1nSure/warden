@@ -106,8 +106,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			if m.confirming {
-				val := strings.TrimSpace(m.textinput.Value())
-				ok := val == "y" || val == "Y" || val == "yes"
+				val := strings.ToLower(strings.TrimSpace(m.textinput.Value()))
+				ok := val == "y" || val == "yes"
+				if val == "" || val == "n" || val == "no" {
+					ok = false
+				}
 				ch := m.confirmCh
 				id := m.confirmID
 				m.confirming = false
@@ -211,13 +214,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirming = true
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
-			m.messages = append(m.messages,
-				ErrorStyle().Render("⚠ dangerous")+"  "+ToolStyle().Render(inner.tool)+"  "+DimStyle().Render(inner.args),
-			)
+			m.messages = append(m.messages, renderConfirmBlock(inner, m.width))
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
-			m.textinput.Placeholder = "y / Enter to cancel..."
+			m.textinput.Placeholder = "y to run, Enter/Esc/n to cancel"
 			m.textinput.Reset()
+
 
 		case doneMsg:
 			m.streaming = false
@@ -307,9 +309,15 @@ type toolStartMsg struct {
 }
 type wardenStartMsg struct{ ch <-chan tea.Msg }
 type confirmMsg struct {
-	id   string
-	tool string
-	args string
+	id            string
+	tool          string
+	risk          string
+	title         string
+	summary       string
+	details       []string
+	args          string
+	preview       string
+	defaultAction string
 }
 type modeMsg struct{ auto bool }
 type doneMsg struct{}

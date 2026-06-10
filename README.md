@@ -73,7 +73,8 @@ backend starts on `localhost:8765`, automatically starts ollama and downloads th
 
 | name | description |
 |---|---|
-| `bash` | PowerShell commands |
+| `powershell` | PowerShell commands (Windows PowerShell, `pwsh` if available) |
+| `bash` | Deprecated alias for `powershell` |
 | `file_read` | read file |
 | `file_write` | write file (creates folders) |
 | `file_delete` | delete file, only within cwd |
@@ -88,23 +89,44 @@ backend starts on `localhost:8765`, automatically starts ollama and downloads th
 | `youtube_search` | search YouTube videos |
 | `google_search` | web search (DuckDuckGo) |
 
+## modes
+
+| mode | behavior |
+|---|---|
+| **Leashed** (`/leash`) | Every tool call is classified by `agent/safety.py`. Safe commands run immediately. Confirm commands require user approval. Blocked commands are rejected and the model sees the block as a tool result. |
+| **Unleashed** (`/unleash`) | All commands run without confirmation. Use with caution. |
+
+## confirmation
+
+When a tool call requires confirmation, the TUI shows:
+- **what** will run (command / path / action)
+- **why** it was flagged (risk details)
+- **keys**: `y` to confirm, `Enter` / `Esc` / `n` to cancel
+
+Confirmations time out after 5 minutes (auto-cancel).
+
 ## slash commands
 
 Entered in the message field:
 
 | command | action |
 |---|---|
-| `/unleash` | auto mode — dangerous commands without confirmation |
-| `/leash` | safe mode — confirmation for dangerous commands |
-| `/reset` | reset session |
-| `/thinking` | toggle model reasoning |
+| `/unleash` | Unleashed — dangerous commands without confirmation |
+| `/leash` | Leashed — confirmation for dangerous commands |
+| `/reset` | Reset session and cancel all pending confirmations |
+| `/thinking` | Toggle model reasoning |
 
 ## security
 
-- `bash`: dangerous patterns (`rm -rf`, `format`, `rmdir`, etc.) require confirmation in safe mode
-- `file_delete`: only within cwd, always requires confirmation
-- `file_write`: outside cwd requires confirmation
-- in TUI: `y` + Enter — confirm, Esc — cancel
+Risk classification is done by `agent/safety.py`, not the model:
+
+- **safe**: read-only commands (`Get-ChildItem`, `git status`, `screenshot`, `browser_read`, `file_read` inside workspace)
+- **confirm**: file writes, installs, mouse clicks, keyboard input, external URLs, process kills, unknown binaries
+- **blocked**: recursive forced delete, encoded commands, `Invoke-Expression` with remote content, disk format, registry/system changes, file delete outside workspace
+
+Path safety uses `Path.resolve()` with containment checks. UNC paths, device paths (`\\.\`, `\\?\`), and traversal (`../`) are blocked.
+
+PowerShell reference with risk markers: `.warden/powershell-reference.md`
 
 ## model
 

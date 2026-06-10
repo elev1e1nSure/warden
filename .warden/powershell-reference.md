@@ -5,6 +5,14 @@ Examples use inline comments so intent is clear without guessing.
 
 ---
 
+## Risk Markers
+
+Commands in this reference are tagged with risk levels:
+
+- **SAFE** — read-only, no side effects
+- **CONFIRM** — modifies state; requires user approval in leashed mode
+- **BLOCKED** — dangerous or system-level; blocked by `agent/safety.py` in leashed mode
+
 ## PowerShell Basics
 
 ### Version & Setup
@@ -257,8 +265,8 @@ Get-ChildItem Env:                     # list all env vars
 Get-ChildItem Env: | Where-Object Name -like "PATH*"
 
 # Persistent — survives session
-[System.Environment]::SetEnvironmentVariable("MY_VAR", "value", "User")    # user scope
-[System.Environment]::SetEnvironmentVariable("MY_VAR", "value", "Machine") # system scope (needs admin)
+[System.Environment]::SetEnvironmentVariable("MY_VAR", "value", "User")    # CONFIRM — persistent env var
+[System.Environment]::SetEnvironmentVariable("MY_VAR", "value", "Machine") # BLOCKED — system scope change
 [System.Environment]::GetEnvironmentVariable("MY_VAR", "User")             # read persistent
 
 # Reload PATH in current session after changes
@@ -326,18 +334,18 @@ Copy-Item "source.txt" "dest.txt"
 Copy-Item "C:\src" "C:\dst" -Recurse
 Move-Item "old.txt" "new.txt"
 Rename-Item "old.txt" "new.txt"
-Remove-Item "file.txt"
-Remove-Item "folder" -Recurse -Force   # delete directory and all contents
+Remove-Item "file.txt"  # CONFIRM
+Remove-Item "folder" -Recurse -Force   # BLOCKED — immediate and unrecoverable
 
 # Read / Write
 Get-Content "file.txt"                 # read entire file (returns array of lines)
 Get-Content "file.txt" -Raw            # read as single string
 Get-Content "file.txt" -Tail 20        # last 20 lines
 Get-Content "file.txt" -Wait           # tail -f equivalent
-Set-Content "file.txt" "new content"   # write (overwrites)
-Add-Content "file.txt" "more content"  # append
-Out-File    "output.txt"               # pipe output to file
-"text" | Out-File "file.txt" -Append
+Set-Content "file.txt" "new content"   # CONFIRM — overwrites
+Add-Content "file.txt" "more content"  # CONFIRM — appends
+Out-File    "output.txt"               # CONFIRM — overwrites
+"text" | Out-File "file.txt" -Append  # CONFIRM
 
 # Find files
 Get-ChildItem -Recurse | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-1) }
@@ -367,9 +375,9 @@ Start-Process "script.ps1" -Verb RunAs                  # run as admin
 Start-Process "app.exe" -WindowStyle Hidden             # no window
 
 # Stop
-Stop-Process -Name "notepad"
+Stop-Process -Name "notepad"  # CONFIRM
 Stop-Process -Id 1234
-Stop-Process -Name "chrome" -Force     # force kill
+Stop-Process -Name "chrome" -Force     # CONFIRM — force kill
 Get-Process -Name "hung*" | Stop-Process -Force
 
 # Exit codes
@@ -390,16 +398,16 @@ tasklist /V                            # verbose (includes window titles)
 # taskkill — kill processes
 taskkill /PID 1234
 taskkill /IM "notepad.exe"
-taskkill /IM "chrome.exe" /F           # /F = force
-taskkill /IM "app.exe" /T             # /T = kill process tree (children too)
+taskkill /IM "chrome.exe" /F           # CONFIRM — force kill
+taskkill /IM "app.exe" /T             # BLOCKED — kills process tree
 
 # systeminfo — machine details
 systeminfo
 systeminfo | findstr /C:"OS Name" /C:"Total Physical Memory"
 
 # shutdown
-shutdown /s /t 0                       # shutdown immediately
-shutdown /r /t 0                       # restart immediately
+shutdown /s /t 0                       # BLOCKED — system shutdown
+shutdown /r /t 0                       # BLOCKED — system restart
 shutdown /r /t 60                      # restart in 60 seconds
 shutdown /a                            # abort pending shutdown
 shutdown /l                            # log off current user
@@ -416,13 +424,13 @@ Get-Service -Name "wuauserv"           # Windows Update
 Get-Service | Where-Object { $_.Status -eq "Running" }
 Get-Service | Where-Object { $_.StartType -eq "Automatic" -and $_.Status -ne "Running" }
 
-Start-Service   "ServiceName"
-Stop-Service    "ServiceName"
-Restart-Service "ServiceName"
-Suspend-Service "ServiceName"          # pause
-Resume-Service  "ServiceName"
+Start-Service   "ServiceName"  # CONFIRM
+Stop-Service    "ServiceName"  # CONFIRM
+Restart-Service "ServiceName"  # CONFIRM
+Suspend-Service "ServiceName"          # CONFIRM
+Resume-Service  "ServiceName"  # CONFIRM
 
-Set-Service "ServiceName" -StartupType Automatic   # Auto / Manual / Disabled
+Set-Service "ServiceName" -StartupType Automatic   # BLOCKED — system service change
 Set-Service "ServiceName" -Description "My service"
 
 # sc.exe — lower-level, more control (needs admin for most ops)
@@ -431,11 +439,11 @@ sc query "wuauserv"                    # specific service
 sc query type= all state= all         # all types and states
 sc start  "ServiceName"
 sc stop   "ServiceName"
-sc config "ServiceName" start= auto   # set startup type (note space after =)
+sc config "ServiceName" start= auto   # BLOCKED — system service change
 sc config "ServiceName" start= demand # manual
-sc config "ServiceName" start= disabled
-sc create "MySvc" binPath= "C:\app\service.exe" start= auto
-sc delete "MySvc"
+sc config "ServiceName" start= disabled  # BLOCKED
+sc create "MySvc" binPath= "C:\app\service.exe" start= auto  # BLOCKED
+sc delete "MySvc"  # BLOCKED
 sc description "MySvc" "My service description"
 
 # Check if service exists
@@ -575,7 +583,7 @@ git pull                               # fetch + merge
 git pull --rebase                      # fetch + rebase (cleaner history)
 git push origin main
 git push -u origin feature/my-feature  # push + set upstream
-git push --force-with-lease            # force push safely (checks remote state)
+git push --force-with-lease            # CONFIRM — force push
 
 # Rebase
 git rebase main                        # rebase current branch onto main
@@ -614,9 +622,9 @@ git restore --staged file.txt          # unstage file (keep changes)
 git reset HEAD~1                       # undo last commit, keep changes staged
 git reset --soft HEAD~1                # undo last commit, keep changes staged
 git reset --mixed HEAD~1               # undo last commit, unstage changes
-git reset --hard HEAD~1                # undo last commit, discard changes (DESTRUCTIVE)
+git reset --hard HEAD~1                # BLOCKED — discards changes
 git revert abc1234                     # create new commit that undoes a commit (safe)
-git clean -fd                          # delete untracked files and dirs (DESTRUCTIVE)
+git clean -fd                          # BLOCKED — deletes untracked files
 git clean -n                           # dry run — show what would be deleted
 
 # Tags
@@ -660,10 +668,10 @@ node --version ; npm --version ; pnpm --version
 
 # npm
 npm install                            # install from package.json
-npm install express                    # add dependency
+npm install express                    # CONFIRM — installs packages
 npm install -D typescript              # add devDependency
 npm install -g typescript              # global install
-npm uninstall express
+npm uninstall express  # CONFIRM
 npm update                             # update all to allowed versions
 npm outdated                           # show outdated packages
 npm run build                          # run script
@@ -677,10 +685,10 @@ npm audit fix
 
 # pnpm (preferred — faster, disk-efficient)
 pnpm install                           # install from package.json
-pnpm add express                       # add dependency
+pnpm add express                       # CONFIRM — installs packages
 pnpm add -D typescript                 # add devDependency
 pnpm add -g typescript                 # global install
-pnpm remove express
+pnpm remove express  # CONFIRM
 pnpm update
 pnpm outdated
 pnpm run build
@@ -728,7 +736,7 @@ go test -cover ./...                   # with coverage
 # Tools
 go fmt ./...                           # format all code
 go vet ./...                           # check for issues
-go clean -cache                        # clear build cache
+go clean -cache                        # CONFIRM — clears cache
 
 # Env
 $env:GOPATH                            # workspace dir (default: $HOME\go)

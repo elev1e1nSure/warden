@@ -148,12 +148,28 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 				ch <- toolMsg{tool: t}
 			case "confirm":
 				var t struct {
-					ID   string `json:"id"`
-					Tool string `json:"tool"`
-					Args string `json:"args"`
+					ID      string   `json:"id"`
+					Tool    string   `json:"tool"`
+					Risk    string   `json:"risk"`
+					Title   string   `json:"title"`
+					Summary string   `json:"summary"`
+					Details []string `json:"details"`
+					Args    string   `json:"args"`
+					Preview string   `json:"preview"`
+					Default string   `json:"default"`
 				}
 				json.Unmarshal(line, &t)
-				ch <- confirmMsg{id: t.ID, tool: t.Tool, args: t.Args}
+				ch <- confirmMsg{
+					id:      t.ID,
+					tool:    t.Tool,
+					risk:    t.Risk,
+					title:   t.Title,
+					summary: t.Summary,
+					details: t.Details,
+					args:    t.Args,
+					preview: t.Preview,
+					defaultAction: t.Default,
+				}
 			case "done":
 				ch <- doneMsg{}
 			case "error":
