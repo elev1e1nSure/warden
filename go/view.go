@@ -260,6 +260,7 @@ func (m model) renderHeader() string {
 	if !m.thinkingEnabled {
 		reasoning = ThinkingOffStyle().Render("Off")
 	}
+	b.WriteString(DimStyle().Render("Status: "))
 	b.WriteString(mode)
 	b.WriteString(DimStyle().Render(" · Thinking "))
 	b.WriteString(reasoning)
