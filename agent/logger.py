@@ -54,7 +54,7 @@ def warn(msg: str) -> None:
 	"""Warning"""
 	ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
 	tag = _colorize("[WARN]", Colors.YELLOW, bold=True)
-	print(f"{ts} {tag} {msg}")
+	print(f"{ts} {tag} {msg}", file=sys.stderr)
 
 
 def error(msg: str) -> None:

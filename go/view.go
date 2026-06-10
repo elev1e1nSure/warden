@@ -27,7 +27,7 @@ func toolPendingLine() string {
 
 func truncateRunes(text string, limit int) string {
 	if limit < 1 {
-		return ""
+		return text
 	}
 	runes := []rune(text)
 	if len(runes) <= limit {
