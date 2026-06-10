@@ -254,22 +254,23 @@ func (m model) renderHeader() string {
 
 	b.WriteString(prefix)
 	b.WriteString(WardenStyle().Render("Warden"))
-	b.WriteString(DimStyle().Render(" " + wardenVersion + " · " + wardenModel))
+	b.WriteString(DimStyle().Render(" " + wardenVersion))
 	b.WriteString("\n")
 
-	mode := SafeStyle().Render("Leashed")
+	b.WriteString(prefix)
+	b.WriteString(DimStyle().Render(wardenModel))
+	b.WriteString("\n")
+
+	mode := "Leashed"
 	if m.autoMode {
-		mode = AutoStyle().Render("Unleashed")
+		mode = "Unleashed"
 	}
-	reasoning := ThinkingOnStyle().Render("On")
+	reasoning := "On"
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Off")
+		reasoning = "Off"
 	}
 	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render("Status: "))
-	b.WriteString(mode)
-	b.WriteString(DimStyle().Render(" · Thinking "))
-	b.WriteString(reasoning)
+	b.WriteString(DimStyle().Render("Status: " + mode + " · Thinking " + reasoning))
 	b.WriteString("\n")
 
 	b.WriteString(prefix)
