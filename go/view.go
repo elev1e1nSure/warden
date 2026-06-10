@@ -189,12 +189,15 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m model) renderMessages() []string {
+func (m *model) renderMessages() []string {
+	m.ensureMarkdownRenderer()
 	out := make([]string, 0, len(m.messages))
 	for _, entry := range m.messages {
 		switch entry.kind {
 		case messageThink:
 			out = append(out, m.renderThinkEntry(entry))
+		case messageAssistant:
+			out = append(out, m.renderMarkdown(entry.text))
 		default:
 			out = append(out, entry.text)
 		}

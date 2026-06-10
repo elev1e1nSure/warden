@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 )
 
 type model struct {
@@ -38,6 +39,9 @@ type model struct {
 	thinkingExpanded bool
 	// path
 	cwd string
+	// markdown
+	mdRenderer *glamour.TermRenderer
+	mdWidth    int
 }
 
 func initialModel() model {
@@ -179,10 +183,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tokenMsg:
 			if !m.thinkDone {
 				m.finishThink()
-				m.appendText(m.wardenLine(""))
+				m.appendAssistant(m.wardenLine(""))
 				m.thinkDone = true
 			}
-			m.appendToLastText(inner.text)
+			m.appendToLastAssistant(inner.text)
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
@@ -340,6 +344,7 @@ type messageKind int
 const (
 	messageText messageKind = iota
 	messageThink
+	messageAssistant
 )
 
 type messageEntry struct {
@@ -387,6 +392,21 @@ func (m *model) appendToLastText(text string) {
 	}
 	last := len(m.messages) - 1
 	if m.messages[last].kind != messageText {
+		return
+	}
+	m.messages[last].text += text
+}
+
+func (m *model) appendAssistant(text string) {
+	m.messages = append(m.messages, messageEntry{kind: messageAssistant, text: text})
+}
+
+func (m *model) appendToLastAssistant(text string) {
+	if len(m.messages) == 0 {
+		return
+	}
+	last := len(m.messages) - 1
+	if m.messages[last].kind != messageAssistant {
 		return
 	}
 	m.messages[last].text += text
