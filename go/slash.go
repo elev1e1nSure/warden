@@ -67,12 +67,11 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		return true, m.setMode(false)
 	case "/reset":
 		m.clearHintState()
-		m.messages = []string{}
-		m.viewport.SetContent("")
+		m.messages = []messageEntry{}
+		m.syncViewport()
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Reset"))
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		m.appendText(m.wardenLine("Reset"))
+		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.ResetSession()
 			return noopMsg{}
@@ -85,9 +84,8 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			status = "off"
 		}
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Thinking "+status))
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		m.appendText(m.wardenLine("Thinking " + status))
+		m.syncViewport()
 		return true, m.setThinking(m.thinkingEnabled)
 	}
 	return false, nil

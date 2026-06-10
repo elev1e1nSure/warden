@@ -13,7 +13,7 @@ type model struct {
 	viewport  viewport.Model
 	textinput textinput.Model
 	client    *Client
-	messages  []string
+	messages  []messageEntry
 	streaming bool
 	height    int
 	width     int
@@ -33,7 +33,8 @@ type model struct {
 	hintVisible bool
 	hintCount   int
 	// status
-	thinkingEnabled bool
+	thinkingEnabled  bool
+	thinkingExpanded bool
 }
 
 func initialModel() model {
@@ -51,7 +52,7 @@ func initialModel() model {
 		textinput:       ti,
 		viewport:        vp,
 		client:          NewClient("http://localhost:8765"),
-		messages:        []string{},
+		messages:        []messageEntry{},
 		thinkingEnabled: true,
 	}
 }
@@ -70,13 +71,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = msg.Width
 		m.viewport.Height = msg.Height - 4 - m.hintCount
 		m.textinput.Width = msg.Width
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		m.syncViewport()
 
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			return m, tea.Quit
+
+		case tea.KeyF2:
+			m.thinkingExpanded = !m.thinkingExpanded
+			m.syncViewport()
+			return m, nil
 
 		case tea.KeyTab:
 			if !m.streaming {
@@ -132,7 +137,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 			ts := DimStyle().Render("[" + time.Now().Format("15:04") + "]")
-			m.messages = append(m.messages, ts+"  "+UserStyle().Render("you:")+"  "+text)
+			m.appendText(ts + "  " + UserStyle().Render("you:") + "  " + text)
 			m.textinput.Reset()
 			m.streaming = true
 			m.loading = true
@@ -151,61 +156,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.toolRunning = false
-			m.messages = append(m.messages, m.wardenLine(""))
+			m.appendThink()
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case thinkMsg:
 			m.thinkBuf += inner.text
-			m.messages[len(m.messages)-1] = m.renderThinkLine()
+			m.updateThink(inner.text)
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case tokenMsg:
 			if !m.thinkDone {
-				m.clearThinkLine()
-				m.messages = append(m.messages, m.wardenLine(""))
+				m.finishThink()
+				m.appendText(m.wardenLine(""))
 				m.thinkDone = true
-				m.thinkBuf = ""
 			}
-			if len(m.messages) > 0 {
-				m.messages[len(m.messages)-1] += inner.text
-				m.syncViewport()
-			}
+			m.appendToLastText(inner.text)
+			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case toolStartMsg:
 			m.toolRunning = true
 			if !m.thinkDone && len(m.messages) > 0 {
-				m.clearThinkLine()
-				m.thinkDone = true
-				m.thinkBuf = ""
+				m.finishThink()
 			}
-			m.messages = append(m.messages,
+			m.appendText(
 				toolStartLine(inner.name, inner.args),
-				toolPendingLine(),
 			)
+			m.appendText(toolPendingLine())
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case toolMsg:
 			m.toolRunning = false
 			sticky := stickyTool(inner.tool.Name)
-			if len(m.messages) > 0 && m.messages[len(m.messages)-1] == toolPendingLine() {
+			if len(m.messages) > 0 && m.messages[len(m.messages)-1].text == toolPendingLine() {
 				if sticky {
-					m.messages[len(m.messages)-1] = toolResultBlock(inner.tool.Result)
+					m.messages[len(m.messages)-1].text = toolResultBlock(inner.tool.Result)
 				} else {
 					m.messages = m.messages[:len(m.messages)-1]
 					if len(m.messages) > 0 {
-						m.messages[len(m.messages)-1] = toolSummaryLine(inner.tool.Name, inner.tool.Result)
+						m.messages[len(m.messages)-1].text = toolSummaryLine(inner.tool.Name, inner.tool.Result)
 					} else {
-						m.messages = append(m.messages, toolSummaryLine(inner.tool.Name, inner.tool.Result))
+						m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Result))
 					}
 				}
 			} else if sticky {
-				m.messages = append(m.messages, toolResultBlock(inner.tool.Result))
+				m.appendText(toolResultBlock(inner.tool.Result))
 			} else {
-				m.messages = append(m.messages, toolSummaryLine(inner.tool.Name, inner.tool.Result))
+				m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Result))
 			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -214,20 +214,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirming = true
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
-			m.messages = append(m.messages, renderConfirmBlock(inner, m.width))
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
-			m.textinput.Placeholder = "y to run, Enter/Esc/n to cancel"
+			m.appendText(renderConfirmBlock(inner, m.width))
+			m.syncViewport()
+			m.textinput.Placeholder = ""
 			m.textinput.Reset()
-
 
 		case doneMsg:
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
+			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
-			m.messages = append(m.messages, "")
+			m.appendText("")
 			m.syncViewport()
 		}
 
@@ -236,9 +235,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
+			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
-			m.messages = append(m.messages, "")
+			m.appendText("")
 			m.syncViewport()
 		}
 
@@ -246,9 +246,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.loading {
 			m.spinner = (m.spinner + 1) % 24
 			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
-				m.messages[len(m.messages)-1] = m.renderThinkLine()
-				m.viewport.SetContent(strings.Join(m.messages, "\n"))
-				m.viewport.GotoBottom()
+				m.syncViewport()
 			}
 			return m, m.tick()
 		}
@@ -260,20 +258,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.autoMode {
 			label = "Unleashed"
 		}
-		m.messages = append(m.messages, DimStyle().Render("  Mode: "+label))
-		m.viewport = setContent(m.viewport, m.messages, false)
+		m.appendText(DimStyle().Render("  Mode: " + label))
+		m.syncViewport()
 
 	case backendReadyMsg:
 		m.client.ResetSession()
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine(randomWardenPresence()))
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		m.appendText(m.wardenLine(randomWardenPresence()))
+		m.syncViewport()
 
 	case backendErrorMsg:
-		m.messages = append(m.messages, ErrorStyle().Render("Error: backend unavailable"))
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
-		m.viewport.GotoBottom()
+		m.appendText(ErrorStyle().Render("Error: backend unavailable"))
+		m.syncViewport()
 	}
 
 	var cmd tea.Cmd
@@ -330,3 +326,60 @@ type nextMsg struct {
 	ch    <-chan tea.Msg
 }
 type noopMsg struct{}
+
+type messageKind int
+
+const (
+	messageText messageKind = iota
+	messageThink
+)
+
+type messageEntry struct {
+	kind      messageKind
+	text      string
+	startedAt time.Time
+	duration  time.Duration
+}
+
+func (m *model) appendText(text string) {
+	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
+}
+
+func (m *model) appendThink() {
+	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
+}
+
+func (m *model) updateThink(text string) {
+	if len(m.messages) == 0 {
+		return
+	}
+	last := len(m.messages) - 1
+	if m.messages[last].kind != messageThink {
+		return
+	}
+	m.messages[last].text += text
+}
+
+func (m *model) finishThink() {
+	if len(m.messages) == 0 {
+		return
+	}
+	last := len(m.messages) - 1
+	if m.messages[last].kind != messageThink {
+		return
+	}
+	if m.messages[last].duration == 0 {
+		m.messages[last].duration = time.Since(m.messages[last].startedAt)
+	}
+}
+
+func (m *model) appendToLastText(text string) {
+	if len(m.messages) == 0 {
+		return
+	}
+	last := len(m.messages) - 1
+	if m.messages[last].kind != messageText {
+		return
+	}
+	m.messages[last].text += text
+}

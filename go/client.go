@@ -83,12 +83,6 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 		return err
 	}
 	resp.Body.Close()
-	request("POST", "/confirm", resp.StatusCode)
-	action := "confirmed"
-	if !ok {
-		action = "cancelled"
-	}
-	info("action: " + action)
 	return nil
 }
 

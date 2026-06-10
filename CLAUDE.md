@@ -11,6 +11,8 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 - ask before large changes
 - don't add dependencies without reason
 - code comments in English, short
+- risk classification is deterministic code in `agent/safety.py` — never the model or the prompt
+- risk markers in `.warden/powershell-reference.md` must match what `agent/safety.py` actually enforces; change them together
 
 ## stack
 
@@ -28,12 +30,14 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 - typing is mandatory (`typing`, `dataclasses`)
 - no unnecessary abstractions — simple and clear
 - async where streaming is needed
+- tests: `pytest agent/` — run after any change to `agent/safety.py`
 
 ## structure
 
 ```
 go/        — bubbletea frontend
-agent/     — backend: server, chat, tools, logs
+agent/     — backend: server, chat, tools, safety, logs
+.warden/   — runtime reference docs (powershell-reference.md)
 ```
 
 ## visual
@@ -42,4 +46,5 @@ agent/     — backend: server, chat, tools, logs
 - colors: cyan for warden, yellow for tools, red for errors, dim for meta info
 - controls: arrows, Enter, Esc, Ctrl+C
 - no buttons, no mouse clicks in the TUI itself
+- confirmation block: title, "will run:" preview, "why:" bullets, key hints; `y` confirms, Enter / Esc / `n` cancel (cancel is the default)
 - if there's a need to add something truly new — discuss with the user first, then add to this section

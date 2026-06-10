@@ -54,3 +54,15 @@ func ThinkingOnStyle() lipgloss.Style {
 func ThinkingOffStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Dim)
 }
+
+func TitleStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(White).Bold(true)
+}
+
+func ConfirmYStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#4caf7d")).Bold(true)
+}
+
+func ConfirmNStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#e05555")).Bold(true)
+}
