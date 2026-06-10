@@ -17,7 +17,7 @@ Write-Host ""
 Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
-# Start backend
+# Start backend in background
 Write-Host "[BACKEND]" -ForegroundColor Yellow -NoNewline
 Write-Host " starting Python server..." -ForegroundColor White
 $backendJob = Start-Job -ScriptBlock {
@@ -29,56 +29,51 @@ $backendJob = Start-Job -ScriptBlock {
     python server.py
 } -ArgumentList $backendDir
 
-# Small pause for backend startup
+# Wait for backend to start
 Start-Sleep -Seconds 2
 
-# Start frontend
+# Check if backend started successfully
+if ($backendJob.State -eq "Failed") {
+    Write-Host "[ERROR] Backend failed to start" -ForegroundColor Red
+    $backendError = Receive-Job $backendJob -ErrorAction SilentlyContinue
+    Write-Host $backendError -ForegroundColor Red
+    exit 1
+}
+
+# Start frontend in foreground (Bubbletea needs terminal access)
 Write-Host "[FRONTEND]" -ForegroundColor Cyan -NoNewline
 Write-Host " starting Go client..." -ForegroundColor White
-$frontendJob = Start-Job -ScriptBlock {
-    param($dir)
-    chcp 65001 | Out-Null
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $OutputEncoding = [System.Text.Encoding]::UTF8
-    Set-Location $dir
-    go run .
-} -ArgumentList $frontendDir
-
 Write-Host ""
 Write-Host "System started. Press Ctrl+C to stop." -ForegroundColor Green
 Write-Host ""
 
-# Output logs in real time
-while ($true) {
-    $backendOutput = Receive-Job $backendJob -ErrorAction SilentlyContinue
-    if ($backendOutput) {
-        foreach ($line in $backendOutput) {
-            Write-Host "[BACKEND] " -ForegroundColor Yellow -NoNewline
-            Write-Host $line -ForegroundColor White
+# Start background job to stream backend logs
+$logJob = Start-Job -ScriptBlock {
+    param($job)
+    while ($true) {
+        $output = Receive-Job $job -ErrorAction SilentlyContinue
+        if ($output) {
+            foreach ($line in $output) {
+                Write-Host "[BACKEND] " -ForegroundColor Yellow -NoNewline
+                Write-Host $line -ForegroundColor White
+            }
         }
-    }
-
-    $frontendOutput = Receive-Job $frontendJob -ErrorAction SilentlyContinue
-    if ($frontendOutput) {
-        foreach ($line in $frontendOutput) {
-            Write-Host "[FRONTEND] " -ForegroundColor Cyan -NoNewline
-            Write-Host $line -ForegroundColor White
+        if ($job.State -ne "Running") {
+            break
         }
+        Start-Sleep -Milliseconds 100
     }
+} -ArgumentList $backendJob
 
-    if ($backendJob.State -eq "Failed" -or $frontendJob.State -eq "Failed") {
-        Write-Host "[ERROR] One of the processes failed" -ForegroundColor Red
-        break
-    }
+# Start frontend in foreground
+Set-Location $frontendDir
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+go run .
 
-    if ($backendJob.State -eq "Completed" -or $frontendJob.State -eq "Completed") {
-        Write-Host "[INFO] One of the processes completed" -ForegroundColor DarkGray
-        break
-    }
-
-    Start-Sleep -Milliseconds 100
-}
-
-# Cleanup
+# Cleanup after frontend exits
+Stop-Job $logJob -ErrorAction SilentlyContinue
+Remove-Job $logJob -Force -ErrorAction SilentlyContinue
+Stop-Job $backendJob -ErrorAction SilentlyContinue
 Remove-Job $backendJob -Force -ErrorAction SilentlyContinue
-Remove-Job $frontendJob -Force -ErrorAction SilentlyContinue
