@@ -215,6 +215,29 @@ func (m *model) syncViewport() {
 	m.viewport = setContent(m.viewport, m.renderMessages())
 }
 
+func renderedLineCount(text string) int {
+	return strings.Count(text, "\n") + 1
+}
+
+func (m *model) syncViewportToLatestThink() {
+	rendered := m.renderMessages()
+	target := -1
+	line := 0
+	for i, entry := range m.messages {
+		if i >= len(rendered) {
+			break
+		}
+		if entry.kind == messageThink {
+			target = line
+		}
+		line += renderedLineCount(rendered[i])
+	}
+	m.viewport = setContent(m.viewport, rendered)
+	if target >= 0 {
+		m.viewport.SetYOffset(target)
+	}
+}
+
 func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
 
@@ -274,8 +297,12 @@ func (m model) renderHeader() string {
 	if !m.thinkingEnabled {
 		reasoning = "Off"
 	}
+	thoughts := "Hidden"
+	if m.thinkingExpanded {
+		thoughts = "Shown"
+	}
 	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render(wardenModel + " · " + mode + " · Thinking " + reasoning))
+	b.WriteString(DimStyle().Render(wardenModel + " · " + mode + " · Thinking " + reasoning + " · Thoughts " + thoughts))
 	b.WriteString("\n")
 
 	b.WriteString(prefix)

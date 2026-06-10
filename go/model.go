@@ -323,14 +323,14 @@ type toolStartMsg struct {
 }
 type wardenStartMsg struct{ ch <-chan tea.Msg }
 type confirmMsg struct {
-	id            string
-	tool          string
-	risk          string
-	title         string
-	summary       string
-	details       []string
-	args          string
-	preview       string
+	id      string
+	tool    string
+	risk    string
+	title   string
+	summary string
+	details []string
+	args    string
+	preview string
 }
 type modeMsg struct{ auto bool }
 type doneMsg struct{}
