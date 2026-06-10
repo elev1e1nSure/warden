@@ -45,6 +45,32 @@ _EMOJI_RE = re.compile(
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
 MAX_ITER = 20
 
+_COMPACT_PROMPT = (
+    "Summarize this conversation. Include: all decisions made, code written or modified, "
+    "files changed, current task status, and any important context needed to continue. "
+    "Be concise but complete. Output only the summary, no preamble."
+)
+
+_CONTEXT_LIMITS: list[tuple[str, int]] = [
+    ("1m", 1_000_000), ("200k", 200_000), ("128k", 131_072),
+    ("64k", 65_536), ("32k", 32_768), ("8k", 8_192),
+]
+
+def _guess_context_limit(model_name: str) -> int:
+    name = model_name.lower()
+    for marker, limit in _CONTEXT_LIMITS:
+        if marker in name:
+            return limit
+    if "claude" in name:
+        return 200_000
+    if "gemini" in name:
+        return 1_000_000
+    if "deepseek" in name:
+        return 65_536
+    if "gpt-4" in name:
+        return 128_000
+    return 128_000
+
 
 def _clean_visible_text(text: str) -> str:
 	return _EMOJI_RE.sub("", text)

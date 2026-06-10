@@ -87,9 +87,12 @@ func (c *Client) SendQuestion(id string, answers [][]string) error {
 	body, _ := json.Marshal(map[string]any{"id": id, "answers": answers})
 	resp, err := http.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
 	if err != nil {
+		logError("send question failed: " + err.Error())
 		return err
 	}
 	resp.Body.Close()
+	request("POST", "/question", resp.StatusCode)
+	info("question sent")
 	return nil
 }
 
@@ -107,9 +110,11 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 func (c *Client) GetStatus() (*StatusResult, error) {
 	resp, err := http.Get(c.BaseURL + "/status")
 	if err != nil {
+		logError("get status failed: " + err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
+	request("GET", "/status", resp.StatusCode)
 	var result StatusResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
@@ -120,9 +125,11 @@ func (c *Client) GetStatus() (*StatusResult, error) {
 func (c *Client) GetTools() ([]string, error) {
 	resp, err := http.Get(c.BaseURL + "/tools")
 	if err != nil {
+		logError("get tools failed: " + err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
+	request("GET", "/tools", resp.StatusCode)
 	var result struct {
 		Tools []string `json:"tools"`
 	}
@@ -162,6 +169,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 				Type string `json:"type"`
 			}
 			if err := json.Unmarshal(line, &base); err != nil {
+				logError("json unmarshal error: " + err.Error())
 				continue
 			}
 			switch base.Type {

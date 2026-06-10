@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -175,6 +176,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.questioning {
 				ch := m.questionCh
 				id := m.questionID
+				m.historySav = m.textinput.Value()
 				m = m.clearQuestionState()
 				return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch))
 			}
@@ -194,27 +196,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyRunes:
 			if m.questioning {
 				q := m.questionsData[m.questionIdx]
-				if len(q.Options) > 0 && len(msg.Runes) == 1 {
-					r := msg.Runes[0]
-					if r >= '1' && r <= '9' {
-						idx := int(r - '1')
-						if idx < len(q.Options) {
-							m.questionAnswers = append(m.questionAnswers, []string{q.Options[idx].Label})
-							m.questionIdx++
-							if m.questionIdx >= len(m.questionsData) {
-								ch := m.questionCh
-								id := m.questionID
-								answers := m.questionAnswers
-								m = m.clearQuestionState()
-								return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
-							}
-							m.syncViewport()
-							return m, m.focusInput()
+				if len(q.Options) > 0 {
+					input := string(msg.Runes)
+					if num, err := parseOptionNumber(input); err == nil && num >= 1 && num <= len(q.Options) {
+						idx := num - 1
+						m.questionAnswers = append(m.questionAnswers, []string{q.Options[idx].Label})
+						m.questionIdx++
+						if m.questionIdx >= len(m.questionsData) {
+							ch := m.questionCh
+							id := m.questionID
+							answers := m.questionAnswers
+							m = m.clearQuestionState()
+							return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
 						}
+						m.syncViewport()
+						return m, m.focusInput()
 					}
 				}
 				return m, nil
 			}
+			m.textinput.Placeholder = ""
 
 		case tea.KeyEnter:
 			if m.questioning {
@@ -643,4 +644,10 @@ func (m model) clearQuestionState() model {
 	m.textinput.Placeholder = ""
 	m.textinput.Reset()
 	return m
+}
+
+func parseOptionNumber(input string) (int, error) {
+	var num int
+	_, err := fmt.Sscanf(input, "%d", &num)
+	return num, err
 }

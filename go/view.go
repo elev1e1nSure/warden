@@ -26,7 +26,7 @@ func toolPendingLine() string {
 
 func truncateRunes(text string, limit int) string {
 	if limit < 1 {
-		limit = 1
+		return ""
 	}
 	runes := []rune(text)
 	if len(runes) <= limit {
@@ -54,11 +54,10 @@ func toolSummaryLine(name string, result string) string {
 	head = truncateRunes(head, 100)
 
 	arrow := ToolStyle().Render("  → ")
-	toolName := ToolStyle().Render(name)
 	if toolResultIsError(result) {
 		return arrow + ErrorStyle().Render(name) + "  " + ErrorStyle().Render(head)
 	}
-	return arrow + toolName + "  " + DimStyle().Render(head)
+	return arrow + ToolStyle().Render(name) + "  " + DimStyle().Render(head)
 }
 
 func toolResultBlock(result string) string {
@@ -67,7 +66,7 @@ func toolResultBlock(result string) string {
 		return DimStyle().Render("  (empty)")
 	}
 
-	lines := strings.Split(result, "\n")
+	lines := strings.Split(trimmed, "\n")
 	hidden := 0
 	if len(lines) > 10 {
 		hidden = len(lines) - 10
