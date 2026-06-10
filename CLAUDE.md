@@ -7,6 +7,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 ## rules
 
 - language: English, informal, no emojis
+- UI/UX text and logs must be exclusively in English — no exceptions
 - don't rewrite entire files — only what's needed
 - ask before large changes
 - don't add dependencies without reason
