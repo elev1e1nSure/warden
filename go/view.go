@@ -212,7 +212,7 @@ func (m *model) renderMessages() []string {
 }
 
 func (m *model) syncViewport() {
-	m.viewport = setContent(m.viewport, m.renderMessages(), m.streaming || m.loading)
+	m.viewport = setContent(m.viewport, m.renderMessages())
 }
 
 func renderConfirmBlock(inner confirmMsg, width int) string {

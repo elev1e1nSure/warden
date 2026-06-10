@@ -57,16 +57,9 @@ func readNext(ch <-chan tea.Msg) tea.Cmd {
 	}
 }
 
-// setContent updates viewport and optionally pins it to the latest line.
-func setContent(vp viewport.Model, lines []string, forceBottom bool) viewport.Model {
-	isEmpty := len(strings.Join(lines, "\n")) == 0
-	atBottom := vp.AtBottom()
+// setContent updates viewport content without forcing scroll.
+func setContent(vp viewport.Model, lines []string) viewport.Model {
 	vp.SetContent(strings.Join(lines, "\n"))
-	if forceBottom || (atBottom && !isEmpty) {
-		vp.GotoBottom()
-	} else if isEmpty {
-		vp.GotoTop()
-	}
 	return vp
 }
 
