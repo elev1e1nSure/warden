@@ -12,56 +12,56 @@ import (
 var presenceRng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 var wardenPresencePhrases = []string{
-	"тут",
-	"на месте",
-	"в деле",
-	"я здесь",
-	"рядом",
-	"на связи",
-	"живой",
-	"на посту",
-	"в строю",
-	"на дежурстве",
-	"здесь",
-	"под рукой",
-	"внутри",
-	"на линии",
-	"в работе",
-	"поблизости",
-	"не ушёл",
-	"включён",
-	"на чеку",
-	"смотрю",
-	"держу курс",
-	"держу ход",
-	"на точке",
-	"тут как тут",
-	"в зоне",
-	"в сети",
-	"здесь же",
-	"не сплю",
-	"наготове",
-	"в порядке",
-	"спокойно",
-	"в тени",
-	"на ковре",
-	"подхвачу",
-	"на подхвате",
-	"не дергай",
-	"слушаю",
-	"держусь",
-	"ещё тут",
-	"не сдвинулся",
-	"стоим",
-	"ожидаю",
-	"внимателен",
-	"на страже",
-	"с тобой",
-	"у штурвала",
-	"в курсе",
-	"рядом стою",
-	"тут и есть",
-	"живой тут",
+	"here",
+	"ready",
+	"on it",
+	"present",
+	"nearby",
+	"online",
+	"alive",
+	"on duty",
+	"standing by",
+	"on watch",
+	"here",
+	"at hand",
+	"inside",
+	"on line",
+	"working",
+	"close by",
+	"didn't leave",
+	"on",
+	"alert",
+	"watching",
+	"on course",
+	"on track",
+	"on point",
+	"right here",
+	"in zone",
+	"in network",
+	"right here",
+	"awake",
+	"ready",
+	"in order",
+	"calm",
+	"in shadow",
+	"on guard",
+	"covering",
+	"on standby",
+	"don't panic",
+	"listening",
+	"holding",
+	"still here",
+	"didn't move",
+	"standing",
+	"waiting",
+	"attentive",
+	"on guard",
+	"with you",
+	"at helm",
+	"aware",
+	"standing by",
+	"right here",
+	"alive here",
 }
 
 func randomWardenPresence() string {
@@ -94,20 +94,19 @@ func truncateRunes(text string, limit int) string {
 
 func toolResultIsError(result string) bool {
 	lower := strings.ToLower(strings.TrimSpace(result))
-	return strings.HasPrefix(lower, "ошибка") ||
-		strings.HasPrefix(lower, "error") ||
+	return strings.HasPrefix(lower, "error") ||
 		strings.HasPrefix(lower, "stderr")
 }
 
 func toolSummaryLine(name string, result string) string {
 	result = strings.TrimSpace(result)
 	if result == "" {
-		result = "(пусто)"
+		result = "(empty)"
 	}
 	lines := strings.Split(result, "\n")
 	head := strings.TrimSpace(lines[0])
 	if len(lines) > 1 {
-		head += fmt.Sprintf(" · +%d строк", len(lines)-1)
+		head += fmt.Sprintf(" · +%d lines", len(lines)-1)
 	}
 	head = truncateRunes(head, 120)
 	prefix := "  ✓ "
@@ -122,7 +121,7 @@ func toolSummaryLine(name string, result string) string {
 func toolResultBlock(result string) string {
 	result = strings.TrimSpace(result)
 	if result == "" {
-		return DimStyle().Render("  (пусто)")
+		return DimStyle().Render("  (empty)")
 	}
 
 	lines := strings.Split(result, "\n")
@@ -135,7 +134,7 @@ func toolResultBlock(result string) string {
 		lines[i] = "  " + truncateRunes(strings.TrimRight(line, " \t"), 160)
 	}
 	if hidden > 0 {
-		lines = append(lines, fmt.Sprintf("  … +%d строк", hidden))
+		lines = append(lines, fmt.Sprintf("  … +%d lines", hidden))
 	}
 	if toolResultIsError(result) {
 		return ErrorStyle().Render(strings.Join(lines, "\n"))
@@ -241,22 +240,22 @@ func (m model) View() string {
 	var footer string
 	if m.confirming {
 		footer = KeyStyle().Render("[Y Enter]") +
-			DimStyle().Render(" Подтвердить  ") +
+			DimStyle().Render(" Confirm  ") +
 			KeyStyle().Render("[Esc]") +
-			DimStyle().Render(" Отменить")
+			DimStyle().Render(" Cancel")
 	} else {
 		footer = KeyStyle().Render("[Enter]") +
-			DimStyle().Render(" Отправить  ") +
+			DimStyle().Render(" Send  ") +
 			KeyStyle().Render("[Esc]") +
-			DimStyle().Render(" Очистить  ") +
+			DimStyle().Render(" Clear  ") +
 			KeyStyle().Render("[Ctrl+C]") +
-			DimStyle().Render(" Выйти")
+			DimStyle().Render(" Exit")
 	}
 
 	var scrollTag string
 	if m.viewport.TotalLineCount() > m.viewport.Height {
 		if m.viewport.AtBottom() {
-			scrollTag = " конец "
+			scrollTag = " end "
 		} else {
 			scrollTag = fmt.Sprintf(" %d%% ", int(m.viewport.ScrollPercent()*100))
 		}

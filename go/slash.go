@@ -13,10 +13,10 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/unleash", "Снять поводок — опасные команды без подтверждения"},
-	{"/leash", "Надеть поводок — подтверждение на опасные команды"},
-	{"/reset", "Сбросить историю сессии"},
-	{"/thinking", "Включить/выключить размышления модели"},
+	{"/unleash", "Unleash — dangerous commands without confirmation"},
+	{"/leash", "Leash — confirmation for dangerous commands"},
+	{"/reset", "Reset session"},
+	{"/thinking", "Toggle model reasoning"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -70,7 +70,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.messages = []string{}
 		m.viewport.SetContent("")
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Сброшено"))
+		m.messages = append(m.messages, m.wardenLine("Reset"))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 		return true, func() tea.Msg {
@@ -80,12 +80,12 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
 		m.clearHintState()
-		status := "вкл"
+		status := "on"
 		if !m.thinkingEnabled {
-			status = "выкл"
+			status = "off"
 		}
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Размышления "+status))
+		m.messages = append(m.messages, m.wardenLine("Thinking "+status))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 		return true, m.setThinking(m.thinkingEnabled)

@@ -212,11 +212,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
 			m.messages = append(m.messages,
-				ErrorStyle().Render("⚠ опасно")+"  "+ToolStyle().Render(inner.tool)+"  "+DimStyle().Render(inner.args),
+				ErrorStyle().Render("⚠ dangerous")+"  "+ToolStyle().Render(inner.tool)+"  "+DimStyle().Render(inner.args),
 			)
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
-			m.textinput.Placeholder = "y / Enter для отмены..."
+			m.textinput.Placeholder = "y / Enter to cancel..."
 			m.textinput.Reset()
 
 		case doneMsg:
@@ -258,7 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.autoMode {
 			label = "Unleashed"
 		}
-		m.messages = append(m.messages, DimStyle().Render("  Режим: "+label))
+		m.messages = append(m.messages, DimStyle().Render("  Mode: "+label))
 		m.viewport = setContent(m.viewport, m.messages, false)
 
 	case backendReadyMsg:
