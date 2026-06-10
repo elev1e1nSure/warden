@@ -13,8 +13,8 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/auto", "Авторежим — опасные команды без подтверждения"},
-	{"/safe", "Безопасный режим — подтверждение на опасные команды"},
+	{"/unleash", "Снять поводок — опасные команды без подтверждения"},
+	{"/leash", "Надеть поводок — подтверждение на опасные команды"},
 	{"/reset", "Сбросить историю сессии"},
 	{"/thinking", "Включить/выключить размышления модели"},
 }
@@ -46,16 +46,27 @@ func slashCommonPrefix(matches []slashCmd) string {
 	return prefix
 }
 
+func (m *model) clearHintState() {
+	m.hintCount = 0
+	m.hintVisible = false
+	if m.height > 0 {
+		m.viewport.Height = m.height - 4
+	}
+}
+
 // handleSlash processes /commands before sending.
 func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(text)) {
-	case "/auto":
+	case "/unleash":
 		m.autoMode = true
+		m.clearHintState()
 		return true, m.setMode(true)
-	case "/safe":
+	case "/leash":
 		m.autoMode = false
+		m.clearHintState()
 		return true, m.setMode(false)
 	case "/reset":
+		m.clearHintState()
 		m.messages = []string{}
 		m.viewport.SetContent("")
 		m.wardenTS = time.Now().Format("15:04")
@@ -68,6 +79,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		}
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
+		m.clearHintState()
 		status := "вкл"
 		if !m.thinkingEnabled {
 			status = "выкл"

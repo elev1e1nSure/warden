@@ -254,9 +254,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case modeMsg:
 		m.autoMode = msg.auto
-		label := "Safe"
+		label := "Leashed"
 		if m.autoMode {
-			label = "Auto"
+			label = "Unleashed"
 		}
 		m.messages = append(m.messages, DimStyle().Render("  Режим: "+label))
 		m.viewport = setContent(m.viewport, m.messages, false)

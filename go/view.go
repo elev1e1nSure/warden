@@ -290,9 +290,9 @@ func (m model) renderHint() string {
 }
 
 func (m model) renderFooterStatus(footer string) string {
-	mode := SafeStyle().Render("Safe")
+	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
-		mode = AutoStyle().Render("Auto")
+		mode = AutoStyle().Render("Unleashed")
 	}
 
 	thinking := ThinkingOnStyle().Render("On")
