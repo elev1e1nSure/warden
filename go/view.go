@@ -13,7 +13,7 @@ const wardenVersion = "v0.1.0"
 
 func stickyTool(name string) bool {
 	switch name {
-	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search",
+	case "browser_read", "browser_screenshot", "youtube_search", "google_search",
 		"apply_patch", "webfetch", "question":
 		return true
 	default:
