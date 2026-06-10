@@ -2,6 +2,10 @@
 
 $ErrorActionPreference = "Stop"
 
+# Установка UTF-8 кодировки
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendDir = Join-Path $scriptDir "agent"
 $frontendDir = Join-Path $scriptDir "go"
@@ -62,7 +66,7 @@ while ($true) {
     }
 
     if ($backendJob.State -eq "Completed" -or $frontendJob.State -eq "Completed") {
-        Write-Host "[INFO] Один из процессов завершился" -ForegroundColor Dim
+        Write-Host "[INFO] Один из процессов завершился" -ForegroundColor DarkGray
         break
     }
 
