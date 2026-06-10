@@ -113,16 +113,6 @@ func (m model) runCompact() tea.Cmd {
 	}
 }
 
-func (m model) fetchTools() tea.Cmd {
-	return func() tea.Msg {
-		tools, err := m.client.GetTools()
-		if err != nil {
-			return toolsResultMsg{tools: []string{"error: " + err.Error()}}
-		}
-		return toolsResultMsg{tools: tools}
-	}
-}
-
 func (m model) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", "$env:WARDEN_CLIP | Set-Clipboard")
