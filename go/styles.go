@@ -59,6 +59,10 @@ func TitleStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(White).Bold(true)
 }
 
+func ModelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(White)
+}
+
 func ConfirmYStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#4caf7d")).Bold(true)
 }

@@ -250,7 +250,7 @@ func (m model) renderHeader() string {
 	version := DimStyle().Render(" " + wardenVersion)
 	line1 := name + version
 
-	line2 := TitleStyle().Render(wardenModel)
+	line2 := ModelStyle().Render(wardenModel)
 
 	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
