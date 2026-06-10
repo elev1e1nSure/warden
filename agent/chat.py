@@ -32,22 +32,30 @@ _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
 MAX_ITER = 20
 
 
-def _chunk_parts(chunk: Any) -> tuple[str, str]:
+def _extract_message(chunk: Any) -> dict:
 	try:
 		msg = chunk.message
-		return (getattr(msg, "thinking", None) or ""), (getattr(msg, "content", None) or "")
+		return {
+			"thinking": getattr(msg, "thinking", None) or "",
+			"content": getattr(msg, "content", None) or "",
+			"tool_calls": getattr(msg, "tool_calls", None) or [],
+		}
 	except AttributeError:
 		msg = chunk.get("message") or {}
-		return (msg.get("thinking") or ""), (msg.get("content") or "")
+		return {
+			"thinking": msg.get("thinking") or "",
+			"content": msg.get("content") or "",
+			"tool_calls": msg.get("tool_calls") or [],
+		}
+
+
+def _chunk_parts(chunk: Any) -> tuple[str, str]:
+	msg = _extract_message(chunk)
+	return msg["thinking"], msg["content"]
 
 
 def _get_tool_calls(chunk: Any) -> list:
-	try:
-		msg = chunk.message
-		return getattr(msg, "tool_calls", None) or []
-	except AttributeError:
-		msg = chunk.get("message") or {}
-		return msg.get("tool_calls") or []
+	return _extract_message(chunk)["tool_calls"]
 
 
 class ChatSession:
