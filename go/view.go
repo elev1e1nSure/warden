@@ -257,10 +257,6 @@ func (m model) renderHeader() string {
 	b.WriteString(DimStyle().Render(" " + wardenVersion))
 	b.WriteString("\n")
 
-	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render(wardenModel))
-	b.WriteString("\n")
-
 	mode := "Leashed"
 	if m.autoMode {
 		mode = "Unleashed"
@@ -270,7 +266,7 @@ func (m model) renderHeader() string {
 		reasoning = "Off"
 	}
 	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render("Status: " + mode + " · Thinking " + reasoning))
+	b.WriteString(DimStyle().Render(wardenModel + " · " + mode + " · Thinking " + reasoning))
 	b.WriteString("\n")
 
 	b.WriteString(prefix)
