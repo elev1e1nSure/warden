@@ -13,6 +13,10 @@ var (
 )
 
 func WardenStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
+}
+
+func HeaderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(White).Bold(true)
 }
 
