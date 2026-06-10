@@ -253,7 +253,7 @@ func (m model) renderHeader() string {
 	prefix := "    "
 
 	b.WriteString(prefix)
-	b.WriteString(WardenStyle().Render("Warden"))
+	b.WriteString(WardenStyle().Render("Warden CLI"))
 	b.WriteString(DimStyle().Render(" " + wardenVersion))
 	b.WriteString("\n")
 

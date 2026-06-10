@@ -13,7 +13,7 @@ var (
 )
 
 func WardenStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
+	return lipgloss.NewStyle().Foreground(White).Bold(true)
 }
 
 func UserStyle() lipgloss.Style {
