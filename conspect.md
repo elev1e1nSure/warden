@@ -21,12 +21,13 @@ Go TUI <-> Python backend (HTTP NDJSON) <-> Ollama <-> Tools (PowerShell, filesy
 ## Tools
 | Type | Examples |
 |---|---|
-| CLI | powershell, bash, file_read, file_write, file_delete, file_list |
+| CLI | powershell, bash, file_read, file_write, file_delete, file_list, glob, grep, edit, apply_patch |
 | Clipboard | clipboard (read/write) |
 | Screenshot | screenshot, browser_screenshot |
-| Browser | browser_open, browser_read |
+| Browser | browser_open, browser_read, webfetch |
 | Interaction | mouse, keyboard |
 | Search | google_search, youtube_search |
+| Task Management | todowrite, skill, question |
 
 ## Modes
 - **Ask**: Requires confirmation for risky actions

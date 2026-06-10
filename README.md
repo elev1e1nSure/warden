@@ -6,7 +6,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama.
 
 | layer | technology |
 |---|---|
-| frontend | go 1.23+, bubbletea, lipgloss |
+| frontend | go 1.24+, bubbletea, lipgloss |
 | backend | python 3.11+, aiohttp |
 | llm | ollama (qwen3:8b) or remote OpenAI-compatible API (OpenRouter) |
 | computer use | pyautogui, pillow |
@@ -106,19 +106,27 @@ OpenRouter reasoning-capable models are enabled with the `reasoning` request par
 |---|---|
 | `powershell` | PowerShell commands (Windows PowerShell, `pwsh` if available) |
 | `bash` | Deprecated alias for `powershell` |
-| `file_read` | read file |
+| `file_read` | read file with line numbers (offset/limit for partial reads) |
 | `file_write` | write file (creates folders) |
 | `file_delete` | delete file, only within cwd |
 | `file_list` | list files and folders |
+| `glob` | find files by glob pattern (e.g. `**/*.py`) |
+| `grep` | search file contents by regex (uses ripgrep if available) |
+| `edit` | replace specific string in file (must match exactly once) |
+| `apply_patch` | apply unified-format patch to multiple files |
 | `clipboard` | read / write clipboard |
 | `screenshot` | take a screenshot |
 | `mouse` | move, click, right_click, double_click, scroll |
 | `keyboard` | type, press (hotkey) |
 | `browser_open` | open URL in user's browser |
-| `browser_read` | read page text |
-| `browser_screenshot` | screenshot page |
+| `browser_read` | read page text via Playwright |
+| `browser_screenshot` | screenshot page via Playwright |
 | `youtube_search` | search YouTube videos |
 | `google_search` | web search (DuckDuckGo) |
+| `webfetch` | fetch content from URL (HTML, JSON, plain text) |
+| `skill` | load local skill file and sample files |
+| `todowrite` | create and maintain structured task list |
+| `question` | ask user questions during task (handled by chat loop) |
 
 ## modes
 
