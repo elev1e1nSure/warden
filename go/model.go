@@ -244,8 +244,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyRunes:
 			if m.confirming {
 				r := strings.ToLower(string(msg.Runes))
-				if r == "y" || r == "n" {
-					ok := r == "y"
+				if r == "y" || r == "н" {
+					ok := true
+					ch := m.confirmCh
+					id := m.confirmID
+					m.confirming = false
+					m.confirmID = ""
+					m.confirmCh = nil
+					m.confirmTool = ""
+					m.textinput.Placeholder = ""
+					m.textinput.Reset()
+					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+				}
+				if r == "n" || r == "т" {
+					ok := false
 					ch := m.confirmCh
 					id := m.confirmID
 					m.confirming = false
@@ -420,7 +432,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
-			if inner.defaultVal != "" {
+			if inner.defaultVal != "" && inner.defaultVal != "cancel" {
 				m.textinput.SetValue(inner.defaultVal)
 				m.textinput.CursorEnd()
 			}
