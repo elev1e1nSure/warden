@@ -61,6 +61,9 @@ class ChatSession:
 	def reset(self) -> None:
 		self.history = []
 
+	def set_thinking_enabled(self, enabled: bool) -> None:
+		self.thinking_enabled = enabled
+
 	def add_user(self, text: str) -> None:
 		self.history.append({"role": "user", "content": text})
 

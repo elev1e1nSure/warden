@@ -27,6 +27,12 @@ class Backend:
 		if not self.ollama.has_model():
 			await self.ollama.pull_model()
 
+	def set_auto_mode(self, enabled: bool) -> None:
+		self.auto_mode = enabled
+
+	def set_thinking_enabled(self, enabled: bool) -> None:
+		self.chat.set_thinking_enabled(enabled)
+
 
 
 
@@ -50,7 +56,7 @@ async def reset(request: web.Request) -> web.Response:
 async def set_mode(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	data = await request.json()
-	backend.auto_mode = bool(data.get("auto", False))
+	backend.set_auto_mode(bool(data.get("auto", False)))
 	mode = "AUTO" if backend.auto_mode else "SAFE"
 	log_request("POST", "/mode", 200)
 	info(f"mode changed to {mode}")
@@ -60,7 +66,7 @@ async def set_mode(request: web.Request) -> web.Response:
 async def set_thinking(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	data = await request.json()
-	backend.chat.thinking_enabled = bool(data.get("enabled", True))
+	backend.set_thinking_enabled(bool(data.get("enabled", True)))
 	status = "enabled" if backend.chat.thinking_enabled else "disabled"
 	log_request("POST", "/thinking", 200)
 	info(f"thinking {status}")
