@@ -25,7 +25,6 @@ class Colors:
 	YELLOW = "\033[33m"
 	RED = "\033[31m"
 	GREEN = "\033[32m"
-	BLUE = "\033[34m"
 	MAGENTA = "\033[35m"
 	WHITE = "\033[37m"
 	GRAY = "\033[90m"
@@ -69,13 +68,6 @@ def success(msg: str) -> None:
 	"""Success"""
 	ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
 	tag = _colorize("[OK]", Colors.GREEN, bold=True)
-	print(f"{ts} {tag} {msg}")
-
-
-def debug(msg: str) -> None:
-	"""Debug message"""
-	ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
-	tag = _colorize("[DEBUG]", Colors.DIM)
 	print(f"{ts} {tag} {msg}")
 
 

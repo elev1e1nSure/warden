@@ -9,11 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type Message struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
 type TokenMsg struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -24,10 +19,6 @@ type ToolMsg struct {
 	Name   string `json:"name"`
 	Args   string `json:"args"`
 	Result string `json:"result"`
-}
-
-type DoneMsg struct {
-	Type string `json:"type"`
 }
 
 type Client struct {
@@ -105,7 +96,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 	ch := make(chan tea.Msg, 64)
 	go func() {
 		defer close(ch)
-		msg := Message{Type: "message", Text: text}
+		msg := map[string]string{"type": "message", "text": text}
 		body, _ := json.Marshal(msg)
 
 		resp, err := http.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
