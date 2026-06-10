@@ -10,11 +10,19 @@ import (
 )
 
 type StatusResult struct {
-	Model    string `json:"model"`
-	Provider string `json:"provider"`
-	Mode     string `json:"mode"`
-	Thinking bool   `json:"thinking"`
-	CWD      string `json:"cwd"`
+	Model      string `json:"model"`
+	Provider   string `json:"provider"`
+	Mode       string `json:"mode"`
+	Thinking   bool   `json:"thinking"`
+	CWD        string `json:"cwd"`
+	TokenCount int    `json:"token_count"`
+	TokenLimit int    `json:"token_limit"`
+}
+
+type CompactResult struct {
+	Summary      string `json:"summary"`
+	TokensBefore int    `json:"tokens_before"`
+	TokensAfter  int    `json:"tokens_after"`
 }
 
 type TokenMsg struct {
@@ -116,6 +124,21 @@ func (c *Client) GetStatus() (*StatusResult, error) {
 	defer resp.Body.Close()
 	request("GET", "/status", resp.StatusCode)
 	var result StatusResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) Compact() (*CompactResult, error) {
+	resp, err := http.Post(c.BaseURL+"/compact", "application/json", nil)
+	if err != nil {
+		logError("compact failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
+	request("POST", "/compact", resp.StatusCode)
+	var result CompactResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -247,7 +270,12 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 				}
 				ch <- questionMsg{id: t.ID, questions: items}
 			case "done":
-				ch <- doneMsg{}
+				var d struct {
+					TokenCount int `json:"token_count"`
+					TokenLimit int `json:"token_limit"`
+				}
+				json.Unmarshal(line, &d)
+				ch <- doneMsg{tokenCount: d.TokenCount, tokenLimit: d.TokenLimit}
 			case "error":
 				var e struct {
 					Text string `json:"text"`

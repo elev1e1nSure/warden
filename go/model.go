@@ -53,6 +53,13 @@ type model struct {
 	liveActivity string
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
+	// interrupt / rollback state
+	interruptStream bool
+	streamStart     int
+	lastUserInput   string
+	// token tracking
+	tokenCount int
+	tokenLimit int
 	// input history
 	history    []string
 	historyIdx int
@@ -173,6 +180,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEsc:
+			if m.streaming && !m.questioning && !m.confirming {
+				m.interruptStream = true
+				m.streaming = false
+				m.loading = false
+				m.liveActivity = ""
+				m.thinkBuf = ""
+				m.thinkDone = false
+				m.toolRunning = false
+				if m.streamStart <= len(m.messages) {
+					m.messages = m.messages[:m.streamStart]
+				}
+				m.textinput.SetValue(m.lastUserInput)
+				m.textinput.CursorEnd()
+				m.textinput.Placeholder = ""
+				m.syncViewport()
+				return m, m.focusInput()
+			}
 			if m.questioning {
 				ch := m.questionCh
 				id := m.questionID
@@ -281,6 +305,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(m.execShell(cmdText), m.tick())
 			}
 
+			m.lastUserInput = text
+			m.streamStart = len(m.messages)
 			m.appendText(DimStyle().Render("  > ") + text)
 			m.appendText("")
 			m.textinput.Reset()
@@ -295,6 +321,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, readNext(msg.ch))
 
 	case nextMsg:
+		// drain silently if user interrupted
+		if m.interruptStream {
+			if _, ok := msg.inner.(doneMsg); ok {
+				m.interruptStream = false
+			} else {
+				cmds = append(cmds, readNext(msg.ch))
+			}
+			break
+		}
 		switch inner := msg.inner.(type) {
 		case wardenStartMsg:
 			m.thinkBuf = ""
@@ -373,7 +408,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.appendText("")
+			if inner.tokenLimit > 0 {
+				m.tokenCount = inner.tokenCount
+				m.tokenLimit = inner.tokenLimit
+			}
 			m.syncViewport()
+			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
+				m.loading = true
+				m.appendText(m.wardenLine(DimStyle().Render("context at " + fmt.Sprintf("%d%%", m.tokenCount*100/m.tokenLimit) + ", compacting...")))
+				cmds = append(cmds, m.runCompact(), m.tick())
+			}
 		}
 
 	case doneMsg:
@@ -386,7 +430,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.appendText("")
+			if msg.tokenLimit > 0 {
+				m.tokenCount = msg.tokenCount
+				m.tokenLimit = msg.tokenLimit
+			}
 			m.syncViewport()
+			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
+				m.loading = true
+				m.appendText(m.wardenLine(DimStyle().Render("context at " + fmt.Sprintf("%d%%", m.tokenCount*100/m.tokenLimit) + ", compacting...")))
+				cmds = append(cmds, m.runCompact(), m.tick())
+			}
 		}
 
 	case shellResultMsg:
@@ -420,6 +473,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 
 	case statusResultMsg:
+		if msg.tokenLimit > 0 {
+			m.tokenCount = msg.tokenCount
+			m.tokenLimit = msg.tokenLimit
+		}
 		var line string
 		if msg.brief {
 			line = msg.provider + " · " + msg.model
@@ -430,7 +487,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			line = "model: " + msg.model + "  provider: " + msg.provider + "  mode: " + msg.mode + "  thinking: " + thinkStr + "  cwd: " + msg.cwd
 		}
-		
+
 		m.appendText(m.wardenLine(DimStyle().Render(line)))
 		m.syncViewport()
 
@@ -448,11 +505,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.syncViewport()
 
+	case compactResultMsg:
+		m.loading = false
+		if msg.err != "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("compact: " + msg.err)))
+		} else {
+			before := fmt.Sprintf("%.1fK", float64(msg.tokensBefore)/1000)
+			after := fmt.Sprintf("%.1fK", float64(msg.tokensAfter)/1000)
+			m.tokenCount = msg.tokensAfter
+			m.appendText(m.wardenLine(DimStyle().Render("compacted  " + before + " → " + after)))
+		}
+		m.syncViewport()
+
 	case providerInitMsg:
 		m.providerName = msg.provider
 
 	case backendReadyMsg:
 		m.loading = false
+		m.tokenCount = 0
 		m.client.ResetSession()
 		m.syncViewport()
 		cmds = append(cmds, m.initProvider())
@@ -509,7 +579,15 @@ type confirmMsg struct {
 	preview string
 }
 type modeMsg struct{ auto bool }
-type doneMsg struct{}
+type doneMsg struct {
+	tokenCount int
+	tokenLimit int
+}
+type compactResultMsg struct {
+	tokensBefore int
+	tokensAfter  int
+	err          string
+}
 type backendReadyMsg struct{}
 type backendErrorMsg struct{}
 type tickMsg struct{}
@@ -537,12 +615,14 @@ type questionMsg struct {
 }
 
 type statusResultMsg struct {
-	model    string
-	provider string
-	mode     string
-	thinking bool
-	cwd      string
-	brief    bool
+	model      string
+	provider   string
+	mode       string
+	thinking   bool
+	cwd        string
+	brief      bool
+	tokenCount int
+	tokenLimit int
 }
 type toolsResultMsg struct{ tools []string }
 type clipboardDoneMsg struct{ err error }

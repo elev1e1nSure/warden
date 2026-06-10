@@ -22,6 +22,7 @@ var slashCommands = []slashCmd{
 	{"/clear", "Clear screen without resetting session"},
 	{"/pwd", "Show current working directory"},
 	{"/tools", "List available tools"},
+	{"/compact", "Summarize conversation to free up context"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -121,6 +122,13 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/tools":
 		m.clearHintState()
 		return true, m.fetchTools()
+	case "/compact":
+		m.clearHintState()
+		m.loading = true
+		m.spinner = 0
+		m.appendText(m.wardenLine(DimStyle().Render("compacting...")))
+		m.syncViewport()
+		return true, tea.Batch(m.runCompact(), m.tick())
 	}
 	m.appendText(m.wardenLine(ErrorStyle().Render("unknown command")))
 	m.syncViewport()

@@ -45,6 +45,32 @@ _EMOJI_RE = re.compile(
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
 MAX_ITER = 20
 
+_COMPACT_PROMPT = (
+	"Summarize the conversation above in a few sentences. "
+	"Keep all key facts, decisions, file paths, and tool results. "
+	"Discard chatty filler."
+)
+
+_CONTEXT_LIMITS: dict[str, int] = {
+	"llama3": 8192,
+	"llama2": 4096,
+	"mistral": 8192,
+	"mixtral": 32768,
+	"codellama": 16384,
+	"deepseek": 16384,
+	"qwen": 32768,
+	"gemma": 8192,
+	"phi": 4096,
+}
+
+
+def _guess_context_limit(model: str) -> int:
+	lower = model.lower()
+	for key, limit in _CONTEXT_LIMITS.items():
+		if key in lower:
+			return limit
+	return 128000
+
 def _clean_visible_text(text: str) -> str:
 	return _EMOJI_RE.sub("", text)
 
@@ -86,9 +112,49 @@ class ChatSession:
 		self.thinking_enabled: bool = True
 		self.confirmation_manager = confirmation_manager
 		self.question_manager = question_manager
+		self.token_count: int = 0
+		self.token_limit: int = _guess_context_limit(model)
 
 	def reset(self) -> None:
 		self.history = []
+		self.token_count = 0
+
+	def _estimate_tokens(self) -> int:
+		total = 0
+		for msg in self.history:
+			content = msg.get("content", "")
+			if isinstance(content, str):
+				total += len(content) // 4
+			elif isinstance(content, list):
+				for part in content:
+					if isinstance(part, dict):
+						total += len(str(part.get("text", ""))) // 4
+		return max(total, 0)
+
+	async def compact(self) -> dict:
+		if len(self.history) < 2:
+			return {"summary": "nothing to compact", "tokens_before": self.token_count, "tokens_after": self.token_count}
+
+		tokens_before = self._estimate_tokens()
+		system = SYSTEM + f" Configured model name: {self.model}."
+		messages = [{"role": "system", "content": system}] + self.history + [
+			{"role": "user", "content": _COMPACT_PROMPT}
+		]
+
+		summary = ""
+		try:
+			async for chunk in self._client.chat(model=self.model, messages=messages):
+				if chunk.content:
+					summary += chunk.content
+		except Exception as e:
+			return {"summary": f"error: {e}", "tokens_before": tokens_before, "tokens_after": tokens_before}
+
+		self.history = [
+			{"role": "user", "content": "[Conversation summary]"},
+			{"role": "assistant", "content": summary},
+		]
+		self.token_count = self._estimate_tokens()
+		return {"summary": summary, "tokens_before": tokens_before, "tokens_after": self.token_count}
 
 	def set_thinking_enabled(self, enabled: bool) -> None:
 		self.thinking_enabled = enabled
@@ -202,6 +268,7 @@ class ChatSession:
 				reasoning=full_reasoning,
 				reasoning_details=collected_reasoning_details or None,
 			)
+			self.token_count = self._estimate_tokens()
 
 			if not collected_tool_calls:
 				break

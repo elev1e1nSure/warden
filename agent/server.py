@@ -97,9 +97,19 @@ async def status(request: web.Request) -> web.Response:
 		"mode": "unleashed" if backend.auto_mode else "leashed",
 		"thinking": backend.chat.thinking_enabled,
 		"cwd": os.getcwd(),
+		"token_count": backend.chat.token_count,
+		"token_limit": backend.chat.token_limit,
 	}
 	log_request("GET", "/status", 200)
 	return web.json_response(data)
+
+
+async def compact_handler(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	log_request("POST", "/compact")
+	result = await backend.chat.compact()
+	info(f"compacted: {result['tokens_before']} → {result['tokens_after']} tokens")
+	return web.json_response(result)
 
 
 async def question_handler(request: web.Request) -> web.Response:
@@ -196,7 +206,12 @@ async def chat(request: web.Request) -> web.StreamResponse:
 			except (ConnectionResetError, ClientConnectionResetError):
 				break
 		if not _client_disconnected(request):
-			await response.write((json.dumps({"type": "done"}) + "\n").encode())
+			done_msg = {
+				"type": "done",
+				"token_count": backend.chat.token_count,
+				"token_limit": backend.chat.token_limit,
+			}
+			await response.write((json.dumps(done_msg) + "\n").encode())
 	except (ConnectionResetError, ClientConnectionResetError):
 		pass
 	except Exception as e:
@@ -231,6 +246,7 @@ async def main() -> None:
 	app.router.add_get("/status", status)
 	app.router.add_get("/tools", tools_list)
 	app.router.add_post("/question", question_handler)
+	app.router.add_post("/compact", compact_handler)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)

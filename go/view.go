@@ -322,20 +322,23 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 }
 
 // renderWaveSpinner renders a smooth bouncing wave that slightly overflows edges.
+// pos triangle-wave: -1, 0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0, repeat
+// -1 and 7 are overflow positions (peak offscreen), giving a clean soft bounce.
 func (m model) renderWaveSpinner() string {
 	const n = 7
-	const cycle = (n + 2) * 2 // 18: pos goes -1..n then back
+	const lo = -1       // one past left edge
+	const hi = n        // one past right edge (=7)
+	const span = hi - lo // 8
+	const cycle = span * 2 // 16
 	if !m.loading {
 		return FaintStyle().Render(strings.Repeat("·", n))
 	}
 	s := m.spinner % cycle
-	// forward: s=0..n+1, backward: s=n+2..cycle-1
 	var pos int
-	half := cycle / 2 // n+1 = 8
-	if s <= half {
-		pos = s - 1 // -1..n
+	if s < span {
+		pos = lo + s // -1..6
 	} else {
-		pos = cycle - s - 1 // n-1..0 going back, then -1 again at s=cycle
+		pos = hi - (s - span) // 7..0
 	}
 	var b strings.Builder
 	for i := 0; i < n; i++ {
@@ -359,8 +362,6 @@ func (m model) renderWaveSpinner() string {
 
 // renderStatusBar renders the 2-line bottom status bar.
 func (m model) renderStatusBar() string {
-	// Line 1: mode · model · provider
-	// Visual hierarchy: green(mode) · white(model) · dim(provider)
 	mode := AccentStyle().Render("ask")
 	if m.autoMode {
 		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("build")
@@ -372,12 +373,28 @@ func (m model) renderStatusBar() string {
 	}
 	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
 	providerPart := DimStyle().Render(provider)
-	line1 := mode + dot + modelPart + dot + providerPart
+	left := mode + dot + modelPart + dot + providerPart
+
+	line1 := left
+	if m.tokenLimit > 0 && m.tokenCount > 0 {
+		pct := m.tokenCount * 100 / m.tokenLimit
+		k := float64(m.tokenCount) / 1000.0
+		tokenStr := DimStyle().Render(fmt.Sprintf("%.1fK (%d%%)", k, pct))
+		leftWidth := lipgloss.Width(left)
+		tokenWidth := lipgloss.Width(tokenStr)
+		padding := m.width - leftWidth - tokenWidth
+		if padding > 1 {
+			line1 = left + strings.Repeat(" ", padding) + tokenStr
+		}
+	}
 
 	// Line 2: wave spinner + hint
-	hint := "  esc interrupt"
-	if m.confirming {
+	var hint string
+	switch {
+	case m.confirming:
 		hint = "  Y run  N cancel"
+	case m.streaming:
+		hint = "  esc interrupt"
 	}
 	line2 := m.renderWaveSpinner() + DimStyle().Render(hint)
 

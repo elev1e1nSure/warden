@@ -84,12 +84,27 @@ func (m model) fetchStatus(brief bool) tea.Cmd {
 			return statusResultMsg{model: "error: " + err.Error(), brief: brief}
 		}
 		return statusResultMsg{
-			model:    s.Model,
-			provider: s.Provider,
-			mode:     s.Mode,
-			thinking: s.Thinking,
-			cwd:      s.CWD,
-			brief:    brief,
+			model:      s.Model,
+			provider:   s.Provider,
+			mode:       s.Mode,
+			thinking:   s.Thinking,
+			cwd:        s.CWD,
+			brief:      brief,
+			tokenCount: s.TokenCount,
+			tokenLimit: s.TokenLimit,
+		}
+	}
+}
+
+func (m model) runCompact() tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.client.Compact()
+		if err != nil {
+			return compactResultMsg{err: err.Error()}
+		}
+		return compactResultMsg{
+			tokensBefore: result.TokensBefore,
+			tokensAfter:  result.TokensAfter,
 		}
 	}
 }
@@ -139,14 +154,5 @@ func (m model) tick() tea.Cmd {
 }
 
 func (m model) advance() int {
-	r := m.spinner % 7
-	switch {
-	case r < 4:
-		return 1
-	case r < 6:
-		return 2
-	case r == 6:
-		return -1
-	}
 	return 1
 }
