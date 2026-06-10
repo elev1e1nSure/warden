@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -738,7 +739,5 @@ func (m model) clearQuestionState() model {
 }
 
 func parseOptionNumber(input string) (int, error) {
-	var num int
-	_, err := fmt.Sscanf(input, "%d", &num)
-	return num, err
+	return strconv.Atoi(strings.TrimSpace(input))
 }
