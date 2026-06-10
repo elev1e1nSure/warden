@@ -231,6 +231,14 @@ func stopBackend(cmd *exec.Cmd) {
 	cmd.Wait()
 }
 
+func killBackendByPort() {
+	if runtime.GOOS == "windows" {
+		exec.Command("for", "/f", "\"tokens=5\"", "%a", "in", "('netstat -ano ^| findstr :8765')", "do", "taskkill /F /PID %a").Run()
+	} else {
+		exec.Command("pkill", "-f", "agent.server").Run()
+	}
+}
+
 func runLauncher(alreadyRunning bool) (ready bool, backend *exec.Cmd) {
 	m := launchModel{
 		state:    stateBoot,
@@ -295,5 +303,7 @@ func main() {
 
 	if backend != nil {
 		stopBackend(backend)
+	} else if alreadyRunning {
+		killBackendByPort()
 	}
 }
