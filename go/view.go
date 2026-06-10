@@ -169,9 +169,9 @@ func formatThinkDuration(d time.Duration) string {
 		d = 0
 	}
 	if d < time.Second {
-		ms := d.Round(100 * time.Millisecond)
-		if ms < 100*time.Millisecond {
-			ms = 100 * time.Millisecond
+		ms := d.Round(10 * time.Millisecond)
+		if ms < 10*time.Millisecond {
+			ms = 10 * time.Millisecond
 		}
 		return fmt.Sprintf("%dms", ms/time.Millisecond)
 	}
