@@ -1,9 +1,27 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
+*.log
 .env
 .venv/
 venv/
+
+# Go
+*.exe
+*.exe~
+go/*.exe
+go/main.exe
+go/warden.exe
+
+# Project runtime
 .warden/*
 !.warden/powershell-reference.md
-*.exe
+.tmp/
+
+# Claude worktrees
+.claude/
+
+# External
+opencode/
