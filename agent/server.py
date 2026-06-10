@@ -3,6 +3,12 @@ import json
 import os
 import sys
 
+# Установка UTF-8 кодировки для Windows
+if sys.platform == "win32":
+	import io
+	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+	sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
 
