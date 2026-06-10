@@ -53,8 +53,12 @@ warden/
 ## launch
 
 ```bash
+# From the go/ directory:
+cd go
+
 # launcher starts backend + frontend together
-cd go && go run ./cmd/warden
+go run ./cmd/warden
+
 # or build and run
 go build -o warden.exe ./cmd/warden && ./warden.exe
 ```
