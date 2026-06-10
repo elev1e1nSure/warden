@@ -248,7 +248,7 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 func (m model) renderHeader() string {
 	var b strings.Builder
 
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 
 	prefix := "    "
 
