@@ -90,6 +90,11 @@ async def confirm(request: web.Request) -> web.Response:
 	return web.Response(status=404, text="not found")
 
 
+def _client_disconnected(request: web.Request) -> bool:
+	transport = request.transport
+	return transport is not None and transport.is_closing()
+
+
 async def chat(request: web.Request) -> web.StreamResponse:
 	backend = _get_backend(request)
 	data = await request.json()
@@ -105,7 +110,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 
 	try:
 		async for type_, payload in backend.chat.stream(text, auto_mode=backend.auto_mode):
-			if request.transport.is_closing():
+			if _client_disconnected(request):
 				backend.confirmation_manager.cancel_all()
 				break
 			if type_ == "warden_start":
@@ -135,12 +140,12 @@ async def chat(request: web.Request) -> web.StreamResponse:
 				await response.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
 			except (ConnectionResetError, ClientConnectionResetError):
 				break
-		if not request.transport.is_closing():
+		if not _client_disconnected(request):
 			await response.write((json.dumps({"type": "done"}) + "\n").encode())
 	except (ConnectionResetError, ClientConnectionResetError):
 		pass
 	except Exception as e:
-		if not request.transport.is_closing():
+		if not _client_disconnected(request):
 			try:
 				await response.write((json.dumps({"type": "error", "text": str(e)}, ensure_ascii=False) + "\n").encode())
 			except (ConnectionResetError, ClientConnectionResetError):
