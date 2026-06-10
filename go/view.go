@@ -13,7 +13,8 @@ const wardenVersion = "v0.1.0"
 
 func stickyTool(name string) bool {
 	switch name {
-	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search":
+	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search",
+		"apply_patch", "webfetch", "question":
 		return true
 	default:
 		return false
@@ -43,20 +44,47 @@ func toolResultIsError(result string) bool {
 		strings.HasPrefix(lower, "stderr")
 }
 
-func toolSummaryLine(name string, result string) string {
+func toolSummaryLine(name, args, result string) string {
 	result = strings.TrimSpace(result)
 	if result == "" {
 		result = "(empty)"
 	}
+	isErr := toolResultIsError(result)
+	arrow := ToolStyle().Render("  → ")
+
+	// Shell tools: show the command, append result only when it has content.
+	if (name == "powershell" || name == "bash") && args != "" {
+		cmd := truncateRunes(strings.TrimSpace(args), 80)
+		var nameRender string
+		if isErr {
+			nameRender = ErrorStyle().Render(name)
+		} else {
+			nameRender = ToolStyle().Render(name)
+		}
+		line := arrow + nameRender + "  " + DimStyle().Render(cmd)
+		if result != "(no output)" && result != "(empty)" {
+			rlines := strings.Split(result, "\n")
+			head := strings.TrimSpace(rlines[0])
+			if len(rlines) > 1 {
+				head += fmt.Sprintf("  +%d", len(rlines)-1)
+			}
+			head = truncateRunes(head, 60)
+			if isErr {
+				line += "  " + ErrorStyle().Render(head)
+			} else {
+				line += "  " + DimStyle().Render(head)
+			}
+		}
+		return line
+	}
+
 	lines := strings.Split(result, "\n")
 	head := strings.TrimSpace(lines[0])
 	if len(lines) > 1 {
 		head += fmt.Sprintf("  +%d lines", len(lines)-1)
 	}
 	head = truncateRunes(head, 100)
-
-	arrow := ToolStyle().Render("  → ")
-	if toolResultIsError(result) {
+	if isErr {
 		return arrow + ErrorStyle().Render(name) + "  " + ErrorStyle().Render(head)
 	}
 	return arrow + ToolStyle().Render(name) + "  " + DimStyle().Render(head)

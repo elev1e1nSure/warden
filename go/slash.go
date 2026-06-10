@@ -115,6 +115,8 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/clear":
 		m.clearHintState()
 		m.messages = []messageEntry{}
+		m.lastAssistantRaw = ""
+		m.appendText(m.wardenLine(DimStyle().Render("screen cleared")))
 		m.syncViewport()
 		return true, nil
 	case "/pwd":
