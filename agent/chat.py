@@ -25,7 +25,13 @@ SYSTEM = (
 	"For file deletion use file_delete. "
 	"For video search use youtube_search, then browser_open to open it. "
 	"For reading pages and navigation use browser_read. "
-	"If something isn't found — try another approach, don't stop immediately."
+	"If something isn't found — try another approach, don't stop immediately. "
+	"PowerShell 7 cheat-sheet: $env:V, $?, $LASTEXITCODE, $null; "
+	"-eq -ne -gt -lt -like -match -replace; arrays @(1,2,3); hashtables @{}; "
+	"foreach ($x in $arr) { ... } | Where-Object { ... } | ForEach-Object { ... }; "
+	"splatting: $params = @{ ... }; Cmdlet @params; Write-Output (pipeline) vs Write-Host (screen); "
+	"try { ... } catch { ... } finally { ... }; Test-Path, Get-Content, Set-Content, Remove-Item -Recurse -Force. "
+	"For full syntax, operators, and examples read `.warden/powershell-reference.md` via file_read."
 )
 
 _TOOLS = [t.to_ollama() for t in REGISTRY.values()]
