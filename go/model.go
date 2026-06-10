@@ -268,8 +268,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case backendReadyMsg:
 		m.client.ResetSession()
-		m.wardenTS = time.Now().Format("15:04")
-		m.appendText(m.wardenLine(randomWardenPresence()))
 		m.syncViewport()
 
 	case backendErrorMsg:

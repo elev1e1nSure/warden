@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"math/rand"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,65 +19,6 @@ var wardenLogo = `
 ╚███╔███╔╝██║  ██║██║  ██║██████╔╝███████╗██║ ╚████║
  ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝
 `
-
-var presenceRng = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-var wardenPresencePhrases = []string{
-	"here",
-	"ready",
-	"on it",
-	"present",
-	"nearby",
-	"online",
-	"alive",
-	"on duty",
-	"standing by",
-	"on watch",
-	"here",
-	"at hand",
-	"inside",
-	"on line",
-	"working",
-	"close by",
-	"didn't leave",
-	"on",
-	"alert",
-	"watching",
-	"on course",
-	"on track",
-	"on point",
-	"right here",
-	"in zone",
-	"in network",
-	"right here",
-	"awake",
-	"ready",
-	"in order",
-	"calm",
-	"in shadow",
-	"on guard",
-	"covering",
-	"on standby",
-	"don't panic",
-	"listening",
-	"holding",
-	"still here",
-	"didn't move",
-	"standing",
-	"waiting",
-	"attentive",
-	"on guard",
-	"with you",
-	"at helm",
-	"aware",
-	"standing by",
-	"right here",
-	"alive here",
-}
-
-func randomWardenPresence() string {
-	return wardenPresencePhrases[presenceRng.Intn(len(wardenPresencePhrases))]
-}
 
 func stickyTool(name string) bool {
 	switch name {
@@ -271,8 +211,7 @@ func (m model) renderMessages() []string {
 }
 
 func (m *model) syncViewport() {
-	m.viewport.SetContent(strings.Join(m.renderMessages(), "\n"))
-	m.viewport.GotoTop()
+	m.viewport = setContent(m.viewport, m.renderMessages(), m.streaming || m.loading)
 }
 
 func renderConfirmBlock(inner confirmMsg, width int) string {
