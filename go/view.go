@@ -191,7 +191,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	}
 	brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	var summary string
-	if entry.duration == 0 {
+	if entry.duration == 0 && m.loading {
 		frame := brailleFrames[m.spinner%len(brailleFrames)]
 		summary = DimStyle().Render("  " + frame + "  thinking")
 	} else {
@@ -362,7 +362,7 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 func (m model) renderWaveSpinner() string {
 	const n = 7
 	const lo = -1
-	const hi = n        // =7
+	const hi = n         // =7
 	const span = hi - lo // 8
 	const cycle = span * 2 // 16
 	if !m.loading {
@@ -375,8 +375,6 @@ func (m model) renderWaveSpinner() string {
 	} else {
 		pos = hi - (s - span)
 	}
-	// Background dots pulse: bright for 3 ticks out of every 20 (~210ms flash each 1.4s)
-	bgBright := m.spinner%20 < 3
 	var b strings.Builder
 	for i := 0; i < n; i++ {
 		dist := i - pos
@@ -393,11 +391,7 @@ func (m model) renderWaveSpinner() string {
 		case dist == 3:
 			b.WriteString(FaintStyle().Render("░"))
 		default:
-			if bgBright {
-				b.WriteString(lipgloss.NewStyle().Foreground(GreenFaint).Render("·"))
-			} else {
-				b.WriteString(FaintStyle().Render("·"))
-			}
+			b.WriteString(" ")
 		}
 	}
 	return b.String()
@@ -407,7 +401,7 @@ func (m model) renderWaveSpinner() string {
 func (m model) renderStatusBar() string {
 	mode := AccentStyle().Render("ask")
 	if m.autoMode {
-		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("build")
+		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("auto")
 	}
 	dot := FaintStyle().Render(" · ")
 	provider := m.providerName

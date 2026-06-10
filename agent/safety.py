@@ -278,8 +278,8 @@ def _classify_powershell(command: str) -> tuple[str, str, List[str]]:
 # ---------------------------------------------------------------------------
 
 def _apply_mode(decision: SafetyDecision, tool_name: str, mode: str) -> SafetyDecision:
-	"""In build mode, downgrade confirm→safe for everything except file_delete."""
-	if mode == "build" and decision.risk == "confirm":
+	"""In auto mode, downgrade confirm→safe for everything except file_delete."""
+	if mode == "auto" and decision.risk == "confirm":
 		if tool_name not in ("file_delete", "delete"):
 			return SafetyDecision(
 				risk="safe",
@@ -395,6 +395,27 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
 			reason="read-only",
 			summary="Listing directory",
 			details=[f"path: {path}"],
+			normalized_args=normalized,
+		), tool_name, mode)
+
+	# --- todowrite ---
+	if tool_name == "todowrite":
+		return _apply_mode(SafetyDecision(
+			risk="safe",
+			reason="updates session todo state",
+			summary="Updating todo list",
+			details=[],
+			normalized_args=normalized,
+		), tool_name, mode)
+
+	# --- skill ---
+	if tool_name == "skill":
+		name = str(normalized.get("name", ""))
+		return _apply_mode(SafetyDecision(
+			risk="safe",
+			reason="reads local skill files",
+			summary="Loading skill",
+			details=[f"name: {name}"],
 			normalized_args=normalized,
 		), tool_name, mode)
 

@@ -94,7 +94,7 @@ async def status(request: web.Request) -> web.Response:
 	data = {
 		"model": backend.model,
 		"provider": provider,
-		"mode": "unleashed" if backend.auto_mode else "leashed",
+		"mode": "auto" if backend.auto_mode else "ask",
 		"thinking": backend.chat.thinking_enabled,
 		"cwd": os.getcwd(),
 		"token_count": backend.chat.token_count,

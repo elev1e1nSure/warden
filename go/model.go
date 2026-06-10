@@ -211,6 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.thinkBuf = ""
 				m.thinkDone = false
 				m.toolRunning = false
+				m.finishThink()
 				if m.streamStart <= len(m.messages) {
 					m.messages = m.messages[:m.streamStart]
 				}
@@ -241,6 +242,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textinput.Reset()
 
 		case tea.KeyRunes:
+			if m.confirming {
+				r := strings.ToLower(string(msg.Runes))
+				if r == "y" || r == "n" {
+					ok := r == "y"
+					ch := m.confirmCh
+					id := m.confirmID
+					m.confirming = false
+					m.confirmID = ""
+					m.confirmCh = nil
+					m.confirmTool = ""
+					m.textinput.Placeholder = ""
+					m.textinput.Reset()
+					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+				}
+				return m, nil
+			}
 			if m.questioning {
 				q := m.questionsData[m.questionIdx]
 				if len(q.Options) > 0 {
@@ -285,20 +302,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.confirming {
-				val := strings.ToLower(strings.TrimSpace(m.textinput.Value()))
-				ok := val == "y" || val == "yes"
-				if val == "" {
-					return m, nil
-				}
-				ch := m.confirmCh
-				id := m.confirmID
-				m.confirming = false
-				m.confirmID = ""
-				m.confirmCh = nil
-				m.confirmTool = ""
-				m.textinput.Placeholder = ""
-				m.textinput.Reset()
-				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+				return m, nil
 			}
 			if m.streaming {
 				return m, nil
@@ -498,9 +502,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case modeMsg:
 		m.autoMode = msg.auto
-		label := "Leashed"
+		label := "Ask"
 		if m.autoMode {
-			label = "Unleashed"
+			label = "Auto"
 		}
 		m.appendText(DimStyle().Render("  Mode: " + label))
 		m.syncViewport()

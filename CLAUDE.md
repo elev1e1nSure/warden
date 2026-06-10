@@ -51,7 +51,7 @@ agent/     — backend: server, chat, tools, safety, logs
   - dim `#666666` — metadata: timestamps, result text, descriptions
   - faint `#444444` — separators, inactive wave chars
 - **layout:** no top header; status bar at bottom (2 lines); rounded border on input
-- **status bar line 1:** `leashed · model · provider` — mode in green, rest dim
+- **status bar line 1:** `ask · model · provider` — mode in green, rest dim
 - **status bar line 2:** wave spinner (green `█▓▒░` bouncing) + hint (`esc interrupt` or confirm prompt)
 - **wave spinner:** 7 positions, peak bounces left-right using `█▓▒░░░░`; idle = `·······` faint
 - **input:** `RoundedBorder`, green-faint when idle, faint when streaming; prompt `> `

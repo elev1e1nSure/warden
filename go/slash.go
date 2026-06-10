@@ -12,7 +12,7 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/build", "Build mode — autonomous, no confirmations except delete"},
+	{"/auto", "Auto mode — autonomous, no confirmations except delete"},
 	{"/ask", "Ask mode — confirm before any destructive action"},
 	{"/reset", "Reset session"},
 	{"/thinking", "Toggle model reasoning"},
@@ -21,7 +21,6 @@ var slashCommands = []slashCmd{
 	{"/copy-last", "Copy last response to clipboard"},
 	{"/clear", "Clear screen without resetting session"},
 	{"/pwd", "Show current working directory"},
-	{"/tools", "List available tools"},
 	{"/compact", "Summarize conversation to free up context"},
 }
 
@@ -67,7 +66,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		return false, nil
 	}
 	switch trimmed {
-	case "/build":
+	case "/auto":
 		m.autoMode = true
 		m.clearHintState()
 		return true, m.setMode(true)
@@ -125,9 +124,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.appendText(m.wardenLine(DimStyle().Render(m.cwd)))
 		m.syncViewport()
 		return true, nil
-	case "/tools":
-		m.clearHintState()
-		return true, m.fetchTools()
 	case "/compact":
 		m.clearHintState()
 		m.loading = true

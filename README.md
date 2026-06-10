@@ -124,8 +124,8 @@ OpenRouter reasoning-capable models are enabled with the `reasoning` request par
 
 | mode | behavior |
 |---|---|
-| **Leashed** (`/leash`) | Every tool call is classified by `agent/safety.py`. Safe commands run immediately. Confirm commands require user approval. Blocked commands are rejected and the model sees the block as a tool result. |
-| **Unleashed** (`/unleash`) | Safe and confirm-level commands run without confirmation. Blocked commands are still rejected. Use with caution. |
+| **Ask** (`/ask`) | Every tool call is classified by `agent/safety.py`. Safe commands run immediately. Confirm commands require user approval. Blocked commands are rejected and the model sees the block as a tool result. |
+| **Auto** (`/auto`) | Safe and confirm-level commands run without confirmation. Blocked commands are still rejected. Use with caution. |
 
 ## confirmation
 
@@ -142,8 +142,8 @@ Entered in the message field:
 
 | command | action |
 |---|---|
-| `/unleash` | Unleashed — dangerous commands without confirmation |
-| `/leash` | Leashed — confirmation for dangerous commands |
+| `/auto` | Auto — dangerous commands without confirmation |
+| `/ask` | Ask — confirmation for dangerous commands |
 | `/reset` | Reset session and cancel all pending confirmations |
 | `/thinking` | Toggle model reasoning |
 

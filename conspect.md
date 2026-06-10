@@ -29,16 +29,16 @@ Go TUI <-> Python backend (HTTP NDJSON) <-> Ollama <-> Tools (PowerShell, filesy
 | Search | google_search, youtube_search |
 
 ## Modes
-- **Leashed**: Requires confirmation for risky actions
-- **Unleashed**: Auto-approves confirmed commands
+- **Ask**: Requires confirmation for risky actions
+- **Auto**: Auto-approves confirmed commands
 
 ## Confirmation
 - Shows command, risk reason, and confirmation keys (y/n)
 - Times out after 5 minutes
 
 ## Commands
-- `/unleash` - Disable confirmations
-- `/leash` - Enable confirmations
+- `/auto` - Disable confirmations
+- `/ask` - Enable confirmations
 - `/reset` - Clear pending actions
 - `/thinking` - Toggle model reasoning
 
