@@ -164,7 +164,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
-	summary := m.ts() + "  " + WardenStyle().Render("warden:") + "  " + DimStyle().Render("думал "+formatThinkDuration(duration))
+	summary := m.ts() + "  " + WardenStyle().Render("warden:") + "  " + DimStyle().Render("thought "+formatThinkDuration(duration))
 	if !m.thinkingExpanded {
 		return summary
 	}
@@ -246,40 +246,22 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 }
 
 func (m model) renderHeader() string {
-	// Line 1: warden + version | right block
 	name := WardenStyle().Render("warden")
 	version := DimStyle().Render(" " + wardenVersion)
-	left1 := name + version
+	line1 := name + version
 
-	sep := DimStyle().Render("│")
-	rightText := "  /unleash · /leash · /reset · /thinking"
-	right := DimStyle().Render(rightText)
-
-	gap := m.width - lipgloss.Width(left1) - lipgloss.Width(sep) - lipgloss.Width(right)
-	if gap < 1 {
-		gap = m.width - lipgloss.Width(left1)
-		if gap < 1 {
-			gap = 1
-		}
-		right = ""
-	}
-	line1 := left1 + strings.Repeat(" ", gap) + sep + right
-
-	// Line 2: model · mode · thinking
 	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
 		mode = AutoStyle().Render("Unleashed")
 	}
-	reasoning := ThinkingOnStyle().Render("Вкл")
+	reasoning := ThinkingOnStyle().Render("On")
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Выкл")
+		reasoning = ThinkingOffStyle().Render("Off")
 	}
-	line2 := DimStyle().Render(wardenModel+" · ") + mode + DimStyle().Render(" · Размышления: ") + reasoning
+	line2 := DimStyle().Render(wardenModel+" · ") + mode + DimStyle().Render(" · Thinking: ") + reasoning
 
-	// Line 3: working directory
 	line3 := DimStyle().Render(m.cwd)
 
-	// Separator
 	sepLine := DimStyle().Render(strings.Repeat("─", m.width))
 
 	return strings.Join([]string{line1, line2, line3, sepLine}, "\n")
@@ -299,7 +281,7 @@ func (m model) View() string {
 			KeyStyle().Render("[Esc]") +
 			DimStyle().Render(" Clear  ") +
 			KeyStyle().Render("[F2]") +
-			DimStyle().Render(" Мысли  ") +
+			DimStyle().Render(" Thoughts  ") +
 			KeyStyle().Render("[Ctrl+C]") +
 			DimStyle().Render(" Exit")
 	}
@@ -344,13 +326,13 @@ func (m model) renderFooterStatus(footer string) string {
 		mode = AutoStyle().Render("Unleashed")
 	}
 
-	reasoning := ThinkingOnStyle().Render("Вкл")
+	reasoning := ThinkingOnStyle().Render("On")
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Выкл")
+		reasoning = ThinkingOffStyle().Render("Off")
 	}
 
-	status := StatusStyle().Render("Статус: ") + mode +
-		StatusStyle().Render("  Размышления: ") + reasoning
+	status := StatusStyle().Render("Status: ") + mode +
+		StatusStyle().Render("  Thinking: ") + reasoning
 
 	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
 	if gap < 2 {

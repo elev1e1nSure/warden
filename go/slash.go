@@ -50,7 +50,7 @@ func (m *model) clearHintState() {
 	m.hintCount = 0
 	m.hintVisible = false
 	if m.height > 0 {
-		m.viewport.Height = m.height - 11
+		m.viewport.Height = m.height - 8
 	}
 }
 
@@ -79,12 +79,12 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
 		m.clearHintState()
-		status := "вкл"
+		status := "on"
 		if !m.thinkingEnabled {
-			status = "выкл"
+			status = "off"
 		}
 		m.wardenTS = time.Now().Format("15:04")
-		m.appendText(m.wardenLine("Размышления " + status))
+		m.appendText(m.wardenLine("Thinking " + status))
 		m.syncViewport()
 		return true, m.setThinking(m.thinkingEnabled)
 	}

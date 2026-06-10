@@ -75,7 +75,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		viewportHeight := msg.Height - 11 - m.hintCount
+		viewportHeight := msg.Height - 8 - m.hintCount
 		if viewportHeight < 1 {
 			viewportHeight = 1
 		}

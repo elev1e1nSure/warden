@@ -32,7 +32,7 @@ func ToolStyle() lipgloss.Style {
 }
 
 func KeyStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Yellow).Bold(true)
+	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
 }
 
 func AutoStyle() lipgloss.Style {
@@ -48,7 +48,7 @@ func StatusStyle() lipgloss.Style {
 }
 
 func ThinkingOnStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9966")).Bold(true)
+	return lipgloss.NewStyle().Foreground(Spruce).Bold(true)
 }
 
 func ThinkingOffStyle() lipgloss.Style {
