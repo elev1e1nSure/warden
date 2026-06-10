@@ -193,6 +193,10 @@ func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {
 	if apiURL != "" {
 		cmd.Env = append(cmd.Env, "WARDEN_API_URL="+apiURL)
 	}
+	// Pass through OpenRouter API key if set in current environment
+	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
+		cmd.Env = append(cmd.Env, "OPENROUTER_API_KEY="+apiKey)
+	}
 	cmd.Stdout = outFile
 	cmd.Stderr = errFile
 
