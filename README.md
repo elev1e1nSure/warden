@@ -32,7 +32,9 @@ frontend and backend are separated: TUI knows nothing about Ollama, backend know
 ```
 warden/
 ├── go/
-│   ├── main.go          # entry point
+│   ├── cmd/warden/      # launcher (starts backend + frontend)
+│   │   └── main.go
+│   ├── main.go          # TUI entry (package tui)
 │   ├── model.go         # bubbletea model
 │   ├── client.go        # http client
 │   ├── styles.go        # lipgloss styles
@@ -43,7 +45,6 @@ warden/
 │   ├── ollama_client.py # ollama management
 │   ├── tools.py         # agent tools
 │   └── logger.py        # backend colored logs
-├── start.ps1           # launch both backend and frontend
 ├── requirements.txt
 ├── README.md
 └── CLAUDE.md
@@ -52,16 +53,10 @@ warden/
 ## launch
 
 ```bash
-# 1. backend
-python agent/server.py
-
-# 2. frontend (another terminal)
-cd go && go run .
-# or
-./go/warden.exe
-
-# or launch both at once (PowerShell)
-./start.ps1
+# launcher starts backend + frontend together
+cd go && go run ./cmd/warden
+# or build and run
+go build -o warden.exe ./cmd/warden && ./warden.exe
 ```
 
 backend starts on `localhost:8765`, automatically starts ollama and downloads the model if needed.
