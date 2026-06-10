@@ -416,12 +416,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmSummary = inner.summary
 			m.confirmDetails = inner.details
 			m.confirmPreview = inner.preview
-			m.confirmDefault = inner.default
+			m.confirmDefault = inner.defaultVal
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
-			if inner.default != "" {
-				m.textinput.SetValue(inner.default)
+			if inner.defaultVal != "" {
+				m.textinput.SetValue(inner.defaultVal)
 				m.textinput.CursorEnd()
 			}
 
@@ -528,11 +528,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.appendText(m.wardenLine(DimStyle().Render(line)))
 		m.syncViewport()
 
-	case toolsResultMsg:
-		
-		m.appendText(m.wardenLine(DimStyle().Render(strings.Join(msg.tools, "  "))))
-		m.syncViewport()
-
 	case clipboardDoneMsg:
 		
 		if msg.err != nil {
@@ -614,7 +609,7 @@ type confirmMsg struct {
 	details []string
 	args    string
 	preview string
-	default string
+	defaultVal string
 }
 type modeMsg struct{ auto bool }
 type doneMsg struct {
@@ -662,7 +657,6 @@ type statusResultMsg struct {
 	tokenCount int
 	tokenLimit int
 }
-type toolsResultMsg struct{ tools []string }
 type clipboardDoneMsg struct{ err error }
 type providerInitMsg struct{ provider string }
 

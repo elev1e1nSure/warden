@@ -161,23 +161,6 @@ func (c *Client) Compact() (*CompactResult, error) {
 	return &result, nil
 }
 
-func (c *Client) GetTools() ([]string, error) {
-	resp, err := http.Get(c.BaseURL + "/tools")
-	if err != nil {
-		logError("get tools failed: " + err.Error())
-		return nil, err
-	}
-	defer resp.Body.Close()
-	request("GET", "/tools", resp.StatusCode)
-	var result struct {
-		Tools []string `json:"tools"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	return result.Tools, nil
-}
-
 func (c *Client) SendMessage(text string) <-chan tea.Msg {
 	ch := make(chan tea.Msg, 64)
 	go func() {
@@ -277,7 +260,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					details: t.Details,
 					args:    t.Args,
 					preview: t.Preview,
-					default: t.Default,
+					defaultVal: t.Default,
 				}
 			case "question":
 				var t struct {
