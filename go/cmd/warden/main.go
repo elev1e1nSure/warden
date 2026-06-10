@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -166,6 +167,37 @@ var (
 	modelFlag    = flag.String("model", "qwen3:8b", "Model name (e.g. poolside/laguna-m.1:free)")
 )
 
+func loadEnvFile(root string) map[string]string {
+	envFile := filepath.Join(root, ".env")
+	result := make(map[string]string)
+	
+	data, err := os.ReadFile(envFile)
+	if err != nil {
+		return result
+	}
+	
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Remove quotes if present
+			if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
+			   (strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+				value = value[1 : len(value)-1]
+			}
+			result[key] = value
+		}
+	}
+	
+	return result
+}
+
 func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {
 	runtimeDir := filepath.Join(root, ".warden")
 	os.MkdirAll(runtimeDir, 0755)
@@ -182,21 +214,34 @@ func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {
 		return nil, err
 	}
 
+	// Load .env file
+	envVars := loadEnvFile(root)
+
 	cmd := exec.Command("python", "-m", "agent.server")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(),
+	
+	// Start with current environment
+	env := os.Environ()
+	
+	// Override with .env values
+	for key, value := range envVars {
+		env = append(env, key+"="+value)
+	}
+	
+	// Set required Python vars
+	env = append(env,
 		"PYTHONPATH="+root,
 		"PYTHONUTF8=1",
 		"PYTHONIOENCODING=utf-8",
 		"WARDEN_MODEL="+model,
 	)
+	
+	// Override API URL if provided via flag
 	if apiURL != "" {
-		cmd.Env = append(cmd.Env, "WARDEN_API_URL="+apiURL)
+		env = append(env, "WARDEN_API_URL="+apiURL)
 	}
-	// Pass through OpenRouter API key if set in current environment
-	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
-		cmd.Env = append(cmd.Env, "OPENROUTER_API_KEY="+apiKey)
-	}
+	
+	cmd.Env = env
 	cmd.Stdout = outFile
 	cmd.Stderr = errFile
 
