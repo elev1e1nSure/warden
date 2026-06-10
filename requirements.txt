@@ -1,6 +1,7 @@
 aiohttp>=3.9.0
 ollama>=0.3.0
 duckduckgo-search>=6.0.0
+pytest
 
 # optional runtime deps (tools import them lazily)
 pyautogui

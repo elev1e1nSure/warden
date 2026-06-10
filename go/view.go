@@ -243,7 +243,7 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 		b.WriteString("\n")
 		preview := inner.preview
 		if len(preview) > width-6 {
-			preview = preview[:width-7] + "…"
+			preview = truncateRunes(preview, width-7)
 		}
 		b.WriteString("    " + preview)
 		b.WriteString("\n")
