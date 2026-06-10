@@ -100,7 +100,7 @@ func (m model) ts() string {
 
 // wardenLine builds the warden header line with an optional suffix.
 func (m model) wardenLine(suffix string) string {
-	return m.ts() + "  " + WardenStyle().Render("warden:") + "  " + suffix
+	return m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + suffix
 }
 
 func compactThinkText(text string) string {
@@ -164,7 +164,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
-	summary := m.ts() + "  " + WardenStyle().Render("warden:") + "  " + DimStyle().Render("thought "+formatThinkDuration(duration))
+	summary := m.ts() + "  " + WardenStyle().Render("Warden:") + "  " + DimStyle().Render("Thought "+formatThinkDuration(duration))
 	if !m.thinkingExpanded {
 		return summary
 	}
@@ -248,20 +248,20 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 func (m model) renderHeader() string {
 	var b strings.Builder
 
-	b.WriteString(WardenStyle().Render("warden"))
+	b.WriteString(WardenStyle().Render("Warden"))
 	b.WriteString(DimStyle().Render(" " + wardenVersion + " · " + wardenModel))
 	b.WriteString("\n")
 
-	mode := SafeStyle().Render("leashed")
+	mode := SafeStyle().Render("Leashed")
 	if m.autoMode {
-		mode = AutoStyle().Render("unleashed")
+		mode = AutoStyle().Render("Unleashed")
 	}
-	reasoning := ThinkingOnStyle().Render("on")
+	reasoning := ThinkingOnStyle().Render("On")
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("off")
+		reasoning = ThinkingOffStyle().Render("Off")
 	}
 	b.WriteString(mode)
-	b.WriteString(DimStyle().Render(" · thinking "))
+	b.WriteString(DimStyle().Render(" · Thinking "))
 	b.WriteString(reasoning)
 	b.WriteString("\n")
 

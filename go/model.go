@@ -147,7 +147,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 			ts := DimStyle().Render("[" + time.Now().Format("15:04") + "]")
-			m.appendText(ts + "  " + UserStyle().Render("you:") + "  " + text)
+			m.appendText(ts + "  " + UserStyle().Render("You:") + "  " + text)
 			m.textinput.Reset()
 			m.streaming = true
 			m.loading = true
