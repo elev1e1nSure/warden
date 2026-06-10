@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -165,12 +166,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlW:
 			if !m.questioning && !m.confirming {
 				val := m.textinput.Value()
-				trimmed := strings.TrimRight(val, " \t")
-				if idx := strings.LastIndexAny(trimmed, " \t"); idx >= 0 {
-					m.textinput.SetValue(strings.TrimRight(val[:idx], " \t"))
-				} else {
-					m.textinput.SetValue("")
+				// Find word boundary using runes to handle multi-byte characters
+				runes := []rune(val)
+				cursor := m.textinput.Cursor()
+				if cursor > len(runes) {
+					cursor = len(runes)
 				}
+				// Search backwards from cursor for word boundary
+				idx := cursor
+				for idx > 0 {
+					r := runes[idx-1]
+					if unicode.IsSpace(r) || unicode.IsPunct(r) {
+						break
+					}
+					idx--
+				}
+				// Trim trailing whitespace/punctuation before the word
+				for idx > 0 {
+					r := runes[idx-1]
+					if !unicode.IsSpace(r) && !unicode.IsPunct(r) {
+						break
+					}
+					idx--
+				}
+				m.textinput.SetValue(string(runes[:idx]))
 				m.textinput.CursorEnd()
 			}
 
