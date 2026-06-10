@@ -277,6 +277,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					details: t.Details,
 					args:    t.Args,
 					preview: t.Preview,
+					default: t.Default,
 				}
 			case "question":
 				var t struct {

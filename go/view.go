@@ -287,6 +287,11 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	b.WriteString(ErrorStyle().Bold(true).Render("⚠  ") + HeaderStyle().Render(inner.title))
 	b.WriteString("\n")
 
+	if inner.risk != "" {
+		b.WriteString(DimStyle().Render("   " + inner.risk))
+		b.WriteString("\n")
+	}
+
 	toolPart := "   " + ToolStyle().Bold(true).Render(inner.tool)
 	if inner.preview != "" {
 		sep := DimStyle().Render("  ·  ")

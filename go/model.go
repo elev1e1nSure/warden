@@ -67,6 +67,7 @@ type model struct {
 	confirmSummary string
 	confirmDetails []string
 	confirmPreview string
+	confirmDefault string
 	// input history
 	history    []string
 	historyIdx int
@@ -396,9 +397,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmSummary = inner.summary
 			m.confirmDetails = inner.details
 			m.confirmPreview = inner.preview
+			m.confirmDefault = inner.default
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
+			if inner.default != "" {
+				m.textinput.SetValue(inner.default)
+				m.textinput.CursorEnd()
+			}
 
 		case questionMsg:
 			m.questioning = true
@@ -589,6 +595,7 @@ type confirmMsg struct {
 	details []string
 	args    string
 	preview string
+	default string
 }
 type modeMsg struct{ auto bool }
 type doneMsg struct {
