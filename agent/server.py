@@ -6,7 +6,7 @@ from aiohttp.client_exceptions import ClientConnectionResetError
 
 from agent.chat import ChatSession
 from agent.ollama_client import OllamaClient
-from agent.tools import PENDING
+from agent.confirmations import ConfirmationManager
 from agent.logger import info, warn, error, success, request as log_request
 
 _backend: Backend | None = None
@@ -16,7 +16,8 @@ class Backend:
 	def __init__(self, model: str = "qwen3:8b") -> None:
 		self.model = model
 		self.ollama = OllamaClient(model=model)
-		self.chat = ChatSession(model=model)
+		self.confirmation_manager = ConfirmationManager()
+		self.chat = ChatSession(model=model, confirmation_manager=self.confirmation_manager)
 		self.auto_mode: bool = False
 
 	async def setup(self) -> None:
@@ -67,13 +68,12 @@ async def set_thinking(request: web.Request) -> web.Response:
 
 
 async def confirm(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
 	data = await request.json()
 	call_id = data.get("id", "")
 	ok = bool(data.get("ok", False))
-	entry = PENDING.get(call_id)
-	if entry:
-		entry["ok"] = ok
-		entry["event"].set()
+	resolved = backend.confirmation_manager.resolve(call_id, ok)
+	if resolved:
 		log_request("POST", "/confirm", 200)
 		action = "confirmed" if ok else "cancelled"
 		info(f"action {action}")

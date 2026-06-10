@@ -3,7 +3,8 @@ from typing import AsyncIterator, List, Dict, Any
 
 import ollama
 
-from agent.tools import REGISTRY, PENDING, gen_id, parse_args
+from agent.confirmations import ConfirmationManager
+from agent.tools import REGISTRY, parse_args
 
 SYSTEM = (
 	"Ты — warden, отдельный страж в компьютере пользователя. "
@@ -50,11 +51,12 @@ def _get_tool_calls(chunk: Any) -> list:
 
 
 class ChatSession:
-	def __init__(self, model: str) -> None:
+	def __init__(self, model: str, confirmation_manager: ConfirmationManager | None = None) -> None:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
 		self._client = ollama.AsyncClient()
 		self.thinking_enabled: bool = True
+		self.confirmation_manager = confirmation_manager
 
 	def reset(self) -> None:
 		self.history = []
@@ -156,12 +158,14 @@ class ChatSession:
 				args_str = ", ".join(f"{k}={v}" for k, v in args.items())
 
 				if tool.is_dangerous(args) and not auto_mode:
-					call_id = gen_id()
-					event = asyncio.Event()
-					PENDING[call_id] = {"event": event, "ok": False}
+					if self.confirmation_manager is None:
+						self.add_tool_result(name, "отменено: нет менеджера подтверждений")
+						yield ("tool", {"name": name, "args": args_str, "result": "отменено"})
+						continue
+					call_id, event = self.confirmation_manager.register()
 					yield ("confirm", {"id": call_id, "tool": name, "args": args_str})
 					await event.wait()
-					ok = PENDING.pop(call_id, {}).get("ok", False)
+					ok = self.confirmation_manager.pop(call_id, {}).get("ok", False)
 					if not ok:
 						self.add_tool_result(name, "отменено пользователем")
 						yield ("tool", {"name": name, "args": args_str, "result": "отменено"})

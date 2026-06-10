@@ -3,7 +3,6 @@ import json
 import os
 import re
 import subprocess
-import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
@@ -536,7 +535,7 @@ class BrowserScreenshotTool(Tool):
 			return f"ошибка: {e}"
 
 
-# ── registry and pending confirmations ─────────────────────────────────────
+# ── registry ───────────────────────────────────────────────────────────────
 
 REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	BashTool(),
@@ -554,13 +553,6 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	GoogleSearchTool(),
 	BrowserScreenshotTool(),
 ]}
-
-# {id: {"event": asyncio.Event, "ok": bool}}
-PENDING: Dict[str, dict] = {}
-
-
-def gen_id() -> str:
-	return uuid.uuid4().hex[:8]
 
 
 def parse_args(arguments: Any) -> dict:
