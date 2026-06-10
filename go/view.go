@@ -13,11 +13,12 @@ import (
 const wardenVersion = "v0.1.0"
 
 var wardenLogo = `
-██     ██  █████  ██████  ██████  ███████ ███    ██
-██     ██ ██   ██ ██   ██ ██   ██ ██      ████   ██
-██  █  ██ ███████ ██████  ██   ██ █████   ██ ██  ██
-██ ███ ██ ██   ██ ██   ██ ██   ██ ██      ██  ██ ██
- ███ ███  ██   ██ ██   ██ ██████  ███████ ██   ████
+██╗    ██╗ █████╗ ██████╗ ██████╗ ███████╗███╗   ██╗
+██║    ██║██╔══██╗██╔══██╗██╔══██╗██╔════╝████╗  ██║
+██║ █╗ ██║███████║██████╔╝██║  ██║█████╗  ██╔██╗ ██║
+██║███╗██║██╔══██║██╔══██╗██║  ██║██╔══╝  ██║╚██╗██║
+╚███╔███╔╝██║  ██║██║  ██║██████╔╝███████╗██║ ╚████║
+ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝
 `
 
 var presenceRng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -329,17 +330,17 @@ func (m model) renderHeader() string {
 	b.WriteString("\n")
 
 	// Status badges row
-	modeBadge := SafeStyle().Render("  Leashed  ")
+	modeBadge := DimStyle().Render("Status: ") + SafeStyle().Render("Leashed")
 	if m.autoMode {
-		modeBadge = AutoStyle().Render("  Unleashed  ")
+		modeBadge = DimStyle().Render("Status: ") + AutoStyle().Render("Unleashed")
 	}
 
-	reasoningBadge := ThinkingOnStyle().Render("  Размышления: Вкл  ")
+	reasoningBadge := DimStyle().Render("Размышления: ") + ThinkingOnStyle().Render("Вкл")
 	if !m.thinkingEnabled {
-		reasoningBadge = ThinkingOffStyle().Render("  Размышления: Выкл  ")
+		reasoningBadge = DimStyle().Render("Размышления: ") + ThinkingOffStyle().Render("Выкл")
 	}
 
-	b.WriteString(modeBadge + "  " + reasoningBadge)
+	b.WriteString("  " + modeBadge + "  " + reasoningBadge)
 	b.WriteString("\n")
 
 	// Separator line
@@ -382,8 +383,6 @@ func (m model) View() string {
 	}
 	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
 	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
-
-	footer = m.renderFooterStatus(footer)
 
 	layers := []string{m.renderHeader(), m.viewport.View(), sep1}
 	if m.hintVisible {

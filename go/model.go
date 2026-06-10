@@ -47,6 +47,7 @@ func initialModel() model {
 
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
+	vp.GotoTop()
 
 	return model{
 		textinput:       ti,
