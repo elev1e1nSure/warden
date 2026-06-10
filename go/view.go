@@ -248,23 +248,21 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 func (m model) renderHeader() string {
 	var b strings.Builder
 
-	name := WardenStyle().Render("warden")
-	version := DimStyle().Render(" " + wardenVersion)
-	b.WriteString(name + version)
+	b.WriteString(WardenStyle().Render("warden"))
+	b.WriteString(DimStyle().Render(" " + wardenVersion + " · " + wardenModel))
 	b.WriteString("\n")
 
-	b.WriteString(ModelStyle().Render(wardenModel))
-	b.WriteString("\n")
-
-	mode := SafeStyle().Render("Leashed")
+	mode := SafeStyle().Render("leashed")
 	if m.autoMode {
-		mode = AutoStyle().Render("Unleashed")
+		mode = AutoStyle().Render("unleashed")
 	}
-	reasoning := ThinkingOnStyle().Render("On")
+	reasoning := ThinkingOnStyle().Render("on")
 	if !m.thinkingEnabled {
-		reasoning = ThinkingOffStyle().Render("Off")
+		reasoning = ThinkingOffStyle().Render("off")
 	}
-	b.WriteString(DimStyle().Render("Status: ") + mode + DimStyle().Render(" | Thinking: ") + reasoning)
+	b.WriteString(mode)
+	b.WriteString(DimStyle().Render(" · thinking "))
+	b.WriteString(reasoning)
 	b.WriteString("\n")
 
 	b.WriteString(DimStyle().Render(m.cwd))
@@ -308,13 +306,12 @@ func (m model) View() string {
 		sepWidth = 0
 	}
 	sep1 := DimStyle().Render(strings.Repeat("─", sepWidth) + scrollTag)
-	sep2 := DimStyle().Render(strings.Repeat("─", m.width))
 
 	layers := []string{m.renderHeader(), m.viewport.View(), sep1}
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
-	layers = append(layers, m.textinput.View(), sep2, footer)
+	layers = append(layers, m.textinput.View(), footer)
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 
