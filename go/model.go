@@ -70,7 +70,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 12 - m.hintCount
+		viewportHeight := msg.Height - 12 - m.hintCount
+		if viewportHeight < 1 {
+			viewportHeight = 1
+		}
+		m.viewport.Height = viewportHeight
 		m.textinput.Width = msg.Width
 		m.syncViewport()
 

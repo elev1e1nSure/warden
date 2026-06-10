@@ -271,7 +271,8 @@ func (m model) renderMessages() []string {
 }
 
 func (m *model) syncViewport() {
-	m.viewport = setContent(m.viewport, m.renderMessages(), m.streaming || m.loading)
+	m.viewport.SetContent(strings.Join(m.renderMessages(), "\n"))
+	m.viewport.GotoTop()
 }
 
 func renderConfirmBlock(inner confirmMsg, width int) string {
