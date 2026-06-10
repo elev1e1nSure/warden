@@ -93,7 +93,7 @@ Entered in the message field:
 | `/auto` | auto mode — dangerous commands without confirmation |
 | `/safe` | safe mode — confirmation for dangerous commands |
 | `/reset` | reset session |
-| `/thinking` | toggle model reasoning |
+| `/ponder` | toggle model reasoning |
 
 ## security
 
