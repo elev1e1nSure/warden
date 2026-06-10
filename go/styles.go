@@ -3,9 +3,9 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Green      = lipgloss.Color("#00D47A")
-	GreenMid   = lipgloss.Color("#00904F")
-	GreenFaint = lipgloss.Color("#004D2A")
+	Green      = lipgloss.Color("#52B788")
+	GreenMid   = lipgloss.Color("#2D8A5A")
+	GreenFaint = lipgloss.Color("#1A4D34")
 	Amber      = lipgloss.Color("#D4A576")
 	Yellow     = Amber // alias kept for compat
 	Red        = lipgloss.Color("#ff4444")

@@ -13,8 +13,8 @@ const wardenVersion = "v0.1.0"
 
 func stickyTool(name string) bool {
 	switch name {
-	case "browser_read", "browser_screenshot", "youtube_search", "google_search",
-		"apply_patch", "webfetch", "question":
+	case "browser_screenshot", "youtube_search", "google_search",
+		"apply_patch", "question":
 		return true
 	default:
 		return false
@@ -251,7 +251,7 @@ func (m *model) renderMessages() []string {
 }
 
 func (m *model) syncViewport() {
-	followTail := m.streaming || m.loading || m.viewport.AtBottom()
+	followTail := !m.userScrolled && (m.streaming || m.loading || m.viewport.AtBottom())
 	m.viewport = setContent(m.viewport, m.renderMessages())
 	if followTail {
 		m.viewport.GotoBottom()
@@ -425,13 +425,19 @@ func (m model) renderStatusBar() string {
 		}
 	}
 
-	// Line 2: wave spinner + hint
+	// Line 2: confirmation or wave spinner + hint
+	if m.escPending {
+		return line1 + "\n" + ErrorStyle().Render("  esc") + DimStyle().Render(" cancel · ") + DimStyle().Render("ctrl+c quit")
+	}
+	if m.quitPending {
+		return line1 + "\n" + ErrorStyle().Render("  ctrl+c") + DimStyle().Render(" quit · ") + DimStyle().Render("any key abort")
+	}
 	var hint string
 	switch {
 	case m.confirming:
 		hint = "  Y run  N cancel"
 	case m.streaming:
-		hint = "  esc interrupt"
+		hint = "  esc cancel"
 	}
 	line2 := m.renderWaveSpinner() + DimStyle().Render(hint)
 

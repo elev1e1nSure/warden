@@ -59,6 +59,11 @@ type model struct {
 	interruptStream bool
 	streamStart     int
 	lastUserInput   string
+	// pending double-press confirmations (during streaming)
+	escPending  bool
+	quitPending bool
+	// viewport scroll: user manually scrolled up during streaming
+	userScrolled bool
 	// token tracking
 	tokenCount int
 	tokenLimit int
@@ -90,6 +95,7 @@ func initialModel(modelName string) model {
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
 	vp.GotoTop()
+	vp.MouseWheelEnabled = false
 
 	cwd, _ := os.Getwd()
 	return model{
@@ -110,6 +116,10 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Block all mouse events — viewport scroll is arrow-key only
+	if _, ok := msg.(tea.MouseMsg); ok {
+		return m, nil
+	}
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -126,8 +136,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.toggleThinkingExpanded()
 			return m, m.focusInput()
 		}
+		// Clear pending confirmations if user presses a different key
+		if msg.Type != tea.KeyEsc {
+			m.escPending = false
+		}
+		if msg.Type != tea.KeyCtrlC {
+			m.quitPending = false
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
+			if m.streaming {
+				if m.quitPending {
+					return m, tea.Quit
+				}
+				m.quitPending = true
+				return m, nil
+			}
 			return m, tea.Quit
 
 		case tea.KeyF2:
@@ -135,7 +159,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.focusInput()
 
 		case tea.KeyUp:
-			if !m.streaming && !m.questioning && !m.confirming && len(m.history) > 0 {
+			if m.streaming {
+				m.userScrolled = true
+				m.viewport.LineUp(3)
+				return m, nil
+			}
+			if !m.questioning && !m.confirming && len(m.history) > 0 {
 				if m.historyIdx == len(m.history) {
 					m.historySav = m.textinput.Value()
 				}
@@ -149,7 +178,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyDown:
-			if !m.streaming && !m.questioning && !m.confirming && len(m.history) > 0 {
+			if m.streaming {
+				m.viewport.LineDown(3)
+				if m.viewport.AtBottom() {
+					m.userScrolled = false
+				}
+				return m, nil
+			}
+			if !m.questioning && !m.confirming && len(m.history) > 0 {
 				if m.historyIdx < len(m.history) {
 					m.historyIdx++
 					m.textinput.Placeholder = ""
@@ -190,20 +226,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyTab:
-			if !m.streaming {
-				val := m.textinput.Value()
-				matches := matchSlash(val)
-				if len(matches) == 1 {
-					m.textinput.SetValue(matches[0].name)
-					m.textinput.CursorEnd()
-				} else if len(matches) > 1 {
-					m.textinput.SetValue(slashCommonPrefix(matches))
-					m.textinput.CursorEnd()
-				}
+			val := m.textinput.Value()
+			matches := matchSlash(val)
+			if len(matches) == 1 {
+				m.textinput.SetValue(matches[0].name)
+				m.textinput.CursorEnd()
+			} else if len(matches) > 1 {
+				m.textinput.SetValue(slashCommonPrefix(matches))
+				m.textinput.CursorEnd()
 			}
 
 		case tea.KeyEsc:
 			if m.streaming && !m.questioning && !m.confirming {
+				if !m.escPending {
+					m.escPending = true
+					return m, nil
+				}
+				// Second ESC — confirmed cancel
+				m.escPending = false
 				m.interruptStream = true
 				m.streaming = false
 				m.loading = false
@@ -211,6 +251,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.thinkBuf = ""
 				m.thinkDone = false
 				m.toolRunning = false
+				m.userScrolled = false
 				m.finishThink()
 				if m.streamStart <= len(m.messages) {
 					m.messages = m.messages[:m.streamStart]
@@ -453,6 +494,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = false
 			m.toolRunning = false
 			m.liveActivity = ""
+			m.escPending = false
+			m.quitPending = false
+			m.userScrolled = false
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
@@ -587,10 +631,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// sync hint visibility and viewport height
 	matches := matchSlash(m.textinput.Value())
-	newCount := 0
-	if !m.streaming {
-		newCount = len(matches)
-	}
+	newCount := len(matches)
 	if newCount != m.hintCount {
 		m.hintCount = newCount
 		m.hintVisible = newCount > 0
