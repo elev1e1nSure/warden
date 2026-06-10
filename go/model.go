@@ -165,7 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				val := m.textinput.Value()
 				trimmed := strings.TrimRight(val, " \t")
 				if idx := strings.LastIndexAny(trimmed, " \t"); idx >= 0 {
-					m.textinput.SetValue(val[:idx+1])
+					m.textinput.SetValue(strings.TrimRight(val[:idx], " \t"))
 				} else {
 					m.textinput.SetValue("")
 				}
@@ -380,7 +380,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if stickyTool(inner.tool.Name) {
 				m.appendText(toolResultBlock(inner.tool.Result))
 			} else {
-				m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Result))
+				m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result))
 			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))

@@ -58,7 +58,11 @@ func (c *Client) ResetSession() error {
 }
 
 func (c *Client) SetMode(auto bool) error {
-	body, _ := json.Marshal(map[string]any{"auto": auto})
+	body, err := json.Marshal(map[string]any{"auto": auto})
+	if err != nil {
+		logError("json marshal set mode error: " + err.Error())
+		return err
+	}
 	resp, err := http.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
 	if err != nil {
 		logError("set mode failed: " + err.Error())
@@ -75,7 +79,11 @@ func (c *Client) SetMode(auto bool) error {
 }
 
 func (c *Client) SetThinking(enabled bool) error {
-	body, _ := json.Marshal(map[string]any{"enabled": enabled})
+	body, err := json.Marshal(map[string]any{"enabled": enabled})
+	if err != nil {
+		logError("json marshal set thinking error: " + err.Error())
+		return err
+	}
 	resp, err := http.Post(c.BaseURL+"/thinking", "application/json", bytes.NewReader(body))
 	if err != nil {
 		logError("set thinking failed: " + err.Error())
@@ -92,7 +100,11 @@ func (c *Client) SetThinking(enabled bool) error {
 }
 
 func (c *Client) SendQuestion(id string, answers [][]string) error {
-	body, _ := json.Marshal(map[string]any{"id": id, "answers": answers})
+	body, err := json.Marshal(map[string]any{"id": id, "answers": answers})
+	if err != nil {
+		logError("json marshal send question error: " + err.Error())
+		return err
+	}
 	resp, err := http.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
 	if err != nil {
 		logError("send question failed: " + err.Error())
@@ -105,7 +117,11 @@ func (c *Client) SendQuestion(id string, answers [][]string) error {
 }
 
 func (c *Client) SendConfirm(id string, ok bool) error {
-	body, _ := json.Marshal(map[string]any{"id": id, "ok": ok})
+	body, err := json.Marshal(map[string]any{"id": id, "ok": ok})
+	if err != nil {
+		logError("json marshal send confirm error: " + err.Error())
+		return err
+	}
 	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
 	if err != nil {
 		logError("send confirm failed: " + err.Error())
@@ -167,7 +183,13 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 	go func() {
 		defer close(ch)
 		msg := map[string]string{"type": "message", "text": text}
-		body, _ := json.Marshal(msg)
+		body, err := json.Marshal(msg)
+		if err != nil {
+			logError("json marshal send message error: " + err.Error())
+			ch <- tokenMsg{text: "\njson error: " + err.Error()}
+			ch <- doneMsg{}
+			return
+		}
 
 		resp, err := http.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
 		if err != nil {
