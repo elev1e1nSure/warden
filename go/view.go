@@ -10,7 +10,6 @@ import (
 )
 
 const wardenVersion = "v0.1.0"
-const wardenModel = "qwen3:8b"
 
 func stickyTool(name string) bool {
 	switch name {
@@ -212,7 +211,11 @@ func (m *model) renderMessages() []string {
 }
 
 func (m *model) syncViewport() {
+	followTail := m.streaming || m.loading || m.viewport.AtBottom()
 	m.viewport = setContent(m.viewport, m.renderMessages())
+	if followTail {
+		m.viewport.GotoBottom()
+	}
 }
 
 func renderedLineCount(text string) int {
@@ -277,6 +280,42 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	return b.String()
 }
 
+func (m model) footerText() string {
+	if m.confirming {
+		return DimStyle().Render("Press Y to run, N to cancel")
+	}
+	return KeyStyle().Render("[F2]") +
+		DimStyle().Render(" Thoughts")
+}
+
+func (m model) layoutViewportHeight() int {
+	if m.height < 1 {
+		return 1
+	}
+
+	hintHeight := 0
+	if m.hintVisible {
+		hintHeight = lipgloss.Height(m.renderHint())
+	}
+
+	reserved := lipgloss.Height(m.renderHeader()) +
+		1 + // scroll separator
+		hintHeight +
+		lipgloss.Height(m.textinput.View()) +
+		1 + // bottom separator
+		lipgloss.Height(m.footerText())
+
+	height := m.height - reserved
+	if height < 1 {
+		height = 1
+	}
+	return height
+}
+
+func (m *model) updateViewportHeight() {
+	m.viewport.Height = m.layoutViewportHeight()
+}
+
 func (m model) renderHeader() string {
 	var b strings.Builder
 
@@ -302,7 +341,7 @@ func (m model) renderHeader() string {
 		thoughts = "Shown"
 	}
 	b.WriteString(prefix)
-	b.WriteString(DimStyle().Render(wardenModel + " · " + mode + " · Thinking " + reasoning + " · Thoughts " + thoughts))
+	b.WriteString(DimStyle().Render(m.modelName + " · " + mode + " · Thinking " + reasoning + " · Thoughts " + thoughts))
 	b.WriteString("\n")
 
 	b.WriteString(prefix)
@@ -324,13 +363,7 @@ func (m model) View() string {
 		return ""
 	}
 
-	var footer string
-	if m.confirming {
-		footer = DimStyle().Render("Press Y to run, N to cancel")
-	} else {
-		footer = KeyStyle().Render("[F2]") +
-			DimStyle().Render(" Thoughts")
-	}
+	footer := m.footerText()
 
 	var scrollTag string
 	if m.viewport.TotalLineCount() > m.viewport.Height {

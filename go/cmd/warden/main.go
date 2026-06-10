@@ -288,7 +288,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tui.Run()
+	err = tui.Run(*modelFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}

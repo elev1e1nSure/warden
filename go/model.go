@@ -12,18 +12,19 @@ import (
 )
 
 type model struct {
-	viewport  viewport.Model
-	textinput textinput.Model
-	client    *Client
-	messages  []messageEntry
-	streaming bool
-	height    int
-	width     int
-	loading   bool
-	spinner   int
-	thinkBuf  string
-	thinkDone bool
-	wardenTS  string
+	viewport   viewport.Model
+	textinput  textinput.Model
+	client     *Client
+	messages   []messageEntry
+	streaming  bool
+	height     int
+	width      int
+	loading    bool
+	spinner    int
+	thinkBuf   string
+	thinkDone  bool
+	wardenTS   string
+	modelName  string
 	// tool execution
 	toolRunning bool
 	// confirmation
@@ -45,7 +46,7 @@ type model struct {
 	mdWidth    int
 }
 
-func initialModel() model {
+func initialModel(modelName string) model {
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.CharLimit = 0
@@ -65,6 +66,7 @@ func initialModel() model {
 		messages:        []messageEntry{},
 		thinkingEnabled: true,
 		cwd:             cwd,
+		modelName:       modelName,
 	}
 }
 
@@ -80,18 +82,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		viewportHeight := msg.Height - 10 - m.hintCount
-		if viewportHeight < 1 {
-			viewportHeight = 1
-		}
-		m.viewport.Height = viewportHeight
 		m.textinput.Width = msg.Width
+		m.updateViewportHeight()
 		m.syncViewport()
 
 	case tea.KeyMsg:
 		if msg.Type != tea.KeyF2 && msg.String() == "f2" {
 			m = m.toggleThinkingExpanded()
-			return m, nil
+			return m, m.focusInput()
 		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -99,7 +97,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyF2:
 			m = m.toggleThinkingExpanded()
-			return m, nil
+			return m, m.focusInput()
 
 		case tea.KeyTab:
 			if !m.streaming {
@@ -124,7 +122,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirmTool = ""
 				m.textinput.Placeholder = ""
 				m.textinput.Reset()
-				return m, tea.Batch(m.sendConfirm(id, false), readNext(ch))
+				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch))
 			}
 			m.textinput.Reset()
 
@@ -143,7 +141,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirmTool = ""
 				m.textinput.Placeholder = ""
 				m.textinput.Reset()
-				return m, tea.Batch(m.sendConfirm(id, ok), readNext(ch))
+				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
 			}
 			if m.streaming {
 				return m, nil
@@ -290,6 +288,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 	}
 
+	cmds = append(cmds, m.focusInput())
+
 	var cmd tea.Cmd
 	m.textinput, cmd = m.textinput.Update(msg)
 	cmds = append(cmds, cmd)
@@ -306,7 +306,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.hintCount = newCount
 		m.hintVisible = newCount > 0
 		if m.height > 0 {
-			m.viewport.Height = m.height - 10 - newCount
+			m.updateViewportHeight()
+			m.syncViewport()
 		}
 	}
 
@@ -420,4 +421,11 @@ func (m *model) appendToLastAssistant(text string) {
 		return
 	}
 	m.messages[last].text += text
+}
+
+func (m *model) focusInput() tea.Cmd {
+	if m.textinput.Focused() {
+		return nil
+	}
+	return m.textinput.Focus()
 }
