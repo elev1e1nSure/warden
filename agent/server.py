@@ -12,6 +12,7 @@ from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import info, warn, error, success, request as log_request
 
 _backend: Backend | None = None
+_shutdown_event: asyncio.Event | None = None
 
 
 class Backend:
@@ -102,6 +103,17 @@ async def status(request: web.Request) -> web.Response:
 	}
 	log_request("GET", "/status", 200)
 	return web.json_response(data)
+
+
+async def shutdown_handler(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	backend.confirmation_manager.cancel_all()
+	backend.question_manager.cancel_all()
+	log_request("POST", "/shutdown", 200)
+	info("graceful shutdown requested")
+	if _shutdown_event is not None:
+		asyncio.get_event_loop().call_soon(_shutdown_event.set)
+	return web.Response(text="ok")
 
 
 async def compact_handler(request: web.Request) -> web.Response:
@@ -225,7 +237,8 @@ async def chat(request: web.Request) -> web.StreamResponse:
 
 
 async def main() -> None:
-	global _backend
+	global _backend, _shutdown_event
+	_shutdown_event = asyncio.Event()
 	info("starting backend...")
 	backend = Backend()
 	_backend = backend
@@ -247,12 +260,14 @@ async def main() -> None:
 	app.router.add_get("/tools", tools_list)
 	app.router.add_post("/question", question_handler)
 	app.router.add_post("/compact", compact_handler)
+	app.router.add_post("/shutdown", shutdown_handler)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)
 	await site.start()
 	success("backend on http://localhost:8765")
-	await asyncio.Event().wait()
+	await _shutdown_event.wait()
+	await runner.cleanup()
 
 
 if __name__ == "__main__":
