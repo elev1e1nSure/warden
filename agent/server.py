@@ -46,7 +46,7 @@ async def health(request: web.Request) -> web.Response:
 async def reset(request: web.Request) -> web.Response:
 	backend.chat.reset()
 	request("POST", "/reset", 200)
-	info("сессия сброшена")
+	info("session reset")
 	return web.Response(text="ok")
 
 
@@ -55,16 +55,16 @@ async def set_mode(request: web.Request) -> web.Response:
 	backend.auto_mode = bool(data.get("auto", False))
 	mode = "AUTO" if backend.auto_mode else "SAFE"
 	request("POST", "/mode", 200)
-	info(f"режим изменён на {mode}")
+	info(f"mode changed to {mode}")
 	return web.Response(text="ok")
 
 
 async def set_thinking(request: web.Request) -> web.Response:
 	data = await request.json()
 	backend.chat.thinking_enabled = bool(data.get("enabled", True))
-	status = "включены" if backend.chat.thinking_enabled else "выключены"
+	status = "enabled" if backend.chat.thinking_enabled else "disabled"
 	request("POST", "/thinking", 200)
-	info(f"размышления {status}")
+	info(f"thinking {status}")
 	return web.Response(text="ok")
 
 
@@ -77,11 +77,11 @@ async def confirm(request: web.Request) -> web.Response:
 		entry["ok"] = ok
 		entry["event"].set()
 		request("POST", "/confirm", 200)
-		action = "подтверждено" if ok else "отменено"
-		info(f"действие {action}")
+		action = "confirmed" if ok else "cancelled"
+		info(f"action {action}")
 		return web.Response(text="ok")
 	request("POST", "/confirm", 404)
-	warn(f"confirm не найден: {call_id}")
+	warn(f"confirm not found: {call_id}")
 	return web.Response(status=404, text="not found")
 
 
@@ -89,7 +89,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	data = await request.json()
 	text = data.get("text", "")
 	request("POST", "/chat")
-	info(f"пользователь: {text[:50]}..." if len(text) > 50 else f"пользователь: {text}")
+	info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
 
 	response = web.StreamResponse(
 		status=200,
@@ -132,9 +132,9 @@ async def chat(request: web.Request) -> web.StreamResponse:
 
 
 async def main() -> None:
-	info("запуск backend...")
+	info("starting backend...")
 	await backend.setup()
-	success("ollama готов")
+	success("ollama ready")
 	
 	app = web.Application()
 	app.router.add_get("/health", health)
@@ -147,7 +147,7 @@ async def main() -> None:
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)
 	await site.start()
-	success("backend на http://localhost:8765")
+	success("backend on http://localhost:8765")
 	await asyncio.Event().wait()
 
 

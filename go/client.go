@@ -46,7 +46,7 @@ func (c *Client) ResetSession() error {
 	}
 	resp.Body.Close()
 	request("POST", "/reset", resp.StatusCode)
-	info("сессия сброшена")
+	info("session reset")
 	return nil
 }
 
@@ -63,7 +63,7 @@ func (c *Client) SetMode(auto bool) error {
 	if !auto {
 		mode = "SAFE"
 	}
-	info("режим: " + mode)
+	info("mode: " + mode)
 	return nil
 }
 
@@ -76,11 +76,11 @@ func (c *Client) SetThinking(enabled bool) error {
 	}
 	resp.Body.Close()
 	request("POST", "/thinking", resp.StatusCode)
-	status := "включены"
+	status := "enabled"
 	if !enabled {
-		status = "выключены"
+		status = "disabled"
 	}
-	info("размышления: " + status)
+	info("thinking: " + status)
 	return nil
 }
 
@@ -93,11 +93,11 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	}
 	resp.Body.Close()
 	request("POST", "/confirm", resp.StatusCode)
-	action := "подтверждено"
+	action := "confirmed"
 	if !ok {
-		action = "отменено"
+		action = "cancelled"
 	}
-	info("действие: " + action)
+	info("action: " + action)
 	return nil
 }
 

@@ -4,12 +4,12 @@ from typing import Optional
 
 
 class Colors:
-    """ANSI цветовые коды"""
+    """ANSI color codes"""
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
     
-    # Цвета
+    # Colors
     CYAN = "\033[36m"
     YELLOW = "\033[33m"
     RED = "\033[31m"
@@ -21,12 +21,12 @@ class Colors:
 
 
 def _timestamp() -> str:
-    """Возвращает метку времени в формате HH:MM:SS"""
+    """Returns timestamp in HH:MM:SS format"""
     return datetime.now().strftime("%H:%M:%S")
 
 
 def _colorize(text: str, color: str, bold: bool = False) -> str:
-    """Окрашивает текст"""
+    """Colorizes text"""
     prefix = color
     if bold:
         prefix += Colors.BOLD
@@ -34,42 +34,42 @@ def _colorize(text: str, color: str, bold: bool = False) -> str:
 
 
 def info(msg: str) -> None:
-    """Информационное сообщение"""
+    """Information message"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     tag = _colorize("[INFO]", Colors.CYAN, bold=True)
     print(f"{ts} {tag} {msg}")
 
 
 def warn(msg: str) -> None:
-    """Предупреждение"""
+    """Warning"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     tag = _colorize("[WARN]", Colors.YELLOW, bold=True)
     print(f"{ts} {tag} {msg}")
 
 
 def error(msg: str) -> None:
-    """Ошибка"""
+    """Error"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     tag = _colorize("[ERROR]", Colors.RED, bold=True)
     print(f"{ts} {tag} {msg}", file=sys.stderr)
 
 
 def success(msg: str) -> None:
-    """Успешное завершение"""
+    """Success"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     tag = _colorize("[OK]", Colors.GREEN, bold=True)
     print(f"{ts} {tag} {msg}")
 
 
 def debug(msg: str) -> None:
-    """Отладочное сообщение"""
+    """Debug message"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     tag = _colorize("[DEBUG]", Colors.DIM)
     print(f"{ts} {tag} {msg}")
 
 
 def request(method: str, path: str, status: Optional[int] = None) -> None:
-    """Лог HTTP запроса"""
+    """HTTP request log"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     method_colored = _colorize(method, Colors.MAGENTA, bold=True)
     path_colored = _colorize(path, Colors.WHITE)
@@ -83,7 +83,7 @@ def request(method: str, path: str, status: Optional[int] = None) -> None:
 
 
 def tool(name: str, args: str, result: Optional[str] = None) -> None:
-    """Лог выполнения инструмента"""
+    """Tool execution log"""
     ts = _colorize(f"[{_timestamp()}]", Colors.GRAY)
     name_colored = _colorize(name, Colors.YELLOW, bold=True)
     args_colored = _colorize(args, Colors.DIM)
