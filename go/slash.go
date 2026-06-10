@@ -16,7 +16,7 @@ var slashCommands = []slashCmd{
 	{"/unleash", "Unleash — dangerous commands without confirmation"},
 	{"/leash", "Leash — confirmation for dangerous commands"},
 	{"/reset", "Reset session"},
-	{"/ponder", "Toggle model reasoning"},
+	{"/thinking", "Toggle model reasoning"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -77,15 +77,15 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			m.client.ResetSession()
 			return noopMsg{}
 		}
-	case "/ponder":
+	case "/thinking":
 		m.thinkingEnabled = !m.thinkingEnabled
 		m.clearHintState()
-		status := "pondering"
+		status := "on"
 		if !m.thinkingEnabled {
-			status = "focused"
+			status = "off"
 		}
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("Pondering "+status))
+		m.messages = append(m.messages, m.wardenLine("Thinking "+status))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 		return true, m.setThinking(m.thinkingEnabled)

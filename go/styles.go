@@ -47,10 +47,10 @@ func StatusStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Dim)
 }
 
-func PonderingOnStyle() lipgloss.Style {
+func ThinkingOnStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9966")).Bold(true)
 }
 
-func PonderingOffStyle() lipgloss.Style {
+func ThinkingOffStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Dim)
 }

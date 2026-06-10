@@ -294,13 +294,13 @@ func (m model) renderFooterStatus(footer string) string {
 		mode = AutoStyle().Render("Unleashed")
 	}
 
-	pondering := PonderingOnStyle().Render("pondering")
+	thinking := ThinkingOnStyle().Render("On")
 	if !m.thinkingEnabled {
-		pondering = PonderingOffStyle().Render("focused")
+		thinking = ThinkingOffStyle().Render("Off")
 	}
 
 	status := StatusStyle().Render("Status: ") + mode +
-		StatusStyle().Render("  Pondering: ") + pondering
+		StatusStyle().Render("  Thinking: ") + thinking
 
 	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
 	if gap < 2 {

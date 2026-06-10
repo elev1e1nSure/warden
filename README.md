@@ -6,7 +6,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama.
 
 | layer | technology |
 |---|---|
-| frontend | go 1.21+, bubbletea, lipgloss |
+| frontend | go 1.23+, bubbletea, lipgloss |
 | backend | python 3.11+, aiohttp |
 | llm | ollama (qwen3:8b) |
 | computer use | pyautogui, pillow |
@@ -37,14 +37,18 @@ warden/
 │   ├── main.go          # TUI entry (package tui)
 │   ├── model.go         # bubbletea model
 │   ├── client.go        # http client
+│   ├── view.go          # rendering, presence phrases, tool lines
+│   ├── slash.go         # slash command handling
+│   ├── commands.go      # bubbletea cmds (backend check, send, confirm)
 │   ├── styles.go        # lipgloss styles
 │   └── logger.go        # frontend logs
 ├── agent/
-│   ├── server.py        # aiohttp backend
-│   ├── chat.py          # session and streaming
-│   ├── ollama_client.py # ollama management
-│   ├── tools.py         # agent tools
-│   └── logger.py        # backend colored logs
+│   ├── server.py          # aiohttp backend
+│   ├── chat.py            # session and streaming
+│   ├── ollama_process.py  # ollama management
+│   ├── confirmations.py   # dangerous tool confirmation manager
+│   ├── tools.py           # agent tools
+│   └── logger.py          # backend colored logs
 ├── requirements.txt
 ├── README.md
 └── CLAUDE.md
@@ -90,10 +94,10 @@ Entered in the message field:
 
 | command | action |
 |---|---|
-| `/auto` | auto mode — dangerous commands without confirmation |
-| `/safe` | safe mode — confirmation for dangerous commands |
+| `/unleash` | auto mode — dangerous commands without confirmation |
+| `/leash` | safe mode — confirmation for dangerous commands |
 | `/reset` | reset session |
-| `/ponder` | toggle model reasoning |
+| `/thinking` | toggle model reasoning |
 
 ## security
 

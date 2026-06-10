@@ -14,7 +14,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 
 ## stack
 
-- **Go 1.21+** — frontend (bubbletea, lipgloss)
+- **Go 1.23+** — frontend (bubbletea, lipgloss)
 - **Python 3.11+** — backend (aiohttp, ollama SDK)
 - pyautogui — mouse / keyboard
 - Pillow — screenshots
@@ -24,7 +24,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 ## code style
 
 - tabs, not spaces
-- snake_case everywhere
+- Go: camelCase, idiomatic Go; Python: snake_case
 - typing is mandatory (`typing`, `dataclasses`)
 - no unnecessary abstractions — simple and clear
 - async where streaming is needed
