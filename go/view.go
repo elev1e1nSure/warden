@@ -164,6 +164,28 @@ func compactThinkText(text string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
+func formatThinkDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Second {
+		ms := d.Round(100 * time.Millisecond)
+		if ms < 100*time.Millisecond {
+			ms = 100 * time.Millisecond
+		}
+		return fmt.Sprintf("%dms", ms/time.Millisecond)
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	mins := int(d / time.Minute)
+	secs := int((d % time.Minute) / time.Second)
+	if secs == 0 {
+		return fmt.Sprintf("%dm", mins)
+	}
+	return fmt.Sprintf("%dm%02ds", mins, secs)
+}
+
 func wrapWords(text string, width int) []string {
 	if width < 1 {
 		width = 1
@@ -194,43 +216,51 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-func (m model) renderThinkLine() string {
-	think := compactThinkText(m.thinkBuf)
-	if think == "" {
-		think = "..."
+func (m model) renderThinkEntry(entry messageEntry) string {
+	duration := entry.duration
+	if duration <= 0 && !entry.startedAt.IsZero() {
+		duration = time.Since(entry.startedAt)
+	}
+	summary := m.ts() + "  " + WardenStyle().Render("warden:") + "  " + DimStyle().Render("думал "+formatThinkDuration(duration))
+	if !m.thinkingExpanded {
+		return summary
 	}
 
-	prefix := m.ts() + "  " + WardenStyle().Render("warden:") + "  "
+	body := compactThinkText(entry.text)
+	if body == "" {
+		return summary
+	}
+
+	prefix := "    "
 	firstWidth := m.width - lipgloss.Width(prefix)
 	if firstWidth < 1 {
 		firstWidth = 1
 	}
 
-	parts := wrapWords(think, firstWidth)
-	if len(parts) == 0 {
-		return m.wardenLine(DimStyle().Render(think))
-	}
-
-	lines := make([]string, 0, len(parts))
-	lines = append(lines, prefix+DimStyle().Render(parts[0]))
-	for _, part := range parts[1:] {
-		lines = append(lines, DimStyle().Render(part))
+	parts := wrapWords(body, firstWidth)
+	lines := make([]string, 0, len(parts)+1)
+	lines = append(lines, summary)
+	for _, part := range parts {
+		lines = append(lines, DimStyle().Render(prefix+part))
 	}
 	return strings.Join(lines, "\n")
 }
 
-func (m *model) clearThinkLine() {
-	if len(m.messages) == 0 {
-		return
+func (m model) renderMessages() []string {
+	out := make([]string, 0, len(m.messages))
+	for _, entry := range m.messages {
+		switch entry.kind {
+		case messageThink:
+			out = append(out, m.renderThinkEntry(entry))
+		default:
+			out = append(out, entry.text)
+		}
 	}
-	last := len(m.messages) - 1
-	if strings.HasPrefix(m.messages[last], m.ts()+"  "+WardenStyle().Render("warden:")) {
-		m.messages = append(m.messages[:last], m.messages[last+1:]...)
-	}
+	return out
 }
 
 func (m *model) syncViewport() {
-	m.viewport = setContent(m.viewport, m.messages, m.streaming || m.loading)
+	m.viewport = setContent(m.viewport, m.renderMessages(), m.streaming || m.loading)
 }
 
 func renderConfirmBlock(inner confirmMsg, width int) string {
@@ -263,6 +293,12 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 		b.WriteString("\n")
 	}
 
+	// Confirmation buttons: larger, closer together, under the warning
+	b.WriteString("\n")
+	yBtn := ConfirmYStyle().Render("  Y  run  ")
+	nBtn := ConfirmNStyle().Render("  N  cancel  ")
+	b.WriteString(yBtn + nBtn)
+
 	return b.String()
 }
 
@@ -273,15 +309,14 @@ func (m model) View() string {
 
 	var footer string
 	if m.confirming {
-		footer = ConfirmYStyle().Render("Y") +
-			DimStyle().Render("  run        ") +
-			ConfirmNStyle().Render("N") +
-			DimStyle().Render("  cancel")
+		footer = DimStyle().Render("Press Y to run, N to cancel")
 	} else {
 		footer = KeyStyle().Render("[Enter]") +
 			DimStyle().Render(" Send  ") +
 			KeyStyle().Render("[Esc]") +
 			DimStyle().Render(" Clear  ") +
+			KeyStyle().Render("[F2]") +
+			DimStyle().Render(" Thoughts  ") +
 			KeyStyle().Render("[Ctrl+C]") +
 			DimStyle().Render(" Exit")
 	}
@@ -328,13 +363,19 @@ func (m model) renderFooterStatus(footer string) string {
 		mode = AutoStyle().Render("Unleashed")
 	}
 
-	thinking := ThinkingOnStyle().Render("On")
+	reasoning := ThinkingOnStyle().Render("On")
 	if !m.thinkingEnabled {
-		thinking = ThinkingOffStyle().Render("Off")
+		reasoning = ThinkingOffStyle().Render("Off")
+	}
+
+	thoughts := ThinkingOnStyle().Render("Shown")
+	if !m.thinkingExpanded {
+		thoughts = ThinkingOffStyle().Render("Hidden")
 	}
 
 	status := StatusStyle().Render("Status: ") + mode +
-		StatusStyle().Render("  Thinking: ") + thinking
+		StatusStyle().Render("  Reasoning: ") + reasoning +
+		StatusStyle().Render("  Thoughts: ") + thoughts
 
 	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
 	if gap < 2 {
