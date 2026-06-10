@@ -293,12 +293,8 @@ func (m model) View() string {
 	if m.confirming {
 		footer = DimStyle().Render("Press Y to run, N to cancel")
 	} else {
-		footer = KeyStyle().Render("[Esc]") +
-			DimStyle().Render(" Clear  ") +
-			KeyStyle().Render("[F2]") +
-			DimStyle().Render(" Thoughts  ") +
-			KeyStyle().Render("[Ctrl+C]") +
-			DimStyle().Render(" Exit")
+		footer = KeyStyle().Render("[F2]") +
+			DimStyle().Render(" Thoughts")
 	}
 
 	var scrollTag string
