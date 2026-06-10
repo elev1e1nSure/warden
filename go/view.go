@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math/rand"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -234,29 +235,34 @@ func (m *model) syncViewport() {
 
 func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
-	b.WriteString(ErrorStyle().Render("⚠ " + inner.title))
+
+	// ⚠  <action title>
+	b.WriteString(ErrorStyle().Bold(true).Render("⚠  ") + TitleStyle().Render(inner.title))
 	b.WriteString("\n")
-	b.WriteString(ToolStyle().Render("  " + inner.tool))
-	b.WriteString("\n")
+
+	//   <tool>  ·  <filename>
+	toolPart := "   " + ToolStyle().Bold(true).Render(inner.tool)
 	if inner.preview != "" {
-		b.WriteString(DimStyle().Render("  will run:"))
-		b.WriteString("\n")
-		preview := inner.preview
-		if len(preview) > width-6 {
-			preview = truncateRunes(preview, width-7)
+		sep := DimStyle().Render("  ·  ")
+		filename := filepath.Base(inner.preview)
+		limit := width - lipgloss.Width(toolPart) - lipgloss.Width(sep) - 2
+		preview := truncateRunes(filename, limit)
+		toolPart += sep + preview
+	}
+	b.WriteString(toolPart)
+	b.WriteString("\n")
+
+	// details: flat, dim, no bullets, no label
+	for _, d := range inner.details {
+		// Replace "path: <filename>" with "path: <full path>" if preview is available
+		detail := d
+		if strings.HasPrefix(d, "path: ") && inner.preview != "" {
+			detail = "path: " + inner.preview
 		}
-		b.WriteString("    " + preview)
+		b.WriteString(DimStyle().Render("   " + detail))
 		b.WriteString("\n")
 	}
-	if len(inner.details) > 0 {
-		b.WriteString(DimStyle().Render("  why:"))
-		b.WriteString("\n")
-		for _, d := range inner.details {
-			b.WriteString("    • " + d)
-			b.WriteString("\n")
-		}
-	}
-	b.WriteString(DimStyle().Render("  [Y] run    [Enter/Esc/N] cancel"))
+
 	return b.String()
 }
 
@@ -267,10 +273,10 @@ func (m model) View() string {
 
 	var footer string
 	if m.confirming {
-		footer = KeyStyle().Render("[Y]") +
-			DimStyle().Render(" Run  ") +
-			KeyStyle().Render("[Enter/Esc/N]") +
-			DimStyle().Render(" Cancel")
+		footer = ConfirmYStyle().Render("Y") +
+			DimStyle().Render("  run        ") +
+			ConfirmNStyle().Render("N") +
+			DimStyle().Render("  cancel")
 	} else {
 		footer = KeyStyle().Render("[Enter]") +
 			DimStyle().Render(" Send  ") +
