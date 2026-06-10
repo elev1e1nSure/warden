@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -36,7 +37,6 @@ type model struct {
 	hintVisible bool
 	hintCount   int
 	// status
-	modelInfo       string
 	thinkingEnabled bool
 }
 
@@ -56,7 +56,6 @@ func initialModel() model {
 		viewport:        vp,
 		client:          NewClient("http://localhost:8765"),
 		messages:        []string{},
-		modelInfo:       "qwen3:8b",
 		thinkingEnabled: true,
 	}
 }
@@ -104,6 +103,147 @@ func slashCommonPrefix(matches []slashCmd) string {
 		}
 	}
 	return prefix
+}
+
+var presenceRng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+var wardenPresencePhrases = []string{
+	"тут",
+	"на месте",
+	"в деле",
+	"я здесь",
+	"рядом",
+	"на связи",
+	"живой",
+	"на посту",
+	"в строю",
+	"на дежурстве",
+	"здесь",
+	"под рукой",
+	"внутри",
+	"на линии",
+	"в работе",
+	"поблизости",
+	"не ушёл",
+	"включён",
+	"на чеку",
+	"смотрю",
+	"держу курс",
+	"держу ход",
+	"на точке",
+	"тут как тут",
+	"в зоне",
+	"в сети",
+	"здесь же",
+	"не сплю",
+	"наготове",
+	"в порядке",
+	"спокойно",
+	"в тени",
+	"на ковре",
+	"подхвачу",
+	"на подхвате",
+	"не дергай",
+	"слушаю",
+	"держусь",
+	"ещё тут",
+	"не сдвинулся",
+	"стоим",
+	"ожидаю",
+	"внимателен",
+	"на страже",
+	"с тобой",
+	"у штурвала",
+	"в курсе",
+	"рядом стою",
+	"тут и есть",
+	"живой тут",
+}
+
+func randomWardenPresence() string {
+	return wardenPresencePhrases[presenceRng.Intn(len(wardenPresencePhrases))]
+}
+
+func stickyTool(name string) bool {
+	switch name {
+	case "browser_open", "browser_read", "browser_screenshot", "youtube_search", "google_search":
+		return true
+	default:
+		return false
+	}
+}
+
+func toolPendingLine() string {
+	return DimStyle().Render("  …")
+}
+
+func truncateRunes(text string, limit int) string {
+	if limit < 1 {
+		limit = 1
+	}
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit-1]) + "…"
+}
+
+func toolResultIsError(result string) bool {
+	lower := strings.ToLower(strings.TrimSpace(result))
+	return strings.HasPrefix(lower, "ошибка") ||
+		strings.HasPrefix(lower, "error") ||
+		strings.HasPrefix(lower, "stderr")
+}
+
+func toolSummaryLine(name string, result string) string {
+	result = strings.TrimSpace(result)
+	if result == "" {
+		result = "(пусто)"
+	}
+	lines := strings.Split(result, "\n")
+	head := strings.TrimSpace(lines[0])
+	if len(lines) > 1 {
+		head += fmt.Sprintf(" · +%d строк", len(lines)-1)
+	}
+	head = truncateRunes(head, 120)
+	prefix := "  ✓ "
+	style := DimStyle()
+	if toolResultIsError(result) {
+		prefix = "  ! "
+		style = ErrorStyle()
+	}
+	return style.Render(prefix + name + " → " + head)
+}
+
+func toolResultBlock(result string) string {
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return DimStyle().Render("  (пусто)")
+	}
+
+	lines := strings.Split(result, "\n")
+	hidden := 0
+	if len(lines) > 10 {
+		hidden = len(lines) - 10
+		lines = lines[:10]
+	}
+	for i, line := range lines {
+		lines[i] = "  " + truncateRunes(strings.TrimRight(line, " \t"), 160)
+	}
+	if hidden > 0 {
+		lines = append(lines, fmt.Sprintf("  … +%d строк", hidden))
+	}
+	if toolResultIsError(result) {
+		return ErrorStyle().Render(strings.Join(lines, "\n"))
+	}
+	return DimStyle().Render(strings.Join(lines, "\n"))
+}
+
+func toolStartLine(name, args string) string {
+	if args == "" {
+		return ToolStyle().Render("▶ " + name)
+	}
+	return ToolStyle().Render("▶ "+name) + "  " + DimStyle().Render(truncateRunes(args, 160))
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -307,17 +447,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.thinkBuf = ""
 			}
 			m.messages = append(m.messages,
-				ToolStyle().Render("▸ "+inner.name+" ")+DimStyle().Render(inner.args),
-				DimStyle().Render("  ..."),
+				toolStartLine(inner.name, inner.args),
+				toolPendingLine(),
 			)
 			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
 
 		case toolMsg:
-			if len(m.messages) > 0 && m.messages[len(m.messages)-1] == DimStyle().Render("  ...") {
-				m.messages[len(m.messages)-1] = DimStyle().Render("  " + inner.tool.Result)
+			m.toolRunning = false
+			sticky := stickyTool(inner.tool.Name)
+			if len(m.messages) > 0 && m.messages[len(m.messages)-1] == toolPendingLine() {
+				if sticky {
+					m.messages[len(m.messages)-1] = toolResultBlock(inner.tool.Result)
+				} else {
+					m.messages = m.messages[:len(m.messages)-1]
+					if len(m.messages) > 0 {
+						m.messages[len(m.messages)-1] = toolSummaryLine(inner.tool.Name, inner.tool.Result)
+					} else {
+						m.messages = append(m.messages, toolSummaryLine(inner.tool.Name, inner.tool.Result))
+					}
+				}
+			} else if sticky {
+				m.messages = append(m.messages, toolResultBlock(inner.tool.Result))
 			} else {
-				m.messages = append(m.messages, DimStyle().Render("  "+inner.tool.Result))
+				m.messages = append(m.messages, toolSummaryLine(inner.tool.Name, inner.tool.Result))
 			}
 			m.viewport = setContent(m.viewport, m.messages)
 			cmds = append(cmds, readNext(msg.ch))
@@ -337,6 +490,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case doneMsg:
 			m.streaming = false
 			m.loading = false
+			m.toolRunning = false
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.messages = append(m.messages, "")
@@ -347,6 +501,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.streaming {
 			m.streaming = false
 			m.loading = false
+			m.toolRunning = false
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.messages = append(m.messages, "")
@@ -376,7 +531,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case backendReadyMsg:
 		m.client.ResetSession()
 		m.wardenTS = time.Now().Format("15:04")
-		m.messages = append(m.messages, m.wardenLine("На месте"))
+		m.messages = append(m.messages, m.wardenLine(randomWardenPresence()))
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.viewport.GotoBottom()
 

@@ -1,17 +1,15 @@
 import asyncio
 import json
-import os
-import sys
 
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from agent.chat import ChatSession
 from agent.ollama_client import OllamaClient
 from agent.tools import PENDING
-from agent.logger import info, warn, error, success, request as log_request, tool
+from agent.logger import info, warn, error, success, request as log_request
+
+_backend: Backend | None = None
 
 
 class Backend:
@@ -29,7 +27,10 @@ class Backend:
 			await self.ollama.pull_model()
 
 
-backend = Backend()
+
+
+def _get_backend(request: web.Request) -> Backend:
+	return request.app["backend"]
 
 
 async def health(request: web.Request) -> web.Response:
@@ -38,6 +39,7 @@ async def health(request: web.Request) -> web.Response:
 
 
 async def reset(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
 	backend.chat.reset()
 	log_request("POST", "/reset", 200)
 	info("session reset")
@@ -45,6 +47,7 @@ async def reset(request: web.Request) -> web.Response:
 
 
 async def set_mode(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
 	data = await request.json()
 	backend.auto_mode = bool(data.get("auto", False))
 	mode = "AUTO" if backend.auto_mode else "SAFE"
@@ -54,6 +57,7 @@ async def set_mode(request: web.Request) -> web.Response:
 
 
 async def set_thinking(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
 	data = await request.json()
 	backend.chat.thinking_enabled = bool(data.get("enabled", True))
 	status = "enabled" if backend.chat.thinking_enabled else "disabled"
@@ -80,6 +84,7 @@ async def confirm(request: web.Request) -> web.Response:
 
 
 async def chat(request: web.Request) -> web.StreamResponse:
+	backend = _get_backend(request)
 	data = await request.json()
 	text = data.get("text", "")
 	log_request("POST", "/chat")
@@ -126,11 +131,15 @@ async def chat(request: web.Request) -> web.StreamResponse:
 
 
 async def main() -> None:
+	global _backend
 	info("starting backend...")
+	backend = Backend()
+	_backend = backend
 	await backend.setup()
 	success("ollama ready")
 
 	app = web.Application()
+	app["backend"] = backend
 	app.router.add_get("/health", health)
 	app.router.add_post("/reset", reset)
 	app.router.add_post("/chat", chat)
@@ -149,4 +158,5 @@ if __name__ == "__main__":
 	try:
 		asyncio.run(main())
 	except KeyboardInterrupt:
-		backend.ollama.shutdown()
+		if _backend is not None:
+			_backend.ollama.shutdown()

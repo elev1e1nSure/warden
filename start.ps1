@@ -32,15 +32,22 @@ $originalDir = Get-Location
 $backendProcess = $null
 $startedBackend = $false
 
-function Write-Status {
+function Write-Section {
+	param([Parameter(Mandatory = $true)][string]$Title)
+
+	Write-Host ""
+	Write-Host $Title -ForegroundColor Cyan
+	Write-Host ("-" * [Math]::Max($Title.Length, 24)) -ForegroundColor DarkGray
+}
+
+function Write-Log {
 	param(
-		[Parameter(Mandatory = $true)][string]$Name,
 		[Parameter(Mandatory = $true)][string]$Message,
-		[ConsoleColor]$Color = [ConsoleColor]::White
+		[ConsoleColor]$Color = [ConsoleColor]::Gray
 	)
 
-	Write-Host "[$Name] " -ForegroundColor $Color -NoNewline
-	Write-Host $Message
+	Write-Host "  " -NoNewline
+	Write-Host $Message -ForegroundColor $Color
 }
 
 function Resolve-CommandPath {
@@ -108,35 +115,38 @@ try {
 	New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 	Remove-Item -LiteralPath $backendOutLog, $backendErrLog -Force -ErrorAction SilentlyContinue
 
-	Write-Host ""
-	Write-Host "============================================================" -ForegroundColor Cyan
-	Write-Host "  WARDEN - starting system" -ForegroundColor Cyan
-	Write-Host "============================================================" -ForegroundColor Cyan
+	Write-Section "warden"
+	Write-Log "booting backend and frontend" DarkGray
+	Write-Log "port $Port" DarkGray
+	Write-Log "health check $healthUrl" DarkGray
+	Write-Log "backend log $backendOutLog" DarkGray
 	Write-Host ""
 
 	if (Test-BackendHealth) {
-		Write-Status "BACKEND" "already healthy on $healthUrl" Yellow
+		Write-Log "backend already up" Green
 	} elseif (Test-PortListening) {
 		throw "Port $Port is busy, but $healthUrl is not healthy. Stop the old backend and run this script again."
 	} else {
-		Write-Status "BACKEND" "starting Python server..." Yellow
+		Write-Log "backend: starting python server" DarkYellow
+		$env:PYTHONPATH = $scriptDir
 		$backendProcess = Start-Process `
 			-FilePath $python `
-			-ArgumentList @("server.py") `
-			-WorkingDirectory $backendDir `
+			-ArgumentList @("-m", "agent.server") `
+			-WorkingDirectory $scriptDir `
 			-RedirectStandardOutput $backendOutLog `
 			-RedirectStandardError $backendErrLog `
 			-WindowStyle Hidden `
 			-PassThru
 		$startedBackend = $true
+		Write-Log "backend: waiting for health check" DarkGray
 		Wait-BackendReady -Process $backendProcess
-		Write-Status "BACKEND" "ready on $healthUrl" Green
+		Write-Log "backend: ready" Green
 	}
 
-	Write-Status "FRONTEND" "starting Go client..." Cyan
+	Write-Log "frontend: starting go client" DarkCyan
+	Write-Log "frontend: handing off to the tui" DarkGray
 	Write-Host ""
-	Write-Host "System started. Press Ctrl+C to stop." -ForegroundColor Green
-	Write-Host "Backend logs: $backendOutLog"
+	Write-Log "system is up. press Ctrl+C to stop" Green
 	Write-Host ""
 
 	Set-Location $frontendDir
@@ -148,7 +158,7 @@ try {
 	Set-Location $originalDir
 
 	if ($startedBackend -and $null -ne $backendProcess -and -not $backendProcess.HasExited) {
-		Write-Status "BACKEND" "stopping Python server..." Yellow
+		Write-Log "backend: stopping" DarkYellow
 		Stop-ProcessTree -ProcessId $backendProcess.Id
 	}
 }

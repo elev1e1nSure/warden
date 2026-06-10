@@ -14,7 +14,6 @@ const (
 	red     = "\033[31m"
 	green   = "\033[32m"
 	yellow  = "\033[33m"
-	blue    = "\033[34m"
 	magenta = "\033[35m"
 	cyan    = "\033[36m"
 	white   = "\033[37m"
@@ -29,20 +28,12 @@ func info(msg string) {
 	fmt.Printf("%s[%s]%s %s[INFO]%s %s\n", gray, timestamp(), reset, cyan+bold, reset, msg)
 }
 
-func warn(msg string) {
-	fmt.Printf("%s[%s]%s %s[WARN]%s %s\n", gray, timestamp(), reset, yellow+bold, reset, msg)
-}
-
 func logError(msg string) {
 	fmt.Printf("%s[%s]%s %s[ERROR]%s %s\n", gray, timestamp(), reset, red+bold, reset, msg)
 }
 
 func success(msg string) {
 	fmt.Printf("%s[%s]%s %s[OK]%s %s\n", gray, timestamp(), reset, green+bold, reset, msg)
-}
-
-func debug(msg string) {
-	fmt.Printf("%s[%s]%s %s[DEBUG]%s %s\n", gray, timestamp(), reset, dim, reset, msg)
 }
 
 func request(method string, path string, status int) {

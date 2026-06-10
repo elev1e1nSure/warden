@@ -8,7 +8,6 @@ var (
 	Red    = lipgloss.Color("#ff4444")
 	Dim    = lipgloss.Color("#666666")
 	White  = lipgloss.Color("#ffffff")
-	Bg     = lipgloss.Color("#0d0d0d")
 	Blue   = lipgloss.Color("#4488ff")
 )
 

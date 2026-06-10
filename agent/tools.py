@@ -216,7 +216,6 @@ class ClipboardTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		action = args.get("action", "read")
 		try:
-			import subprocess
 			if action == "read":
 				proc = await asyncio.to_thread(
 					subprocess.run,
@@ -264,7 +263,8 @@ class ScreenshotTool(Tool):
 class MouseTool(Tool):
 	name = "mouse"
 	description = (
-		"Управлять мышью: двигать, кликать, скроллить. "
+		"Управлять мышью по координатам экрана: двигать, кликать, скроллить. "
+		"Если координаты неизвестны, сначала используй screenshot и найди цель на снимке. "
 		"action: move | click | right_click | double_click | scroll. "
 		"Для scroll: amount — шаги (+ вниз, - вверх)."
 	)
@@ -324,6 +324,7 @@ class KeyboardTool(Tool):
 	description = (
 		"Управлять клавиатурой. "
 		"action: type — напечатать текст, press — нажать клавишу/комбинацию. "
+		"Используй после клика в нужное поле или активное окно. "
 		"Для press ключи через + (ctrl+c, alt+f4, win+d, enter, escape)."
 	)
 	params = {
@@ -355,7 +356,10 @@ class KeyboardTool(Tool):
 
 class BrowserOpenTool(Tool):
 	name = "browser_open"
-	description = "Открыть URL в браузере пользователя. Используй для открытия сайтов, видео, страниц."
+	description = (
+		"Открыть URL в браузере пользователя. "
+		"Не читает страницу и не управляет ею. Для чтения и проверки веб-страниц используй browser_read или browser_screenshot."
+	)
 	params = {"url": {"type": "string", "description": "URL"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
@@ -371,8 +375,8 @@ class BrowserOpenTool(Tool):
 class BrowserReadTool(Tool):
 	name = "browser_read"
 	description = (
-		"Прочитать содержимое страницы: текст и список ссылок. "
-		"Для навигации по сайтам и извлечения данных."
+		"Через Playwright прочитать содержимое страницы: текст и список ссылок. "
+		"Используй для навигации по сайтам, проверки страниц и извлечения данных без открытия окна пользователю."
 	)
 	params = {"url": {"type": "string", "description": "URL"}}
 
@@ -510,7 +514,7 @@ class GoogleSearchTool(Tool):
 
 class BrowserScreenshotTool(Tool):
 	name = "browser_screenshot"
-	description = "Сделать скриншот веб-страницы в фоне, вернуть путь к файлу."
+	description = "Через Playwright сделать скриншот веб-страницы в фоне и вернуть путь к файлу."
 	params = {"url": {"type": "string", "description": "URL"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
