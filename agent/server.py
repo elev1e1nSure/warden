@@ -8,7 +8,7 @@ from aiohttp.client_exceptions import ClientConnectionResetError
 from agent.chat import ChatSession
 from agent.llm_client import OllamaClient, OpenAIClient
 from agent.ollama_process import OllamaProcessManager
-from agent.confirmations import ConfirmationManager
+from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import info, warn, error, success, request as log_request
 
 _backend: Backend | None = None
@@ -26,7 +26,10 @@ class Backend:
 			self.llm = OllamaClient()
 			self.ollama = OllamaProcessManager(model=self.model)
 		self.confirmation_manager = ConfirmationManager()
-		self.chat = ChatSession(model=self.model, client=self.llm, confirmation_manager=self.confirmation_manager)
+		self.question_manager = QuestionManager()
+		self.chat = ChatSession(model=self.model, client=self.llm,
+		                        confirmation_manager=self.confirmation_manager,
+		                        question_manager=self.question_manager)
 		self.auto_mode: bool = False
 
 	async def setup(self) -> None:
@@ -58,6 +61,7 @@ async def health(request: web.Request) -> web.Response:
 async def reset(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	backend.confirmation_manager.cancel_all()
+	backend.question_manager.cancel_all()
 	backend.chat.reset()
 	log_request("POST", "/reset", 200)
 	info("session reset")
@@ -82,6 +86,40 @@ async def set_thinking(request: web.Request) -> web.Response:
 	log_request("POST", "/thinking", 200)
 	info(f"thinking {status}")
 	return web.Response(text="ok")
+
+
+async def status(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	provider = "openrouter" if backend.api_url else "ollama"
+	data = {
+		"model": backend.model,
+		"provider": provider,
+		"mode": "unleashed" if backend.auto_mode else "leashed",
+		"thinking": backend.chat.thinking_enabled,
+		"cwd": os.getcwd(),
+	}
+	log_request("GET", "/status", 200)
+	return web.json_response(data)
+
+
+async def question_handler(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	call_id = data.get("id", "")
+	answers = data.get("answers")
+	resolved = backend.question_manager.resolve(call_id, answers)
+	if resolved:
+		log_request("POST", "/question", 200)
+		info(f"questions answered: {call_id[:8]}")
+		return web.Response(text="ok")
+	log_request("POST", "/question", 404)
+	return web.Response(status=404, text="not found")
+
+
+async def tools_list(request: web.Request) -> web.Response:
+	from agent.tools import REGISTRY
+	log_request("GET", "/tools", 200)
+	return web.json_response({"tools": list(REGISTRY.keys())})
 
 
 async def confirm(request: web.Request) -> web.Response:
@@ -122,6 +160,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 		async for type_, payload in backend.chat.stream(text, auto_mode=backend.auto_mode):
 			if _client_disconnected(request):
 				backend.confirmation_manager.cancel_all()
+				backend.question_manager.cancel_all()
 				break
 			if type_ == "warden_start":
 				msg: dict = {"type": "warden_start"}
@@ -143,6 +182,12 @@ async def chat(request: web.Request) -> web.StreamResponse:
 					"args": payload["args"],
 					"preview": payload.get("preview", ""),
 					"default": payload.get("default", "cancel"),
+				}
+			elif type_ == "question":
+				msg = {
+					"type": "question",
+					"id": payload["id"],
+					"questions": payload["questions"],
 				}
 			else:
 				continue
@@ -183,6 +228,9 @@ async def main() -> None:
 	app.router.add_post("/confirm", confirm)
 	app.router.add_post("/mode", set_mode)
 	app.router.add_post("/thinking", set_thinking)
+	app.router.add_get("/status", status)
+	app.router.add_get("/tools", tools_list)
+	app.router.add_post("/question", question_handler)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, "localhost", 8765)

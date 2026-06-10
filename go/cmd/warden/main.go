@@ -181,7 +181,7 @@ func preCheck() (alreadyRunning bool, err error) {
 var (
 	providerFlag = flag.String("provider", "ollama", "LLM provider: ollama | openrouter")
 	apiURLFlag   = flag.String("api", "", "Override API base URL. If empty, provider picks the default.")
-	modelFlag    = flag.String("model", "qwen3:8b", "Model name (e.g. qwen/qwen3-coder:free, poolside/laguna-m.1:free)")
+	modelFlag    = flag.String("model", "qwen3:8b", "Model name (e.g. poolside/laguna-m.1:free)")
 )
 
 func startBackend(root string, apiURL string, model string) (*exec.Cmd, error) {

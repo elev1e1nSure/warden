@@ -31,6 +31,13 @@ type model struct {
 	confirmID   string
 	confirmCh   <-chan tea.Msg
 	confirmTool string
+	// question
+	questioning     bool
+	questionID      string
+	questionCh      <-chan tea.Msg
+	questionsData   []QuestionItem
+	questionIdx     int
+	questionAnswers [][]string
 	// mode
 	autoMode    bool
 	hintVisible bool
@@ -45,6 +52,10 @@ type model struct {
 	liveActivity string
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
+	// input history
+	history    []string
+	historyIdx int
+	historySav string
 	// markdown
 	mdRenderer *glamour.TermRenderer
 	mdWidth    int
@@ -72,11 +83,13 @@ func initialModel(modelName string) model {
 		thinkingEnabled: true,
 		cwd:             cwd,
 		modelName:       modelName,
+		history:         []string{},
+		loading:         true,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return m.checkBackend()
+	return tea.Batch(m.checkBackend(), m.tick())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -104,6 +117,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.toggleThinkingExpanded()
 			return m, m.focusInput()
 
+		case tea.KeyUp:
+			if !m.streaming && !m.questioning && !m.confirming && len(m.history) > 0 {
+				if m.historyIdx == len(m.history) {
+					m.historySav = m.textinput.Value()
+				}
+				if m.historyIdx > 0 {
+					m.historyIdx--
+					m.textinput.SetValue(m.history[m.historyIdx])
+					m.textinput.CursorEnd()
+				} else if m.historyIdx == 0 {
+					m.textinput.Placeholder = DimStyle().Render("(start of history)")
+				}
+			}
+
+		case tea.KeyDown:
+			if !m.streaming && !m.questioning && !m.confirming && len(m.history) > 0 {
+				if m.historyIdx < len(m.history) {
+					m.historyIdx++
+					m.textinput.Placeholder = ""
+					if m.historyIdx < len(m.history) {
+						m.textinput.SetValue(m.history[m.historyIdx])
+					} else {
+						m.textinput.SetValue(m.historySav)
+					}
+					m.textinput.CursorEnd()
+				}
+			}
+
+
+		case tea.KeyCtrlW:
+			if !m.questioning && !m.confirming {
+				val := m.textinput.Value()
+				trimmed := strings.TrimRight(val, " \t")
+				if idx := strings.LastIndexAny(trimmed, " \t"); idx >= 0 {
+					m.textinput.SetValue(val[:idx+1])
+				} else {
+					m.textinput.SetValue("")
+				}
+				m.textinput.CursorEnd()
+			}
+
 		case tea.KeyTab:
 			if !m.streaming {
 				val := m.textinput.Value()
@@ -118,6 +172,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEsc:
+			if m.questioning {
+				ch := m.questionCh
+				id := m.questionID
+				m = m.clearQuestionState()
+				return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch))
+			}
 			if m.confirming {
 				m.confirming = false
 				ch := m.confirmCh
@@ -131,12 +191,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.textinput.Reset()
 
+		case tea.KeyRunes:
+			if m.questioning {
+				q := m.questionsData[m.questionIdx]
+				if len(q.Options) > 0 && len(msg.Runes) == 1 {
+					r := msg.Runes[0]
+					if r >= '1' && r <= '9' {
+						idx := int(r - '1')
+						if idx < len(q.Options) {
+							m.questionAnswers = append(m.questionAnswers, []string{q.Options[idx].Label})
+							m.questionIdx++
+							if m.questionIdx >= len(m.questionsData) {
+								ch := m.questionCh
+								id := m.questionID
+								answers := m.questionAnswers
+								m = m.clearQuestionState()
+								return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
+							}
+							m.syncViewport()
+							return m, m.focusInput()
+						}
+					}
+				}
+				return m, nil
+			}
+
 		case tea.KeyEnter:
+			if m.questioning {
+				q := m.questionsData[m.questionIdx]
+				if len(q.Options) == 0 {
+					text := strings.TrimSpace(m.textinput.Value())
+					m.textinput.Reset()
+					m.questionAnswers = append(m.questionAnswers, []string{text})
+					m.questionIdx++
+					if m.questionIdx >= len(m.questionsData) {
+						ch := m.questionCh
+						id := m.questionID
+						answers := m.questionAnswers
+						m = m.clearQuestionState()
+						return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
+					}
+					m.syncViewport()
+					return m, m.focusInput()
+				}
+				return m, nil
+			}
 			if m.confirming {
 				val := strings.ToLower(strings.TrimSpace(m.textinput.Value()))
 				ok := val == "y" || val == "yes"
-				if val == "" || val == "n" || val == "no" {
-					ok = false
+				if val == "" {
+					return m, nil
 				}
 				ch := m.confirmCh
 				id := m.confirmID
@@ -159,6 +263,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.Reset()
 				return m, cmd
 			}
+
+			m.history = append(m.history, text)
+			m.historyIdx = len(m.history)
+			m.historySav = ""
+
+			if strings.HasPrefix(text, "! ") {
+				cmdText := strings.TrimPrefix(text, "! ")
+				m.appendText(DimStyle().Render("  > ") + cmdText)
+				m.appendText("")
+				m.textinput.Reset()
+				m.streaming = true
+				m.loading = true
+				m.spinner = 0
+				m.syncViewport()
+				return m, tea.Batch(m.execShell(cmdText), m.tick())
+			}
+
 			m.appendText(DimStyle().Render("  > ") + text)
 			m.appendText("")
 			m.textinput.Reset()
@@ -193,6 +314,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tokenMsg:
 			if !m.thinkDone {
 				m.finishThink()
+				m.appendText("")
 				m.appendAssistant("")
 				m.thinkDone = true
 			}
@@ -230,6 +352,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
 
+		case questionMsg:
+			m.questioning = true
+			m.questionID = inner.id
+			m.questionCh = msg.ch
+			m.questionsData = inner.questions
+			m.questionIdx = 0
+			m.questionAnswers = nil
+			m.textinput.Placeholder = ""
+			m.textinput.Reset()
+			m.syncViewport()
+
 		case doneMsg:
 			m.streaming = false
 			m.loading = false
@@ -255,10 +388,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 		}
 
+	case shellResultMsg:
+		m.streaming = false
+		m.loading = false
+		m.toolRunning = false
+		m.finishThink()
+		m.thinkBuf = ""
+		m.thinkDone = false
+		m.appendText(DimStyle().Render("  ── output ──\n" + msg.output))
+		m.appendText("")
+		m.syncViewport()
+
 	case tickMsg:
 		if m.loading {
 			m.spinner += m.advance()
-			m.spinner %= 24
 			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
 				m.syncViewport()
 			}
@@ -308,11 +451,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.providerName = msg.provider
 
 	case backendReadyMsg:
+		m.loading = false
 		m.client.ResetSession()
 		m.syncViewport()
 		cmds = append(cmds, m.initProvider())
 
 	case backendErrorMsg:
+		m.loading = false
 		m.appendText(ErrorStyle().Render("Error: backend unavailable"))
 		m.syncViewport()
 	}
@@ -367,11 +512,29 @@ type doneMsg struct{}
 type backendReadyMsg struct{}
 type backendErrorMsg struct{}
 type tickMsg struct{}
+type shellResultMsg struct{ output string }
 type startStreamMsg struct{ ch <-chan tea.Msg }
 type nextMsg struct {
 	inner tea.Msg
 	ch    <-chan tea.Msg
 }
+type QuestionOption struct {
+	Label       string
+	Description string
+}
+
+type QuestionItem struct {
+	Question string
+	Header   string
+	Options  []QuestionOption
+	Multiple bool
+}
+
+type questionMsg struct {
+	id        string
+	questions []QuestionItem
+}
+
 type statusResultMsg struct {
 	model    string
 	provider string
@@ -468,4 +631,16 @@ func (m *model) focusInput() tea.Cmd {
 		return nil
 	}
 	return m.textinput.Focus()
+}
+
+func (m model) clearQuestionState() model {
+	m.questioning = false
+	m.questionID = ""
+	m.questionCh = nil
+	m.questionsData = nil
+	m.questionIdx = 0
+	m.questionAnswers = nil
+	m.textinput.Placeholder = ""
+	m.textinput.Reset()
+	return m
 }

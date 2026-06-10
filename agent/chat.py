@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import AsyncIterator, List, Dict, Any
 
-from agent.confirmations import ConfirmationManager
+from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.llm_client import LLMChunk, LLMClient
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
@@ -50,6 +50,21 @@ def _clean_visible_text(text: str) -> str:
 	return _EMOJI_RE.sub("", text)
 
 
+def _reasoning_details_text(details: list[dict[str, Any]] | None) -> str:
+	if not details:
+		return ""
+	parts: list[str] = []
+	for item in details:
+		if not isinstance(item, dict):
+			continue
+		for key in ("text", "summary", "content"):
+			value = item.get(key)
+			if isinstance(value, str) and value.strip():
+				parts.append(value)
+				break
+	return "".join(parts)
+
+
 def _resolve_preview(args: dict, fallback: str) -> str:
 	"""Build a human-readable preview string, resolving relative file paths to absolute."""
 	if "command" in args:
@@ -63,12 +78,15 @@ def _resolve_preview(args: dict, fallback: str) -> str:
 
 
 class ChatSession:
-	def __init__(self, model: str, client: LLMClient, confirmation_manager: ConfirmationManager | None = None) -> None:
+	def __init__(self, model: str, client: LLMClient,
+	             confirmation_manager: ConfirmationManager | None = None,
+	             question_manager: QuestionManager | None = None) -> None:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
 		self._client = client
 		self.thinking_enabled: bool = True
 		self.confirmation_manager = confirmation_manager
+		self.question_manager = question_manager
 
 	def reset(self) -> None:
 		self.history = []
@@ -79,10 +97,20 @@ class ChatSession:
 	def add_user(self, text: str) -> None:
 		self.history.append({"role": "user", "content": text})
 
-	def add_assistant(self, text: str, tool_calls: list | None = None) -> None:
+	def add_assistant(
+		self,
+		text: str,
+		tool_calls: list | None = None,
+		reasoning: str = "",
+		reasoning_details: list[dict[str, Any]] | None = None,
+	) -> None:
 		msg: Dict[str, Any] = {"role": "assistant", "content": text}
 		if tool_calls:
 			msg["tool_calls"] = tool_calls
+		if reasoning:
+			msg["reasoning"] = reasoning
+		if reasoning_details:
+			msg["reasoning_details"] = reasoning_details
 		self.history.append(msg)
 
 	def add_tool_result(self, tool_name: str, result: str, tool_call_id: str = "") -> None:
@@ -102,8 +130,10 @@ class ChatSession:
 			system = SYSTEM + f" Configured model name: {self.model}."
 			messages = [{"role": "system", "content": system}] + self.history
 			full_content = ""
+			full_reasoning = ""
 			in_think = False
 			collected_tool_calls: list = []
+			collected_reasoning_details: list[dict[str, Any]] = []
 
 			try:
 				async for chunk in self._client.chat(
@@ -113,7 +143,6 @@ class ChatSession:
 				):
 					if chunk.tool_calls:
 						collected_tool_calls.extend(chunk.tool_calls)
-						continue
 
 					thinking = chunk.thinking
 					content = chunk.content
@@ -122,6 +151,18 @@ class ChatSession:
 						if self.thinking_enabled:
 							yield ("think", thinking)
 						continue
+
+					if chunk.reasoning:
+						full_reasoning += chunk.reasoning
+						if self.thinking_enabled:
+							yield ("think", chunk.reasoning)
+					elif chunk.reasoning_details:
+						reasoning_text = _reasoning_details_text(chunk.reasoning_details)
+						if reasoning_text and self.thinking_enabled:
+							yield ("think", reasoning_text)
+
+					if chunk.reasoning_details:
+						collected_reasoning_details.extend(chunk.reasoning_details)
 
 					if not content:
 						continue
@@ -156,7 +197,12 @@ class ChatSession:
 				yield ("token", f"\nconnection error: {e}")
 				break
 
-			self.add_assistant(full_content, collected_tool_calls or None)
+			self.add_assistant(
+				full_content,
+				collected_tool_calls or None,
+				reasoning=full_reasoning,
+				reasoning_details=collected_reasoning_details or None,
+			)
 
 			if not collected_tool_calls:
 				break
@@ -180,14 +226,40 @@ class ChatSession:
 				args = parse_args(raw_args)
 				args_str = ", ".join(f"{k}={v}" for k, v in args.items())
 
-				# Safety assessment — the model proposes, the policy decides
-				decision = assess_tool_call(name, args)
+				# ── question tool: special interactive flow ──
+				if name == "question":
+					if self.question_manager is None:
+						self.add_tool_result(name, "error: no question manager")
+						yield ("tool", {"name": name, "args": args_str, "result": "error: no question manager"})
+						continue
+					questions = args.get("questions", [])
+					if not questions:
+						self.add_tool_result(name, "error: no questions provided")
+						yield ("tool", {"name": name, "args": args_str, "result": "error: no questions"})
+						continue
+					call_id, _ = self.question_manager.register(questions)
+					yield ("question", {"id": call_id, "questions": questions})
+					answers = await self.question_manager.wait(call_id)
+					if answers is None:
+						answers = [[] for _ in questions]
+					formatted = ", ".join(
+						f'"{q.get("question", "")}"="{", ".join(a) if a else "Unanswered"}"'
+						for q, a in zip(questions, answers)
+					)
+					result = f"User answered: {formatted}"
+					yield ("tool", {"name": name, "args": args_str, "result": result})
+					self.add_tool_result(name, result, tool_call_id)
+					continue
+
+				# ── regular tool execution with safety ──
+				mode = "build" if auto_mode else "ask"
+				decision = assess_tool_call(name, args, mode=mode)
 				if decision.risk == "blocked":
 					self.add_tool_result(name, f"blocked: {decision.reason}")
 					yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {decision.reason}"})
 					continue
 
-				if decision.risk == "confirm" and not auto_mode:
+				if decision.risk == "confirm":
 					if self.confirmation_manager is None:
 						self.add_tool_result(name, "cancelled: no confirmation manager")
 						yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
@@ -216,6 +288,11 @@ class ChatSession:
 					result = await asyncio.wait_for(tool.execute(args), timeout=60)
 				except asyncio.TimeoutError:
 					result = "error: timeout 60s"
+				except RuntimeError as e:
+					if "question tool must be handled" in str(e):
+						result = "error: question tool needs interactive flow"
+					else:
+						result = f"error: {e}"
 				except Exception as e:
 					result = f"error: {e}"
 				yield ("tool", {"name": name, "args": args_str, "result": result})

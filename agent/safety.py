@@ -277,7 +277,21 @@ def _classify_powershell(command: str) -> tuple[str, str, List[str]]:
 # Tool-level safety assessment
 # ---------------------------------------------------------------------------
 
-def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None) -> SafetyDecision:
+def _apply_mode(decision: SafetyDecision, tool_name: str, mode: str) -> SafetyDecision:
+	"""In build mode, downgrade confirm→safe for everything except file_delete."""
+	if mode == "build" and decision.risk == "confirm":
+		if tool_name not in ("file_delete", "delete"):
+			return SafetyDecision(
+				risk="safe",
+				reason=decision.reason,
+				summary=decision.summary,
+				details=decision.details,
+				normalized_args=decision.normalized_args,
+			)
+	return decision
+
+
+def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: str = "ask") -> SafetyDecision:
 	"""Assess a tool call and return a SafetyDecision."""
 	if cwd is None:
 		cwd = os.getcwd()
@@ -288,101 +302,101 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None) -> Safe
 	if tool_name in ("file_write", "write"):
 		path = str(normalized.get("path", ""))
 		if _is_dangerous_path(path):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="blocked",
 				reason="dangerous path",
 				summary="File path is outside allowed scope",
 				details=["UNC path, device path, or traversal detected"],
 				normalized_args=normalized,
-			)
+			), tool_name, mode)
 		if not _is_path_within_workspace(path, workspace):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="confirm",
 				reason="writes outside workspace",
 				summary="Writing file outside workspace",
 				details=[f"path: {path}"],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="modifies files",
 			summary="Writing file inside workspace",
 			details=[f"path: {path}"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- file_delete ---
 	if tool_name in ("file_delete", "delete"):
 		path = str(normalized.get("path", ""))
 		if _is_dangerous_path(path):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="blocked",
 				reason="dangerous path",
 				summary="File path is outside allowed scope",
 				details=["UNC path, device path, or traversal detected"],
 				normalized_args=normalized,
-			)
+			), tool_name, mode)
 		if not _is_path_within_workspace(path, workspace):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="blocked",
 				reason="deletes outside workspace",
 				summary="Deleting file outside workspace is blocked",
 				details=[f"path: {path}"],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="destructive file operation",
 			summary="Deleting file inside workspace",
 			details=[f"path: {path}"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- file_read ---
 	if tool_name in ("file_read", "read"):
 		path = str(normalized.get("path", ""))
 		if _is_dangerous_path(path):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="blocked",
 				reason="dangerous path",
 				summary="File path is outside allowed scope",
 				details=["UNC path, device path, or traversal detected"],
 				normalized_args=normalized,
-			)
+			), tool_name, mode)
 		if not _is_path_within_workspace(path, workspace):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="confirm",
 				reason="reads outside workspace",
 				summary="Reading file outside workspace",
 				details=[f"path: {path}"],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="safe",
 			reason="read-only",
 			summary="Reading file",
 			details=[f"path: {path}"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- file_list ---
 	if tool_name in ("file_list", "list"):
 		path = str(normalized.get("path", "."))
 		if _is_dangerous_path(path):
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="blocked",
 				reason="dangerous path",
 				summary="Path is outside allowed scope",
 				details=["UNC path, device path, or traversal detected"],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="safe",
 			reason="read-only",
 			summary="Listing directory",
 			details=[f"path: {path}"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- bash / powershell ---
 	if tool_name in ("bash", "powershell"):
@@ -391,61 +405,61 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None) -> Safe
 		summary = reason.capitalize()
 		if risk == "safe":
 			summary = "Read-only shell command"
-		return SafetyDecision(
+		return _apply_mode(SafetyDecision(
 			risk=risk,
 			reason=reason,
 			summary=summary,
 			details=details,
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- clipboard ---
 	if tool_name == "clipboard":
 		action = str(normalized.get("action", "read")).lower()
 		if action == "read":
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="safe",
 				reason="read-only",
 				summary="Reading clipboard",
 				details=[],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="modifies clipboard",
 			summary="Writing to clipboard",
 			details=[],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- screenshot ---
 	if tool_name == "screenshot":
-		return SafetyDecision(
+		return _apply_mode(SafetyDecision(
 			risk="safe",
 			reason="read-only",
 			summary="Taking screenshot",
 			details=[],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- mouse ---
 	if tool_name == "mouse":
 		action = str(normalized.get("action", "click")).lower()
 		if action == "move":
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="safe",
 				reason="read-only pointer",
 				summary="Moving cursor",
 				details=[],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="simulates input",
 			summary=f"Mouse {action}",
 			details=["can interact with UI elements"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- keyboard ---
 	if tool_name == "keyboard":
@@ -454,55 +468,104 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None) -> Safe
 		if action == "press":
 			dangerous_keys = {"delete", "backspace", "alt+f4", "ctrl+w", "ctrl+shift+w"}
 			if any(dk in text for dk in dangerous_keys):
-				return SafetyDecision(
+				return _apply_mode(SafetyDecision(
 					risk="confirm",
 					reason="destructive key combination",
 					summary=f"Pressing {text}",
 					details=["can close windows or delete content"],
 					normalized_args=normalized,
-				)
-		return SafetyDecision(
+				), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="simulates input",
 			summary=f"Keyboard {action}",
 			details=["types or presses keys"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- browser_open ---
 	if tool_name == "browser_open":
 		url = str(normalized.get("url", "")).lower()
 		if "localhost" in url or "127.0.0.1" in url:
-			return SafetyDecision(
+			return _apply_mode(SafetyDecision(
 				risk="safe",
 				reason="local URL",
 				summary="Opening localhost URL",
 				details=[f"url: {url}"],
 				normalized_args=normalized,
-			)
-		return SafetyDecision(
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
 			risk="confirm",
 			reason="opens external URL",
 			summary="Opening external URL",
 			details=[f"url: {url}"],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
 
 	# --- browser_read / browser_screenshot / youtube_search / google_search ---
 	if tool_name in ("browser_read", "browser_screenshot", "youtube_search", "google_search"):
-		return SafetyDecision(
+		return _apply_mode(SafetyDecision(
 			risk="safe",
 			reason="read-only",
 			summary=f"Using {tool_name}",
 			details=[],
 			normalized_args=normalized,
-		)
+		), tool_name, mode)
+
+	# --- apply_patch ---
+	if tool_name == "apply_patch":
+		return _apply_mode(SafetyDecision(
+			risk="confirm",
+			reason="modifies files via patch",
+			summary="Applying patch to files",
+			details=["can create, modify, delete, or rename files"],
+			normalized_args=normalized,
+		), tool_name, mode)
+
+	# --- todowrite ---
+	if tool_name == "todowrite":
+		return _apply_mode(SafetyDecision(
+			risk="safe",
+			reason="read-only",
+			summary="Updating task list",
+			details=[],
+			normalized_args=normalized,
+		), tool_name, mode)
+
+	# --- webfetch ---
+	if tool_name == "webfetch":
+		url = str(normalized.get("url", "")).lower()
+		if "localhost" in url or "127.0.0.1" in url or "::1" in url:
+			return _apply_mode(SafetyDecision(
+				risk="safe",
+				reason="read-only local",
+				summary=f"Fetching local URL",
+				details=[f"url: {url}"],
+				normalized_args=normalized,
+			), tool_name, mode)
+		return _apply_mode(SafetyDecision(
+			risk="safe",
+			reason="read-only",
+			summary=f"Fetching {url}",
+			details=[],
+			normalized_args=normalized,
+		), tool_name, mode)
+
+	# --- question ---
+	if tool_name == "question":
+		return _apply_mode(SafetyDecision(
+			risk="safe",
+			reason="interactive",
+			summary="Asking user",
+			details=[],
+			normalized_args=normalized,
+		), tool_name, mode)
 
 	# --- unknown tool ---
-	return SafetyDecision(
+	return _apply_mode(SafetyDecision(
 		risk="confirm",
 		reason="unknown tool",
 		summary=f"Unknown tool: {tool_name}",
 		details=["no safety policy defined — requires confirmation"],
 		normalized_args=normalized,
-	)
+	), tool_name, mode)

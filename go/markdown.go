@@ -15,7 +15,7 @@ func (m *model) ensureMarkdownRenderer() {
 	var err error
 	m.mdRenderer, err = glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(m.width),
+		glamour.WithWordWrap(m.width-2),
 	)
 	if err != nil {
 		m.mdRenderer = nil
@@ -23,23 +23,22 @@ func (m *model) ensureMarkdownRenderer() {
 }
 
 // renderMarkdown converts markdown text to styled terminal output.
+// Trims glamour's surrounding blank lines and strips its default 2-space left margin.
 func (m *model) renderMarkdown(text string) string {
+	if text == "" {
+		return text
+	}
 	if m.mdRenderer == nil {
 		return text
 	}
-	// Keep the first line (warden header with ANSI styles) untouched.
-	lines := strings.SplitN(text, "\n", 2)
-	header := lines[0]
-	body := ""
-	if len(lines) > 1 {
-		body = lines[1]
-	}
-	if body == "" {
-		return header
-	}
-	out, err := m.mdRenderer.Render(body)
+	out, err := m.mdRenderer.Render(text)
 	if err != nil {
 		return text
 	}
-	return header + "\n" + strings.TrimRight(out, "\n")
+	out = strings.Trim(out, "\n")
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimPrefix(strings.TrimPrefix(line, "  "), "  ")
+	}
+	return strings.Join(lines, "\n")
 }

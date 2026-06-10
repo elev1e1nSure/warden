@@ -86,18 +86,19 @@ backend starts on `localhost:8765`, automatically starts ollama and downloads th
 $env:OPENROUTER_API_KEY="sk-or-v1-..."
 
 # Launch with OpenRouter — provider auto-sets the API URL
-.\warden.exe --provider openrouter --model qwen/qwen3-coder:free
 .\warden.exe --provider openrouter --model poolside/laguna-m.1:free
 
 # Or set the API URL explicitly
-.\warden.exe --api https://openrouter.ai/api/v1 --model qwen/qwen3-coder:free
+.\warden.exe --api https://openrouter.ai/api/v1 --model poolside/laguna-m.1:free
 ```
+
+OpenRouter reasoning-capable models are enabled with the `reasoning` request parameter, and Warden preserves returned `reasoning_details` across turns when the provider sends them.
 
 | flag | description |
 |---|---|
 | `--provider` | `ollama` (default) or `openrouter`. Auto-sets `--api` for known providers. |
 | `--api` | Override API base URL. Used when `--provider` is not enough. |
-| `--model` | Model name. Default: `qwen3:8b`. |
+| `--model` | Model name. Default: `qwen3:8b` locally; for OpenRouter, `poolside/laguna-m.1:free` is the quick start example. |
 
 ## tools
 
@@ -181,4 +182,4 @@ ollama run qwen3:8b
 
 Set `OPENROUTER_API_KEY` and launch with `--api` and `--model`.
 
-Example free model: `qwen/qwen3-coder:free`
+Quick start free model: `poolside/laguna-m.1:free`

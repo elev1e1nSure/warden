@@ -8,6 +8,8 @@ import dataclasses
 class LLMChunk:
 	thinking: str = ""
 	content: str = ""
+	reasoning: str = ""
+	reasoning_details: List[Dict[str, Any]] | None = None
 	tool_calls: List[Dict[str, Any]] | None = None
 
 
@@ -48,9 +50,9 @@ class OpenAIClient(LLMClient):
 		from openai import AsyncOpenAI
 
 		api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or "sk-no-key"
-		# OpenRouter optional headers for rankings
 		headers = {}
-		if "openrouter.ai" in base_url:
+		self._is_openrouter = "openrouter.ai" in base_url
+		if self._is_openrouter:
 			headers["HTTP-Referer"] = "https://github.com/elev1e1nSure/warden"
 			headers["X-Title"] = "warden"
 		self._client = AsyncOpenAI(base_url=base_url, api_key=api_key, default_headers=headers)
@@ -83,11 +85,16 @@ class OpenAIClient(LLMClient):
 						"type": "function",
 						"function": {"name": name, "arguments": str(arguments)},
 					})
-				result.append({
+				assistant_msg: Dict[str, Any] = {
 					"role": "assistant",
 					"content": str(msg.get("content", "")),
 					"tool_calls": openai_tool_calls,
-				})
+				}
+				if msg.get("reasoning"):
+					assistant_msg["reasoning"] = str(msg["reasoning"])
+				if msg.get("reasoning_details"):
+					assistant_msg["reasoning_details"] = msg["reasoning_details"]
+				result.append(assistant_msg)
 			else:
 				result.append(dict(msg))
 		return result
@@ -103,6 +110,8 @@ class OpenAIClient(LLMClient):
 		if tools:
 			kwargs["tools"] = tools
 			kwargs["tool_choice"] = "auto"
+		if self._is_openrouter:
+			kwargs["extra_body"] = {"reasoning": {"enabled": True}}
 
 		stream = await self._client.chat.completions.create(
 			model=model,
@@ -112,9 +121,19 @@ class OpenAIClient(LLMClient):
 		)
 
 		accumulated_tool_calls: List[Dict[str, Any]] = []
+		accumulated_reasoning: List[str] = []
+		accumulated_reasoning_details: List[Dict[str, Any]] = []
 
 		async for chunk in stream:
 			delta = chunk.choices[0].delta
+			reasoning = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_text", None) or ""
+			if reasoning:
+				accumulated_reasoning.append(str(reasoning))
+
+			reasoning_details = getattr(delta, "reasoning_details", None) or []
+			if reasoning_details:
+				accumulated_reasoning_details.extend(list(reasoning_details))
+
 			if delta.tool_calls:
 				for tc in delta.tool_calls:
 					while len(accumulated_tool_calls) <= tc.index:
@@ -130,6 +149,12 @@ class OpenAIClient(LLMClient):
 
 			if delta.content:
 				yield LLMChunk(content=delta.content)
+
+		if accumulated_reasoning or accumulated_reasoning_details:
+			yield LLMChunk(
+				reasoning="".join(accumulated_reasoning),
+				reasoning_details=accumulated_reasoning_details or None,
+			)
 
 		if accumulated_tool_calls:
 			yield LLMChunk(tool_calls=accumulated_tool_calls)

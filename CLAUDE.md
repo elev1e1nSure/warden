@@ -44,8 +44,22 @@ agent/     — backend: server, chat, tools, safety, logs
 ## visual
 
 - no colored text backgrounds. only text + color + bold
-- colors: cyan for warden, yellow for tools, red for errors, dim for meta info
+- **accent colors:**
+  - green `#00D47A` — primary accent: mode in status bar, Warden label, active input border, slash command names in hints, wave spinner peak
+  - yellow `#FFD700` — secondary accent: "you" label in user messages, tool names in tool lines
+  - red `#ff4444` — errors only
+  - dim `#666666` — metadata: timestamps, result text, descriptions
+  - faint `#444444` — separators, inactive wave chars
+- **layout:** no top header; status bar at bottom (2 lines); rounded border on input
+- **status bar line 1:** `leashed · model · provider` — mode in green, rest dim
+- **status bar line 2:** wave spinner (green `█▓▒░` bouncing) + hint (`esc interrupt` or confirm prompt)
+- **wave spinner:** 7 positions, peak bounces left-right using `█▓▒░░░░`; idle = `·······` faint
+- **input:** `RoundedBorder`, green-faint when idle, faint when streaming; prompt `> `
+- **user messages:** `[HH:MM]  you  text` — "you" in yellow bold
+- **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, content rendered as markdown
+- **think line:** `[HH:MM]  + Thought: Xs` dim; F2 expands (no hint shown in UI)
+- **tool lines:** `▶ name  args` → `  ✓ name → result`; name in yellow, result dim, errors red
+- **slash hints:** 2 columns — command name (green, 14-char left-aligned) + description (dim)
 - controls: arrows, Enter, Esc, Ctrl+C
 - no buttons, no mouse clicks in the TUI itself
-- confirmation block: title, "will run:" preview, "why:" bullets, key hints; `y` confirms, Enter / Esc / `n` cancel (cancel is the default)
 - if there's a need to add something truly new — discuss with the user first, then add to this section

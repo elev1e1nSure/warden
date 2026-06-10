@@ -62,8 +62,8 @@ func toolSummaryLine(name string, result string) string {
 }
 
 func toolResultBlock(result string) string {
-	result = strings.TrimSpace(result)
-	if result == "" {
+	trimmed := strings.TrimSpace(result)
+	if trimmed == "" {
 		return DimStyle().Render("  (empty)")
 	}
 
@@ -305,7 +305,7 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 			label := "  " + opt.Label
 			if opt.Description != "" {
 				sep := DimStyle().Render("  —  ")
-				desc := DimStyle().Render(truncateRunes(opt.Description, width-lipgloss.Width(num)-lipgloss.Width(label)-10))
+				desc := DimStyle().Render(truncateRunes(opt.Description, width-lipgloss.Width(num)-lipgloss.Width(label)-lipgloss.Width(sep)))
 				b.WriteString(num + label + sep + desc)
 			} else {
 				b.WriteString(num + label)

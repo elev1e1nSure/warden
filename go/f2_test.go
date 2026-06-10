@@ -9,12 +9,12 @@ import (
 )
 
 func TestF2ExpansionRevealsLatestThoughtsAboveLaterContent(t *testing.T) {
-	m := initialModel()
+	m := initialModel("qwen3:8b")
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
 	m.viewport.Height = 6
-	m.wardenTS = "12:00"
+
 
 	for i := 0; i < 20; i++ {
 		m.appendText("old line")
@@ -44,12 +44,12 @@ func TestF2ExpansionRevealsLatestThoughtsAboveLaterContent(t *testing.T) {
 }
 
 func TestF2StringFallbackExpandsThoughts(t *testing.T) {
-	m := initialModel()
+	m := initialModel("qwen3:8b")
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
 	m.viewport.Height = 6
-	m.wardenTS = "12:00"
+
 	m.messages = append(m.messages, messageEntry{
 		kind:      messageThink,
 		text:      "alpha beta gamma",
@@ -70,12 +70,12 @@ func TestF2StringFallbackExpandsThoughts(t *testing.T) {
 }
 
 func TestLateThinkChunksAppendToLatestThoughtEntry(t *testing.T) {
-	m := initialModel()
+	m := initialModel("qwen3:8b")
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
 	m.viewport.Height = 6
-	m.wardenTS = "12:00"
+
 
 	m.appendThink()
 	m.appendAssistant("answer already started")

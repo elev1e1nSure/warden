@@ -2,7 +2,6 @@ package tui
 
 import (
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -13,10 +12,16 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/unleash", "Unleash — dangerous commands without confirmation"},
-	{"/leash", "Leash — confirmation for dangerous commands"},
+	{"/build", "Build mode — autonomous, no confirmations except delete"},
+	{"/ask", "Ask mode — confirm before any destructive action"},
 	{"/reset", "Reset session"},
 	{"/thinking", "Toggle model reasoning"},
+	{"/model", "Show current provider and model"},
+	{"/status", "Show backend status"},
+	{"/copy-last", "Copy last response to clipboard"},
+	{"/clear", "Clear screen without resetting session"},
+	{"/pwd", "Show current working directory"},
+	{"/tools", "List available tools"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -57,11 +62,11 @@ func (m *model) clearHintState() {
 // handleSlash processes /commands before sending.
 func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(text)) {
-	case "/unleash":
+	case "/build":
 		m.autoMode = true
 		m.clearHintState()
 		return true, m.setMode(true)
-	case "/leash":
+	case "/ask":
 		m.autoMode = false
 		m.clearHintState()
 		return true, m.setMode(false)
@@ -69,7 +74,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		m.messages = []messageEntry{}
 		m.syncViewport()
-		m.wardenTS = time.Now().Format("15:04")
+		
 		m.appendText(m.wardenLine("Reset"))
 		m.syncViewport()
 		return true, func() tea.Msg {
@@ -83,10 +88,39 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		if !m.thinkingEnabled {
 			status = "off"
 		}
-		m.wardenTS = time.Now().Format("15:04")
+		
 		m.appendText(m.wardenLine("Thinking " + status))
 		m.syncViewport()
 		return true, m.setThinking(m.thinkingEnabled)
+	case "/model":
+		m.clearHintState()
+		return true, m.fetchStatus(true)
+	case "/status":
+		m.clearHintState()
+		return true, m.fetchStatus(false)
+	case "/copy-last":
+		m.clearHintState()
+		if m.lastAssistantRaw == "" {
+			
+			m.appendText(m.wardenLine(DimStyle().Render("nothing to copy")))
+			m.syncViewport()
+			return true, nil
+		}
+		return true, m.copyToClipboard(m.lastAssistantRaw)
+	case "/clear":
+		m.clearHintState()
+		m.messages = []messageEntry{}
+		m.syncViewport()
+		return true, nil
+	case "/pwd":
+		m.clearHintState()
+		
+		m.appendText(m.wardenLine(DimStyle().Render(m.cwd)))
+		m.syncViewport()
+		return true, nil
+	case "/tools":
+		m.clearHintState()
+		return true, m.fetchTools()
 	}
 	return false, nil
 }

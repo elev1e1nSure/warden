@@ -29,6 +29,13 @@ func (m model) sendMessage(text string) tea.Cmd {
 	}
 }
 
+func (m model) sendQuestion(id string, answers [][]string) tea.Cmd {
+	return func() tea.Msg {
+		m.client.SendQuestion(id, answers)
+		return nil
+	}
+}
+
 func (m model) sendConfirm(id string, ok bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendConfirm(id, ok)
@@ -114,12 +121,32 @@ func setContent(vp viewport.Model, lines []string) viewport.Model {
 	return vp
 }
 
+func (m model) execShell(cmdText string) tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", cmdText)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return tokenMsg{text: "\n" + string(out) + "\n" + err.Error()}
+		}
+		return shellResultMsg{output: string(out)}
+	}
+}
+
 func (m model) tick() tea.Cmd {
-	return tea.Tick(120*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(70*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
 
 func (m model) advance() int {
+	r := m.spinner % 7
+	switch {
+	case r < 4:
+		return 1
+	case r < 6:
+		return 2
+	case r == 6:
+		return -1
+	}
 	return 1
 }

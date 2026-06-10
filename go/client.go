@@ -9,6 +9,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type StatusResult struct {
+	Model    string `json:"model"`
+	Provider string `json:"provider"`
+	Mode     string `json:"mode"`
+	Thinking bool   `json:"thinking"`
+	CWD      string `json:"cwd"`
+}
+
 type TokenMsg struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -75,6 +83,16 @@ func (c *Client) SetThinking(enabled bool) error {
 	return nil
 }
 
+func (c *Client) SendQuestion(id string, answers [][]string) error {
+	body, _ := json.Marshal(map[string]any{"id": id, "answers": answers})
+	resp, err := http.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 func (c *Client) SendConfirm(id string, ok bool) error {
 	body, _ := json.Marshal(map[string]any{"id": id, "ok": ok})
 	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
@@ -84,6 +102,34 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	}
 	resp.Body.Close()
 	return nil
+}
+
+func (c *Client) GetStatus() (*StatusResult, error) {
+	resp, err := http.Get(c.BaseURL + "/status")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var result StatusResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) GetTools() ([]string, error) {
+	resp, err := http.Get(c.BaseURL + "/tools")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Tools []string `json:"tools"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.Tools, nil
 }
 
 func (c *Client) SendMessage(text string) <-chan tea.Msg {
@@ -163,6 +209,34 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					args:    t.Args,
 					preview: t.Preview,
 				}
+			case "question":
+				var t struct {
+					ID        string `json:"id"`
+					Questions []struct {
+						Question string `json:"question"`
+						Header   string `json:"header"`
+						Multiple bool   `json:"multiple"`
+						Options  []struct {
+							Label       string `json:"label"`
+							Description string `json:"description"`
+						} `json:"options"`
+					} `json:"questions"`
+				}
+				json.Unmarshal(line, &t)
+				items := make([]QuestionItem, len(t.Questions))
+				for i, q := range t.Questions {
+					opts := make([]QuestionOption, len(q.Options))
+					for j, o := range q.Options {
+						opts[j] = QuestionOption{Label: o.Label, Description: o.Description}
+					}
+					items[i] = QuestionItem{
+						Question: q.Question,
+						Header:   q.Header,
+						Multiple: q.Multiple,
+						Options:  opts,
+					}
+				}
+				ch <- questionMsg{id: t.ID, questions: items}
 			case "done":
 				ch <- doneMsg{}
 			case "error":
