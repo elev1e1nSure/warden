@@ -368,14 +368,8 @@ func (m model) renderFooterStatus(footer string) string {
 		reasoning = ThinkingOffStyle().Render("Off")
 	}
 
-	thoughts := ThinkingOnStyle().Render("Shown")
-	if !m.thinkingExpanded {
-		thoughts = ThinkingOffStyle().Render("Hidden")
-	}
-
 	status := StatusStyle().Render("Status: ") + mode +
-		StatusStyle().Render("  Reasoning: ") + reasoning +
-		StatusStyle().Render("  Thoughts: ") + thoughts
+		StatusStyle().Render("  Reasoning: ") + reasoning
 
 	gap := m.width - lipgloss.Width(footer) - lipgloss.Width(status)
 	if gap < 2 {
