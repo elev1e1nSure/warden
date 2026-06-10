@@ -48,8 +48,11 @@ class OllamaClient(LLMClient):
 class OpenAIClient(LLMClient):
 	def __init__(self, base_url: str) -> None:
 		from openai import AsyncOpenAI
+		import logging
 
 		api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or "sk-no-key"
+		if api_key == "sk-no-key":
+			logging.warning("Using fallback API key 'sk-no-key' - requests may fail")
 		headers = {}
 		self._is_openrouter = "openrouter.ai" in base_url
 		if self._is_openrouter:

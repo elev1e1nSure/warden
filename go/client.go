@@ -159,6 +159,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 			ch <- doneMsg{}
 			return
 		}
+		request("POST", "/chat", resp.StatusCode)
 
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)

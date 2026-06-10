@@ -125,7 +125,9 @@ class QuestionManager:
 	def pop(self, call_id: str) -> dict | None:
 		entry = self._pending.pop(call_id, None)
 		if entry is not None and self._is_expired(entry):
-			return None
+			answers = entry.get("answers")
+			self._cancel_entry(call_id)
+			return {"answers": answers} if answers else None
 		return entry
 
 	def cancel_all(self) -> None:

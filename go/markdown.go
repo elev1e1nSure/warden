@@ -38,7 +38,7 @@ func (m *model) renderMarkdown(text string) string {
 	out = strings.Trim(out, "\n")
 	lines := strings.Split(out, "\n")
 	for i, line := range lines {
-		lines[i] = strings.TrimPrefix(strings.TrimPrefix(line, "  "), "  ")
+		lines[i] = strings.TrimLeft(line, " ")
 	}
 	return strings.Join(lines, "\n")
 }

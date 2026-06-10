@@ -110,7 +110,7 @@ async def question_handler(request: web.Request) -> web.Response:
 	resolved = backend.question_manager.resolve(call_id, answers)
 	if resolved:
 		log_request("POST", "/question", 200)
-		info(f"questions answered: {call_id[:8]}")
+		info(f"questions answered: {call_id}")
 		return web.Response(text="ok")
 	log_request("POST", "/question", 404)
 	return web.Response(status=404, text="not found")

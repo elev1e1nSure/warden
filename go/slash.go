@@ -122,5 +122,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		return true, m.fetchTools()
 	}
+	m.appendText(m.wardenLine(ErrorStyle().Render("unknown command")))
+	m.syncViewport()
 	return false, nil
 }
