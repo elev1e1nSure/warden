@@ -168,12 +168,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				val := m.textinput.Value()
 				// Find word boundary using runes to handle multi-byte characters
 				runes := []rune(val)
-				cursor := m.textinput.Cursor
-				if cursor > len(runes) {
-					cursor = len(runes)
-				}
-				// Search backwards from cursor for word boundary
-				idx := cursor
+				// Search backwards from end for word boundary
+				idx := len(runes)
 				for idx > 0 {
 					r := runes[idx-1]
 					if unicode.IsSpace(r) || unicode.IsPunct(r) {
