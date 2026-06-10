@@ -2,6 +2,9 @@
 
 $ErrorActionPreference = "Stop"
 
+# Save current directory to restore later
+$currentDir = Get-Location
+
 # Set UTF-8 encoding
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
@@ -25,8 +28,7 @@ $backendJob = Start-Job -ScriptBlock {
     chcp 65001 | Out-Null
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $OutputEncoding = [System.Text.Encoding]::UTF8
-    Set-Location $dir
-    python server.py
+    python (Join-Path $dir "server.py")
 } -ArgumentList $backendDir
 
 # Wait for backend to start
@@ -66,18 +68,19 @@ $logJob = Start-Job -ScriptBlock {
 } -ArgumentList $backendJob
 
 # Start frontend in foreground
-$originalDir = Get-Location
-Set-Location $frontendDir
-chcp 65001 | Out-Null
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-go run .
-
-# Return to original directory
-Set-Location $originalDir
-
-# Cleanup after frontend exits
-Stop-Job $logJob -ErrorAction SilentlyContinue
-Remove-Job $logJob -Force -ErrorAction SilentlyContinue
-Stop-Job $backendJob -ErrorAction SilentlyContinue
-Remove-Job $backendJob -Force -ErrorAction SilentlyContinue
+try {
+    chcp 65001 | Out-Null
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+    Set-Location $frontendDir
+    go run .
+} finally {
+    # Return to original directory
+    Set-Location $currentDir
+    
+    # Cleanup after frontend exits
+    Stop-Job $logJob -ErrorAction SilentlyContinue
+    Remove-Job $logJob -Force -ErrorAction SilentlyContinue
+    Stop-Job $backendJob -ErrorAction SilentlyContinue
+    Remove-Job $backendJob -Force -ErrorAction SilentlyContinue
+}
