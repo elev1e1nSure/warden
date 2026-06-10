@@ -27,9 +27,10 @@ type model struct {
 	// tool execution
 	toolRunning bool
 	// confirmation
-	confirming bool
-	confirmID  string
-	confirmCh  <-chan tea.Msg
+	confirming  bool
+	confirmID   string
+	confirmCh   <-chan tea.Msg
+	confirmTool string
 	// mode
 	autoMode    bool
 	hintVisible bool
@@ -95,6 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyF2:
 			m.thinkingExpanded = !m.thinkingExpanded
 			m.syncViewport()
+			m.viewport, _ = m.viewport.Update(msg)
 			return m, nil
 
 		case tea.KeyTab:
@@ -117,6 +119,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				id := m.confirmID
 				m.confirmID = ""
 				m.confirmCh = nil
+				m.confirmTool = ""
 				m.textinput.Placeholder = ""
 				m.textinput.Reset()
 				return m, tea.Batch(m.sendConfirm(id, false), readNext(ch))
@@ -135,6 +138,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirming = false
 				m.confirmID = ""
 				m.confirmCh = nil
+				m.confirmTool = ""
 				m.textinput.Placeholder = ""
 				m.textinput.Reset()
 				return m, tea.Batch(m.sendConfirm(id, ok), readNext(ch))
@@ -228,7 +232,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirming = true
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
-			m.appendText(renderConfirmBlock(inner, m.width))
+			m.confirmTool = inner.tool
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
