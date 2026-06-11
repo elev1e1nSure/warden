@@ -16,6 +16,9 @@ class FakeLLMClient(LLMClient):
         self.calls: List[List[Dict[str, Any]]] = []
         self._chunks = chunks or []
 
+    async def list_models(self) -> List[str]:
+        return []
+
     async def chat(
         self,
         model: str,
@@ -91,6 +94,9 @@ class TestChatSessionCompact:
     @pytest.mark.asyncio
     async def test_compact_on_error_preserves_history(self) -> None:
         class BrokenLLM(LLMClient):
+            async def list_models(self) -> List[str]:
+                return []
+
             async def chat(self, model, messages, tools=None):
                 raise RuntimeError("network down")
                 yield  # type: ignore[unreachable]
@@ -167,6 +173,9 @@ class TestChatSessionStream:
     @pytest.mark.asyncio
     async def test_stream_handles_errors_gracefully(self) -> None:
         class BrokenLLM(LLMClient):
+            async def list_models(self) -> List[str]:
+                return []
+
             async def chat(self, model, messages, tools=None):
                 raise RuntimeError("boom")
                 yield  # type: ignore[unreachable]
