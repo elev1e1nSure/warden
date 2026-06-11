@@ -20,6 +20,9 @@ class FakeClient(LLMClient):
 	def __init__(self, chunks: list[LLMChunk]):
 		self._chunks = chunks
 
+	async def list_models(self) -> list[str]:
+		return []
+
 	async def chat(self, model, messages, tools=None):
 		for c in self._chunks:
 			yield c
@@ -83,6 +86,9 @@ class TestCallLlm:
 
 	async def test_llm_exception_yields_error_token(self):
 		class ErrorClient(LLMClient):
+			async def list_models(self) -> list[str]:
+				return []
+
 			async def chat(self, model, messages, tools=None):
 				raise ConnectionError("socket broke")
 				yield  # pragma: no cover — make it async generator
