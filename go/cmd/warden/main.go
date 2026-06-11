@@ -164,7 +164,7 @@ func preCheck() (alreadyRunning bool, err error) {
 var (
 	providerFlag = flag.String("provider", "ollama", "LLM provider: ollama | openrouter")
 	apiURLFlag   = flag.String("api", "", "Override API base URL. If empty, provider picks the default.")
-	modelFlag    = flag.String("model", "qwen3:8b", "Model name (e.g. poolside/laguna-m.1:free)")
+	modelFlag    = flag.String("model", "", "Model name. Defaults to WARDEN_MODEL in .env, then qwen3:8b.")
 )
 
 func loadEnvFile(root string) map[string]string {
@@ -300,6 +300,22 @@ func main() {
 		apiURL = "https://openrouter.ai/api/v1"
 	}
 
+	root, err := findProjectRoot()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "find root failed:", err)
+		os.Exit(1)
+	}
+
+	model := *modelFlag
+	if model == "" {
+		envVars := loadEnvFile(root)
+		if v, ok := envVars["WARDEN_MODEL"]; ok && v != "" {
+			model = v
+		} else {
+			model = "qwen3:8b"
+		}
+	}
+
 	alreadyRunning, err := preCheck()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "precheck failed:", err)
@@ -308,19 +324,14 @@ func main() {
 
 	var backend *exec.Cmd
 	if !alreadyRunning {
-		root, err := findProjectRoot()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "find root failed:", err)
-			os.Exit(1)
-		}
-		backend, err = startBackend(root, apiURL, *modelFlag)
+		backend, err = startBackend(root, apiURL, model)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start backend failed:", err)
 			os.Exit(1)
 		}
 	}
 
-	ready, _ := runLauncher(alreadyRunning, *modelFlag)
+	ready, _ := runLauncher(alreadyRunning, model)
 	if !ready {
 		if backend != nil {
 			stopBackend(backend)
@@ -328,7 +339,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tui.Run(*modelFlag)
+	err = tui.Run(model)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}
