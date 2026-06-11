@@ -394,6 +394,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				id := m.questionID
 				m.historySav = m.textinput.Value()
 				m = m.clearQuestionState()
+				m.updateViewportHeight()
+				m.syncViewport()
 				return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch))
 			}
 			if m.confirming {
@@ -405,6 +407,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirmTool = ""
 				m.textinput.Placeholder = ""
 				m.textinput.Reset()
+				m.updateViewportHeight()
+				m.syncViewport()
 				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch))
 			}
 			m.textinput.Reset()
@@ -625,6 +629,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.confirmDetails = inner.details
 			m.confirmPreview = inner.preview
 			m.confirmDefault = inner.defaultVal
+			m.updateViewportHeight()
 			m.syncViewport()
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
@@ -642,6 +647,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.questionAnswers = nil
 			m.textinput.Placeholder = ""
 			m.textinput.Reset()
+			m.updateViewportHeight()
 			m.syncViewport()
 
 		case doneMsg:
