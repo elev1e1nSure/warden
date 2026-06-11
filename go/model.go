@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -62,6 +64,10 @@ type model struct {
 	modelScrollTop int
 	// activity tracking (index of current think/activity entry)
 	activityIdx int
+	// tool chain (non-verbose collapsing): grouped tally + turn timing
+	chainCounts map[string]int
+	chainOrder  []string
+	chainStart  time.Time
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
 	// interrupt state
@@ -75,9 +81,12 @@ type model struct {
 	// token tracking
 	tokenCount int
 	tokenLimit int
-	// paste buffering (Windows coninput sends paste as individual KeyRunes)
-	pasteBuf []rune
-	pasteSeq int
+	// paste handling: stored payloads referenced by [pasted #N] placeholders
+	pastes     []string
+	lastRuneAt time.Time
+	// input command history (recall with Up/Down at edge lines)
+	history    []string
+	historyIdx int
 	// confirm dialog data
 	confirmRisk    string
 	confirmTitle   string
@@ -152,7 +161,7 @@ func initialModel(modelName string, connected bool) model {
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
 	vp.GotoTop()
-	vp.MouseWheelEnabled = false
+	vp.MouseWheelEnabled = true
 
 	cwd, _ := os.Getwd()
 	m := model{
@@ -177,19 +186,6 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if mouse, ok := msg.(tea.MouseMsg); ok {
-		switch mouse.Button {
-		case tea.MouseButtonWheelUp:
-			m.userScrolled = true
-			m.viewport.LineUp(5)
-		case tea.MouseButtonWheelDown:
-			m.viewport.LineDown(5)
-			if m.viewport.AtBottom() {
-				m.userScrolled = false
-			}
-		}
-		return m, nil
-	}
 	var cmds []tea.Cmd
 
 	// route key events to wizard when open
@@ -209,21 +205,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 
 	case tea.KeyMsg:
-		// Windows coninput sends paste as individual KeyRunes.
-		// Buffer single runes briefly and flush as one paste event.
-		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && !m.confirming && !m.questioning && !m.modelPicking {
-			m.pasteBuf = append(m.pasteBuf, msg.Runes[0])
-			m.pasteSeq++
-			seq := m.pasteSeq
-			return m, tea.Tick(40*time.Millisecond, func(t time.Time) tea.Msg {
-				return pasteFlushMsg{seq: seq}
-			})
-		}
-		if len(m.pasteBuf) > 0 {
-			paste := string(m.pasteBuf)
-			m.pasteBuf = nil
-			m.textinput.SetValue(m.textinput.Value() + paste)
-			m.textinput.CursorEnd()
+		modal := m.confirming || m.questioning || m.modelPicking
+		// Native bracketed paste (or multi-rune burst): collapse big/multiline
+		// pastes into a [pasted #N] placeholder, insert small ones inline.
+		if msg.Type == tea.KeyRunes && (msg.Paste || len(msg.Runes) > 1) && !modal {
+			m.insertPaste(string(msg.Runes))
+			m.lastRuneAt = time.Now()
+			m.syncInputHeight()
+			m.refreshHints()
+			return m, m.focusInput()
 		}
 		// Clear pending confirmations if user presses a different key
 		if msg.Type != tea.KeyEsc {
@@ -255,9 +245,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			if m.streaming {
-				m.userScrolled = true
-				m.viewport.LineUp(3)
+			// history recall when cursor is on the first line
+			if !m.confirming && !m.questioning && m.textinput.Line() == 0 && len(m.history) > 0 {
+				if m.historyIdx > 0 {
+					m.historyIdx--
+				}
+				m.textinput.SetValue(m.history[m.historyIdx])
+				m.textinput.CursorEnd()
+				m.syncInputHeight()
+				m.refreshHints()
 				return m, nil
 			}
 
@@ -274,11 +270,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			if m.streaming {
-				m.viewport.LineDown(3)
-				if m.viewport.AtBottom() {
-					m.userScrolled = false
+			// history recall when cursor is on the last line
+			if !m.confirming && !m.questioning && m.textinput.Line() == m.textinput.LineCount()-1 && len(m.history) > 0 {
+				if m.historyIdx < len(m.history)-1 {
+					m.historyIdx++
+					m.textinput.SetValue(m.history[m.historyIdx])
+					m.textinput.CursorEnd()
+				} else {
+					m.historyIdx = len(m.history)
+					m.resetInput()
 				}
+				m.syncInputHeight()
+				m.refreshHints()
 				return m, nil
 			}
 
@@ -439,6 +442,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.textinput.Placeholder = ""
+			m.lastRuneAt = time.Now()
 
 		case tea.KeyEnter:
 			if m.modelPicking {
@@ -482,12 +486,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.streaming {
 				return m, nil
 			}
-			// flush paste buffer before checking value
-			if len(m.pasteBuf) > 0 {
-				paste := string(m.pasteBuf)
-				m.pasteBuf = nil
-				m.textinput.SetValue(m.textinput.Value() + paste)
-				m.textinput.CursorEnd()
+			// Enter-guard: on legacy consoles a pasted newline arrives as a
+			// KeyEnter inside a rune burst — treat it as a newline, not submit.
+			if time.Since(m.lastRuneAt) < 8*time.Millisecond {
+				m.textinput.InsertString("\n")
+				m.lastRuneAt = time.Now()
+				m.syncInputHeight()
+				return m, nil
 			}
 			val := m.textinput.Value()
 			// \ at end of line + Enter = shell-style line continuation
@@ -497,7 +502,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncInputHeight()
 				return m, nil
 			}
-			text := strings.TrimSpace(val)
+			text := strings.TrimSpace(m.expandPastes(val))
 			if text == "" {
 				return m, nil
 			}
@@ -519,10 +524,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			m.recordHistory(text)
 			m.streamStart = len(m.messages)
 			m.messages = append(m.messages, messageEntry{kind: messageUser, text: text})
 			m.appendText("")
 			m.resetInput()
+			m.startChain()
 			m.streaming = true
 			m.loading = true
 			m.spinner = 0
@@ -549,22 +556,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkDone = false
 			m.toolRunning = false
 			m.lastAssistantRaw = ""
-			if m.activityIdx == -1 {
-				// warden label removed
+			if m.verboseMode {
+				m.activityIdx = m.resetOrAppendThink()
+			} else {
+				m.setAction("Thinking", "", true)
 			}
-			m.activityIdx = m.resetOrAppendThink()
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case thinkMsg:
 			m.thinkBuf += inner.text
-			m.updateThink(inner.text)
+			if m.verboseMode {
+				m.updateThink(inner.text)
+			} else {
+				m.setAction("Thinking", "", true)
+			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case tokenMsg:
 			if !m.thinkDone {
-				m.finishThink()
+				if m.verboseMode {
+					m.finishThink()
+				} else {
+					m.clearAction()
+				}
 				m.appendAssistant("")
 				m.thinkDone = true
 			}
@@ -575,17 +591,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case toolStartMsg:
 			m.toolRunning = true
-			// finalize the active think so it stops animating once the
-			// model switches to a tool
-			if len(m.messages) > 0 {
-				m.finishThink()
-			}
 			if m.verboseMode {
+				m.finishThink()
 				m.appendToolActivity(toolStartLine(inner.name, inner.args))
 				m.runningToolIdx = len(m.messages) - 1
 			} else {
-				m.appendToolFlow(toolDisplayName(inner.name), inner.args)
-				m.runningToolIdx = len(m.messages) - 1
+				display := toolDisplayName(inner.name)
+				m.clearAction()
+				m.ensureCounter()
+				m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
 			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -600,13 +614,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.appendToolActivity(summary)
 				}
 			} else {
-				if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
-					if m.messages[m.runningToolIdx].kind == messageToolFlow {
-						m.messages[m.runningToolIdx].toolDone = true
-					}
-				}
+				m.bumpChain(toolDisplayName(inner.tool.Name))
 			}
-			if inner.tool.Diff != "" {
+			if m.verboseMode && inner.tool.Diff != "" {
 				m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
 			}
 			m.runningToolIdx = -1
@@ -652,7 +662,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.escPending = false
 			m.quitPending = false
 			m.userScrolled = false
-			m.finishThink()
+			if m.verboseMode {
+				m.finishThink()
+			} else {
+				m.freezeChain()
+			}
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
@@ -673,7 +687,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
-			m.finishThink()
+			if m.verboseMode {
+				m.finishThink()
+			} else {
+				m.freezeChain()
+			}
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
@@ -785,7 +803,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.apiKey != "" {
 				_ = saveWardenConfigField("api_key", msg.apiKey)
 			}
-				m.updateViewportHeight()
+			m.updateViewportHeight()
 			m.syncViewport()
 		} else {
 			m.cwErr = msg.err
@@ -820,6 +838,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
 		m.streamStart = len(m.messages)
 		m.resetInput()
+		m.startChain()
 		m.streaming = true
 		m.loading = true
 		m.spinner = 0
@@ -829,14 +848,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case backendErrorMsg:
 		m.loading = false
 		m.syncViewport()
-
-	case pasteFlushMsg:
-		if msg.seq == m.pasteSeq && len(m.pasteBuf) > 0 {
-			paste := string(m.pasteBuf)
-			m.pasteBuf = nil
-			m.textinput.SetValue(m.textinput.Value() + paste)
-			m.textinput.CursorEnd()
-		}
 	}
 
 	cmds = append(cmds, m.focusInput())
@@ -859,7 +870,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
-	// sync hint visibility and viewport height
+	m.refreshHints()
+
+	return m, tea.Batch(cmds...)
+}
+
+// refreshHints recomputes slash/bang hint visibility and resizes the viewport.
+func (m *model) refreshHints() {
 	slashMatches := matchSlash(m.textinput.Value())
 	bangMatches := matchBang(m.textinput.Value(), m.skills)
 	newCount := len(slashMatches) + len(bangMatches)
@@ -871,12 +888,53 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 		}
 	}
+}
 
-	return m, tea.Batch(cmds...)
+// insertPaste inserts pasted text at the cursor. Multiline or long pastes become
+// a [pasted #N, M lines] placeholder expanded on submit; small ones go inline.
+func (m *model) insertPaste(text string) {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+	lines := strings.Count(text, "\n") + 1
+	if lines > 1 || len([]rune(text)) > 120 {
+		m.pastes = append(m.pastes, text)
+		m.textinput.InsertString(fmt.Sprintf("[pasted #%d, %d lines]", len(m.pastes), lines))
+		return
+	}
+	m.textinput.InsertString(text)
+}
+
+var pastePlaceholderRe = regexp.MustCompile(`\[pasted #(\d+), \d+ lines\]`)
+
+// expandPastes swaps [pasted #N] placeholders back to their stored payloads.
+func (m *model) expandPastes(s string) string {
+	if len(m.pastes) == 0 {
+		return s
+	}
+	return pastePlaceholderRe.ReplaceAllStringFunc(s, func(match string) string {
+		sub := pastePlaceholderRe.FindStringSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+		idx, err := strconv.Atoi(sub[1])
+		if err != nil || idx < 1 || idx > len(m.pastes) {
+			return match
+		}
+		return m.pastes[idx-1]
+	})
+}
+
+// recordHistory appends a submitted line to the recall history.
+func (m *model) recordHistory(text string) {
+	if n := len(m.history); n > 0 && m.history[n-1] == text {
+		m.historyIdx = len(m.history)
+		return
+	}
+	m.history = append(m.history, text)
+	m.historyIdx = len(m.history)
 }
 
 // message types
-type pasteFlushMsg struct{ seq int }
 type tokenMsg struct{ text string }
 type thinkMsg struct{ text string }
 type toolMsg struct{ tool ToolMsg }
@@ -971,14 +1029,16 @@ type skillLoadedMsg struct {
 type messageKind int
 
 const (
-	messageText     messageKind = iota
-	messageUser     // user input, rendered with background
-	messageWarden   // warden label, first line of response block
+	messageText   messageKind = iota
+	messageUser               // user input, rendered with background
+	messageWarden             // warden label, first line of response block
 	messageThink
 	messageAssistant
 	messageToolActivity // tool line, filtered out at turn end in normal mode
 	messageToolDiff     // diff block, persists in history even in non-verbose mode
-	messageToolFlow     // live tool activity shown as flowing lines
+	messageToolFlow     // live tool activity shown as flowing lines (verbose)
+	messageChainCounter // non-verbose: running grouped tool tally, frozen at turn end
+	messageChainAction  // non-verbose: single live "what's happening now" line
 )
 
 type messageEntry struct {
@@ -986,10 +1046,11 @@ type messageEntry struct {
 	text      string
 	startedAt time.Time
 	duration  time.Duration
-	activity  string // current verb shown in single-line activity mode
+	activity  string // present-tense verb for the live action line
 	toolName  string // display name for messageToolFlow
-	toolArgs  string // tool arguments (e.g. search query) for display
+	toolArgs  string // tool arguments / detail (query, url, file) for display
 	toolDone  bool   // true when the tool has finished
+	thinking  bool   // chain action line: model is reasoning (animated dots)
 }
 
 func (m *model) appendText(text string) {
@@ -1058,28 +1119,85 @@ func (m *model) finishThink() {
 	}
 }
 
-// compactToolFlow removes live think/tool flow entries and leaves one summary line.
-func (m *model) compactToolFlow() {
-	if m.verboseMode {
-		return
+// ── non-verbose tool chain ──
+// During a turn the chain shows at most two live entries that update in place:
+// a grouped counter ("Searched ×2 · Fetched ×6 · 12s") and a single action line
+// ("Fetching <url>" / "Thinking..."). At turn end the action line is dropped and
+// the counter is frozen as the summary.
+
+func (m *model) startChain() {
+	m.chainCounts = map[string]int{}
+	m.chainOrder = nil
+	m.chainStart = time.Now()
+}
+
+// bumpChain records a completed tool under its display name.
+func (m *model) bumpChain(display string) {
+	if m.chainCounts == nil {
+		m.chainCounts = map[string]int{}
 	}
-	var tools []string
-	seen := make(map[string]bool)
-	var filtered []messageEntry
-	for _, entry := range m.messages {
-		switch entry.kind {
-		case messageToolFlow:
-			if entry.toolName != "" && !seen[entry.toolName] {
-				seen[entry.toolName] = true
-				tools = append(tools, entry.toolName)
-			}
-		case messageThink:
-			// drop
-		default:
-			filtered = append(filtered, entry)
+	if _, ok := m.chainCounts[display]; !ok {
+		m.chainOrder = append(m.chainOrder, display)
+	}
+	m.chainCounts[display]++
+}
+
+// counterIdx returns the index of this turn's counter entry, or -1.
+func (m *model) counterIdx() int {
+	start := m.streamStart
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < len(m.messages); i++ {
+		if m.messages[i].kind == messageChainCounter {
+			return i
 		}
 	}
-	m.messages = filtered
+	return -1
+}
+
+// ensureCounter creates the counter entry once per turn (called before setAction
+// so the counter lands above the action line).
+func (m *model) ensureCounter() {
+	if m.counterIdx() < 0 {
+		m.messages = append(m.messages, messageEntry{kind: messageChainCounter, startedAt: m.chainStart})
+	}
+}
+
+// setAction updates the live action line in place, or appends it at the tail.
+func (m *model) setAction(verb, detail string, thinking bool) {
+	if n := len(m.messages); n > 0 && m.messages[n-1].kind == messageChainAction {
+		e := &m.messages[n-1]
+		e.activity = verb
+		e.toolArgs = detail
+		e.thinking = thinking
+		return
+	}
+	m.messages = append(m.messages, messageEntry{kind: messageChainAction, activity: verb, toolArgs: detail, thinking: thinking})
+}
+
+// clearAction removes the live action line if it is at the tail.
+func (m *model) clearAction() bool {
+	if n := len(m.messages); n > 0 && m.messages[n-1].kind == messageChainAction {
+		m.messages = m.messages[:n-1]
+		return true
+	}
+	return false
+}
+
+// freezeChain ends the turn: drop the action line, freeze the counter time, or
+// remove the counter entirely if no tools ran.
+func (m *model) freezeChain() {
+	m.clearAction()
+	idx := m.counterIdx()
+	if idx < 0 {
+		return
+	}
+	if len(m.chainCounts) == 0 {
+		m.messages = append(m.messages[:idx], m.messages[idx+1:]...)
+		return
+	}
+	m.messages[idx].duration = time.Since(m.chainStart)
 }
 
 func (m *model) appendToLastText(text string) {
@@ -1190,4 +1308,5 @@ func (m *model) syncInputHeight() {
 func (m *model) resetInput() {
 	m.textinput.Reset()
 	m.textinput.SetHeight(1)
+	m.pastes = nil
 }

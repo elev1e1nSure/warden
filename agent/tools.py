@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import os
 import re
@@ -121,11 +122,15 @@ class PowerShellTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		cmd = args.get("command", "")
 		shell = _shell_executable()
+		# Force UTF-8 output so non-ASCII (Cyrillic etc.) isn't mangled by the
+		# console's OEM codepage, then decode as UTF-8.
+		wrapped = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " + cmd
 		try:
 			proc = await asyncio.to_thread(
 				subprocess.run,
-				[shell, "-NonInteractive", "-NoProfile", "-Command", cmd],
+				[shell, "-NonInteractive", "-NoProfile", "-Command", wrapped],
 				capture_output=True, text=True, timeout=30,
+				encoding="utf-8", errors="replace",
 			)
 			out = _clean((proc.stdout or "").strip())
 			err = _clean((proc.stderr or "").strip())
@@ -179,7 +184,12 @@ class FileReadTool(Tool):
 		if offset < 1:
 			offset = 1
 		try:
-			with open(path, encoding="utf-8") as f:
+			try:
+				if os.path.getsize(path) > 50 * 1024 * 1024:
+					return f"error: file too large (>50MB) — use offset/limit or grep: {path}"
+			except OSError:
+				pass
+			with open(path, encoding="utf-8", errors="replace") as f:
 				raw_lines = f.readlines()
 			start = offset - 1
 			end = start + int(limit) if limit else len(raw_lines)
@@ -227,8 +237,13 @@ class GlobTool(Tool):
 		import pathlib
 		pattern = args.get("pattern", "")
 		base = pathlib.Path(args.get("path") or ".").resolve()
+		def _mtime(p: "pathlib.Path") -> float:
+			try:
+				return p.stat().st_mtime
+			except OSError:
+				return 0.0  # broken symlink / vanished file — sort last, don't crash
 		try:
-			matches = sorted(base.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+			matches = sorted(base.glob(pattern), key=_mtime, reverse=True)
 			if not matches:
 				return "(no matches)"
 			paths = [str(p.relative_to(base)).replace("\\", "/") for p in matches[:200]]
@@ -284,7 +299,8 @@ class GrepTool(Tool):
 			cmd += [pattern, path]
 			try:
 				proc = await asyncio.to_thread(
-					subprocess.run, cmd, capture_output=True, text=True, timeout=15
+					subprocess.run, cmd, capture_output=True, text=True, timeout=15,
+					encoding="utf-8", errors="replace",
 				)
 				out = proc.stdout.strip()
 				if not out:
@@ -423,7 +439,7 @@ class FileDeleteTool(Tool):
 		path = args.get("path", "")
 		try:
 			abs_path = os.path.abspath(path)
-			if not abs_path.startswith(os.getcwd()):
+			if not _in_cwd(path):
 				return "error: cannot delete files outside current directory"
 			if not os.path.exists(abs_path):
 				return f"error: not found: {path}"
@@ -521,8 +537,10 @@ class ClipboardTool(Tool):
 			if action == "read":
 				proc = await asyncio.to_thread(
 					subprocess.run,
-					["powershell", "-NoProfile", "-Command", "Get-Clipboard"],
+					["powershell", "-NoProfile", "-Command",
+					 "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-Clipboard"],
 					capture_output=True, text=True, timeout=5,
+					encoding="utf-8", errors="replace",
 				)
 				return (proc.stdout or "").strip() or "(empty)"
 			elif action == "write":
@@ -573,7 +591,6 @@ class ScreenshotTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		try:
 			from PIL import ImageGrab
-			import datetime
 			screenshot_dir = _get_screenshot_dir()
 			_cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
 			name = screenshot_dir / f"screenshot_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
@@ -1198,11 +1215,21 @@ class WebFetchTool(Tool):
 
 		try:
 			import ssl
-			ctx = ssl.create_default_context()
-			ctx.check_hostname = False
-			ctx.verify_mode = ssl.CERT_NONE
 			req = urllib.request.Request(url, headers=headers)
-			with await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout) as resp:
+			# Verify TLS by default; fall back to unverified only if the cert
+			# can't be validated (self-signed/expired), so a bad cert doesn't
+			# silently expose every fetch to MITM.
+			try:
+				ctx = ssl.create_default_context()
+				resp_cm = await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout)
+			except urllib.error.URLError as e:
+				if not isinstance(getattr(e, "reason", None), ssl.SSLCertVerificationError):
+					raise
+				ctx = ssl.create_default_context()
+				ctx.check_hostname = False
+				ctx.verify_mode = ssl.CERT_NONE
+				resp_cm = await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout)
+			with resp_cm as resp:
 				content_type = resp.headers.get("Content-Type", "text/plain")
 				raw = resp.read()
 			content = raw.decode("utf-8", errors="replace")[:10000]

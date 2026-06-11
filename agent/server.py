@@ -114,6 +114,7 @@ async def status(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	data = {
 		"model": backend.model,
+		"provider": "openrouter" if backend.api_url else "ollama",
 		"mode": "auto" if backend.auto_mode else "ask",
 		"cwd": os.getcwd(),
 		"token_count": backend.chat.token_count if backend.chat else 0,

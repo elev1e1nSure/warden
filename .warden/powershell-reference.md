@@ -11,7 +11,7 @@ Commands in this reference are tagged with risk levels:
 
 - **SAFE** — read-only, no side effects
 - **CONFIRM** — modifies state; requires user approval in leashed mode
-- **BLOCKED** — dangerous or system-level; blocked by `agent/safety.py` in leashed mode
+- **BLOCKED** — dangerous or system-level; blocked by `agent/safety/` in leashed mode
 
 ## PowerShell Basics
 

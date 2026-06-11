@@ -221,11 +221,14 @@ func formatThinkDuration(d time.Duration) string {
 	if ms < 10 {
 		ms = 10
 	}
-	if ms < 10_000 {
+	if ms < 1000 {
 		return fmt.Sprintf("%dms", ms)
 	}
-	// only switch to seconds for thinks > 10s
+	// 1s and up: regular seconds (one decimal under 10s, whole seconds after)
 	secs := d.Seconds()
+	if secs < 10 {
+		return fmt.Sprintf("%.1fs", secs)
+	}
 	if secs < 60 {
 		return fmt.Sprintf("%.0fs", secs)
 	}
@@ -269,6 +272,8 @@ func wrapWords(text string, width int) []string {
 
 func toolPastTense(name string) string {
 	switch name {
+	case "Web Search":
+		return "Searched"
 	case "Search":
 		return "Searched"
 	case "Read":
@@ -277,7 +282,7 @@ func toolPastTense(name string) string {
 		return "Wrote"
 	case "Grep":
 		return "Searched"
-	case "Glob":
+	case "Glob", "Find":
 		return "Found"
 	case "Edit":
 		return "Edited"
@@ -289,12 +294,63 @@ func toolPastTense(name string) string {
 		return "Fetched"
 	case "Screenshot":
 		return "Screenshot"
-	case "Keyboard":
+	case "Keyboard", "Type":
 		return "Typed"
 	case "Todo":
 		return "Listed"
+	case "Shell":
+		return "Ran"
+	case "Skill":
+		return "Used"
+	case "Delete":
+		return "Deleted"
+	case "List":
+		return "Listed"
+	case "Mouse":
+		return "Clicked"
+	case "Clipboard":
+		return "Copied"
+	case "Ask":
+		return "Asked"
 	}
 	return "Ran " + strings.ToLower(name)
+}
+
+// toolPresentTenseNames maps display names to present-tense verbs for the live
+// action line.
+var toolPresentTenseNames = map[string]string{
+	"Web Search": "Searching",
+	"Search":     "Searching",
+	"Find":       "Finding",
+	"Read":       "Reading",
+	"Fetch":      "Fetching",
+	"Open":       "Opening",
+	"Screenshot": "Capturing",
+	"Write":      "Writing",
+	"Delete":     "Deleting",
+	"List":       "Listing",
+	"Edit":       "Editing",
+	"Patch":      "Patching",
+	"Shell":      "Running",
+	"Mouse":      "Clicking",
+	"Type":       "Typing",
+	"Clipboard":  "Clipboard",
+	"Ask":        "Asking",
+	"Skill":      "Loading",
+	"Todo":       "Updating todo",
+}
+
+func toolPresentTense(display string) string {
+	if v, ok := toolPresentTenseNames[display]; ok {
+		return v
+	}
+	return "Running " + strings.ToLower(display)
+}
+
+// actionDetail extracts the tool detail for the live action line, stripping any
+// trailing ellipsis/dots so URLs render clean (no "…" or running dots).
+func actionDetail(display, args string) string {
+	return strings.TrimRight(extractToolDetail(display, args), "…. ")
 }
 
 func extractToolDetail(name, args string) string {
@@ -369,6 +425,44 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 		return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
 	}
 	return DimStyle().Render(prefix + entry.toolName + detail)
+}
+
+// renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
+// While live the time ticks; once duration is set the line is frozen.
+func (m model) renderChainCounter(entry messageEntry) string {
+	if len(m.chainOrder) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(m.chainOrder)+1)
+	for _, name := range m.chainOrder {
+		label := toolPastTense(name)
+		if c := m.chainCounts[name]; c > 1 {
+			label += fmt.Sprintf(" ×%d", c)
+		}
+		parts = append(parts, label)
+	}
+	dur := entry.duration
+	if dur == 0 {
+		dur = time.Since(m.chainStart)
+	}
+	parts = append(parts, formatThinkDuration(dur))
+	return DimStyle().Render("  " + strings.Join(parts, " · "))
+}
+
+// renderChainAction renders the single live "what's happening now" line.
+func (m model) renderChainAction(entry messageEntry) string {
+	if !m.loading {
+		return ""
+	}
+	if entry.thinking {
+		dots := []string{".", "..", "..."}
+		return DimStyle().Render("  " + entry.activity + dots[(m.spinner/3)%3])
+	}
+	line := entry.activity
+	if entry.toolArgs != "" {
+		line += " " + entry.toolArgs
+	}
+	return DimStyle().Render("  " + line)
 }
 
 func (m model) renderThinkEntry(entry messageEntry, active bool) string {
@@ -501,6 +595,10 @@ func (m *model) renderMessages() []string {
 			rendered = entry.text
 		case messageToolFlow:
 			rendered = m.renderToolFlowEntry(i, entry)
+		case messageChainCounter:
+			rendered = m.renderChainCounter(entry)
+		case messageChainAction:
+			rendered = m.renderChainAction(entry)
 		case messageToolDiff:
 			rendered = renderUnifiedDiff(entry.text)
 		default:
@@ -657,7 +755,65 @@ func (m model) renderWaveSpinner() string {
 	return b.String()
 }
 
-// renderStatusBar renders the 2-line bottom status bar.
+// renderFullWave renders a full-terminal-width bouncing wave under the prompt bar.
+// Uses a fixed 60-tick cycle (~4.2s at 70ms/tick) regardless of terminal width.
+func (m model) renderFullWave() string {
+	n := m.width
+	if n < 1 {
+		n = 1
+	}
+	if !m.loading {
+		return FaintStyle().Render(strings.Repeat("·", n))
+	}
+	const virtualSpan = 30
+	const cycle = virtualSpan * 2
+	s := m.spinner % cycle
+	var t float64
+	if s < virtualSpan {
+		t = float64(s) / float64(virtualSpan)
+	} else {
+		t = float64(cycle-s) / float64(virtualSpan)
+	}
+	// map to screen pos with slight edge overflow for soft bounce
+	pos := int(t*float64(n+3)) - 2
+	peak := Green
+	mid := GreenMid
+	faint := GreenFaint
+	if m.autoMode {
+		peak = Amber
+		mid = AmberMid
+		faint = AmberFaint
+	}
+	// glow radius scales with terminal width
+	halo := n / 6
+	if halo < 4 {
+		halo = 4
+	}
+	h1 := halo / 3
+	h2 := halo * 2 / 3
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		dist := i - pos
+		if dist < 0 {
+			dist = -dist
+		}
+		switch {
+		case dist == 0:
+			b.WriteString(lipgloss.NewStyle().Foreground(peak).Render("·"))
+		case dist <= h1:
+			b.WriteString(lipgloss.NewStyle().Foreground(mid).Render("·"))
+		case dist <= h2:
+			b.WriteString(lipgloss.NewStyle().Foreground(faint).Render("·"))
+		case dist <= halo:
+			b.WriteString(FaintStyle().Render("·"))
+		default:
+			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#333333")).Render("·"))
+		}
+	}
+	return b.String()
+}
+
+// renderStatusBar renders the single-line bottom status bar: mode · model · hint [tokens].
 func (m model) renderStatusBar() string {
 	mode := AccentStyle().Render("Ask")
 	if m.autoMode {
@@ -665,9 +821,38 @@ func (m model) renderStatusBar() string {
 	}
 	dot := FaintStyle().Render(" · ")
 	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
-	left := mode + dot + modelPart
 
-	line1 := left
+	var hint string
+	switch {
+	case m.escPending:
+		hint = ErrorStyle().Render("Esc") + DimStyle().Render(" cancel · ctrl+c quit")
+	case m.quitPending:
+		hint = ErrorStyle().Render("ctrl+c") + DimStyle().Render(" quit · any key abort")
+	case m.selectMode:
+		hint = DimStyle().Render("select mode · ") + lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Esc") + DimStyle().Render(" exit")
+	case m.confirming:
+		hint = DimStyle().Render("Y run  N cancel")
+	case m.streaming:
+		keyColor := Amber
+		if !m.autoMode {
+			keyColor = Green
+		}
+		hint = lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
+	default:
+		keyColor := Amber
+		if !m.autoMode {
+			keyColor = Green
+		}
+		key := lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Shift Tab")
+		if m.autoMode {
+			hint = key + DimStyle().Render("  to Ask mode")
+		} else {
+			hint = key + DimStyle().Render("  to Auto mode")
+		}
+	}
+
+	left := mode + dot + modelPart + dot + hint
+
 	if m.tokenLimit > 0 && m.tokenCount > 0 {
 		pct := m.tokenCount * 100 / m.tokenLimit
 		k := float64(m.tokenCount) / 1000.0
@@ -676,46 +861,10 @@ func (m model) renderStatusBar() string {
 		tokenWidth := lipgloss.Width(tokenStr)
 		padding := m.width - leftWidth - tokenWidth
 		if padding > 1 {
-			line1 = left + strings.Repeat(" ", padding) + tokenStr
+			return left + strings.Repeat(" ", padding) + tokenStr
 		}
 	}
-
-	// Line 2: confirmation or wave spinner + hint
-	if m.escPending {
-		return line1 + "\n" + ErrorStyle().Render("  Esc") + DimStyle().Render(" cancel · ") + DimStyle().Render("ctrl+c quit")
-	}
-	if m.quitPending {
-		return line1 + "\n" + ErrorStyle().Render("  ctrl+c") + DimStyle().Render(" quit · ") + DimStyle().Render("any key abort")
-	}
-	if m.selectMode {
-		line2 := m.renderWaveSpinner() + DimStyle().Render("  select mode · ") + lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Esc") + DimStyle().Render(" to exit")
-		return line1 + "\n" + line2
-	}
-	var line2suffix string
-	switch {
-	case m.confirming:
-		line2suffix = DimStyle().Render("  Y run  N cancel")
-	case m.streaming:
-		keyColor := Amber
-		if !m.autoMode {
-			keyColor = Green
-		}
-		line2suffix = "  " + lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
-	default:
-		keyColor := Amber
-		if !m.autoMode {
-			keyColor = Green
-		}
-		key := lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Shift Tab")
-		if m.autoMode {
-			line2suffix = "  " + key + DimStyle().Render("  to Ask mode")
-		} else {
-			line2suffix = "  " + key + DimStyle().Render("  to Auto mode")
-		}
-	}
-	line2 := m.renderWaveSpinner() + line2suffix
-
-	return line1 + "\n" + line2
+	return left
 }
 
 // renderInput renders the bordered text input.
@@ -826,7 +975,7 @@ func (m model) View() string {
 		layers = append(layers, m.renderHint())
 	}
 
-	layers = append(layers, m.renderInput(), m.renderStatusBar())
+	layers = append(layers, m.renderFullWave(), m.renderInput(), m.renderStatusBar())
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 

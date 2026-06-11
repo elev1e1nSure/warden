@@ -21,6 +21,7 @@ const (
 	port              = 8765
 	startupTimeout    = 60 * time.Second
 	healthCheckPeriod = 1500 * time.Millisecond
+	spinnerPeriod     = 500 * time.Millisecond
 )
 
 var (
@@ -56,7 +57,7 @@ type backendExitMsg struct{ err error }
 var spinnerFrames = []string{".", "..", "..."}
 
 func tickCmd() tea.Cmd {
-	return tea.Tick(healthCheckPeriod, func(time.Time) tea.Msg {
+	return tea.Tick(spinnerPeriod, func(time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
@@ -70,6 +71,7 @@ func checkHealthCmd() tea.Cmd {
 				return readyMsg{}
 			}
 		}
+		time.Sleep(spinnerPeriod)
 		return tickMsg{}
 	}
 }
@@ -114,7 +116,7 @@ func (m launchModel) View() string {
 	switch m.state {
 	case stateBoot, stateWaiting:
 		frame := spinnerFrames[m.spinner%len(spinnerFrames)]
-		body = lipgloss.NewStyle().Foreground(faint).Render(frame + " Starting")
+		body = lipgloss.NewStyle().Foreground(faint).Render("Starting" + frame)
 	case stateReady:
 		body = lipgloss.NewStyle().Foreground(subtle).Render("ready")
 	case stateFailed:

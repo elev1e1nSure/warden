@@ -12,8 +12,8 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 - ask before large changes
 - don't add dependencies without reason
 - code comments in English, short
-- risk classification is deterministic code in `agent/safety.py` — never the model or the prompt
-- risk markers in `.warden/powershell-reference.md` must match what `agent/safety.py` actually enforces; change them together
+- risk classification is deterministic code in `agent/safety/_policy.py` — never the model or the prompt
+- risk markers in `.warden/powershell-reference.md` must match what `agent/safety/` actually enforces; change them together
 
 ## stack
 
@@ -31,7 +31,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 - typing is mandatory (`typing`, `dataclasses`)
 - no unnecessary abstractions — simple and clear
 - async where streaming is needed
-- tests: `pytest agent/` — run after any change to `agent/safety.py`
+- tests: `pytest agent/` — run after any change to `agent/safety/`
 
 ## structure
 

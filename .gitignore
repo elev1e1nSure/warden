@@ -24,6 +24,7 @@ go/warden.exe
 
 # Scratch files
 poll.html
+TODO.md
 
 # Claude worktrees
 .claude/
