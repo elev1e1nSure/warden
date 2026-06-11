@@ -27,3 +27,5 @@ go/warden.exe
 
 # External
 opencode/
+.opencode/
+.mavis/
