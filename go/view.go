@@ -748,15 +748,15 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }
 
-var pickerKeyStyle = lipgloss.NewStyle().Foreground(Amber).Bold(true)
-var pickerTabActive = lipgloss.NewStyle().Foreground(Amber).Bold(true)
-
 func (m model) renderConnectWizard() string {
-	acc := AccentStyle()
+	acc := WardenStyleAuto(m.autoMode)
 	dim := DimStyle()
 	err := ErrorStyle()
-	bold := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
-	key := func(s string) string { return pickerKeyStyle.Render(s) }
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
+	if m.autoMode {
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Amber)
+	}
+	key := func(s string) string { return keyStyle.Render(s) }
 
 	var lines []string
 
@@ -773,7 +773,7 @@ func (m model) renderConnectWizard() string {
 
 	switch m.cwStep {
 	case 0:
-		lines = append(lines, "  "+bold.Render("connect"), "")
+		lines = append(lines, "  "+acc.Render("connect"), "")
 		providers := []string{"openrouter", "ollama"}
 		for i, p := range providers {
 			if i == m.cwPickIdx {
@@ -787,7 +787,7 @@ func (m model) renderConnectWizard() string {
 		lines = append(lines, "  "+hint)
 
 	case 1:
-		lines = append(lines, "  "+bold.Render("api key"), "")
+		lines = append(lines, "  "+acc.Render("api key"), "")
 		lines = append(lines, "  "+m.cwInput.View())
 		lines = append(lines, "  "+dim.Render("get one at openrouter.ai/keys"))
 		lines = append(lines, "")
@@ -795,7 +795,7 @@ func (m model) renderConnectWizard() string {
 		lines = append(lines, "  "+hint)
 
 	case 2:
-		lines = append(lines, "  "+bold.Render("model"), "")
+		lines = append(lines, "  "+acc.Render("model"), "")
 		if m.cwCustom {
 			lines = append(lines, "  "+m.cwInput.View())
 			lines = append(lines, "")
@@ -835,7 +835,11 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	lines := make([]string, 0, maxVisible+4)
 
 	accent := WardenStyleAuto(autoMode)
-	key := func(s string) string { return pickerKeyStyle.Render(s) }
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
+	if autoMode {
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Amber)
+	}
+	key := func(s string) string { return keyStyle.Render(s) }
 	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
 		key("Enter") + DimStyle().Render(" select   ") +
 		key("Esc") + DimStyle().Render(" cancel")
