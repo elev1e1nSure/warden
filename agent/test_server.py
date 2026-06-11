@@ -23,20 +23,15 @@ def _make_backend(auto_mode: bool = False, api_url: str = "") -> MagicMock:
     backend.confirmation_manager = ConfirmationManager()
     backend.question_manager = QuestionManager()
     # ChatSession-like attributes
-    backend.chat.thinking_enabled = True
     backend.chat.token_count = 0
     backend.chat.token_limit = 8192
     backend.chat.reset = MagicMock()
-    backend.chat.set_thinking_enabled = MagicMock()
     backend.chat.compact = AsyncMock(return_value={
         "tokens_before": 100,
         "tokens_after": 50,
         "summary": "compacted",
     })
     backend.set_auto_mode = MagicMock(side_effect=lambda v: setattr(backend, "auto_mode", v))
-    backend.set_thinking_enabled = MagicMock(
-        side_effect=lambda v: setattr(backend.chat, "thinking_enabled", v)
-    )
     return backend
 
 
@@ -46,7 +41,6 @@ def _make_app(backend: MagicMock, shutdown_event: asyncio.Event | None = None) -
     app.router.add_get("/health", server_module.health)
     app.router.add_post("/reset", server_module.reset)
     app.router.add_post("/mode", server_module.set_mode)
-    app.router.add_post("/thinking", server_module.set_thinking)
     app.router.add_get("/status", server_module.status)
     app.router.add_post("/shutdown", server_module.shutdown_handler)
     app.router.add_post("/compact", server_module.compact_handler)
@@ -94,15 +88,6 @@ async def test_set_mode_safe(aiohttp_client):
     resp = await client.post("/mode", json={"auto": False})
     assert resp.status == 200
     assert backend.auto_mode is False
-
-
-async def test_set_thinking(aiohttp_client):
-    backend = _make_backend()
-    app = _make_app(backend)
-    client = await aiohttp_client(app)
-    resp = await client.post("/thinking", json={"enabled": False})
-    assert resp.status == 200
-    backend.set_thinking_enabled.assert_called_once_with(False)
 
 
 async def test_status_ollama(aiohttp_client):

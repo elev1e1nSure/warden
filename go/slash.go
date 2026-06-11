@@ -16,7 +16,6 @@ type slashCmd struct {
 
 var slashCommands = []slashCmd{
 	{"/reset", "Reset session"},
-	{"/thinking", "Toggle model reasoning"},
 	{"/status", "Show backend status"},
 	{"/copy-last", "Copy last response to clipboard"},
 	{"/clear", "Clear screen without resetting session"},
@@ -81,17 +80,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			m.client.ResetSession()
 			return nil
 		}
-	case "/thinking":
-		m.thinkingEnabled = !m.thinkingEnabled
-		m.clearHintState()
-		status := "on"
-		if !m.thinkingEnabled {
-			status = "off"
-		}
-		
-		m.appendText(m.wardenLine("Thinking " + status))
-		m.syncViewport()
-		return true, m.setThinking(m.thinkingEnabled)
 	case "/status":
 		m.clearHintState()
 		return true, m.fetchStatus(false)

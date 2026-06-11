@@ -53,11 +53,6 @@ class Backend:
 	def set_auto_mode(self, enabled: bool) -> None:
 		self.auto_mode = enabled
 
-	def set_thinking_enabled(self, enabled: bool) -> None:
-		self.chat.set_thinking_enabled(enabled)
-
-
-
 
 def _get_backend(request: web.Request) -> Backend:
 	return request.app["backend"]
@@ -92,16 +87,6 @@ async def set_mode(request: web.Request) -> web.Response:
 	return web.Response(text="ok")
 
 
-async def set_thinking(request: web.Request) -> web.Response:
-	backend = _get_backend(request)
-	data = await request.json()
-	backend.set_thinking_enabled(bool(data.get("enabled", True)))
-	status = "enabled" if backend.chat.thinking_enabled else "disabled"
-	log_request("POST", "/thinking", 200)
-	info(f"thinking {status}")
-	return web.Response(text="ok")
-
-
 async def status(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	provider = "openrouter" if backend.api_url else "ollama"
@@ -109,7 +94,6 @@ async def status(request: web.Request) -> web.Response:
 		"model": backend.model,
 		"provider": provider,
 		"mode": "auto" if backend.auto_mode else "ask",
-		"thinking": backend.chat.thinking_enabled,
 		"cwd": os.getcwd(),
 		"token_count": backend.chat.token_count,
 		"token_limit": backend.chat.token_limit,
@@ -382,7 +366,6 @@ async def main() -> None:
 	app.router.add_post("/chat", chat)
 	app.router.add_post("/confirm", confirm)
 	app.router.add_post("/mode", set_mode)
-	app.router.add_post("/thinking", set_thinking)
 	app.router.add_get("/status", status)
 	app.router.add_get("/tools", tools_list)
 	app.router.add_get("/skills", skills_list)

@@ -412,10 +412,20 @@ class FileListTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		path = args.get("path", ".")
 		try:
+			from agent.safety._filesystem import is_path_within_workspace
+			target = Path(path).resolve()
+			workspace = Path.cwd().resolve()
+			if not is_path_within_workspace(target, workspace):
+				return "error: path is outside allowed scope"
 			with os.scandir(path) as entries_iter:
 				entries = sorted(entries_iter, key=lambda e: e.name.lower())
 			dirs, files = [], []
 			for e in entries:
+				# Skip symlinks that escape the workspace
+				if e.is_symlink():
+					resolved = Path(e.path).resolve()
+					if not is_path_within_workspace(resolved, workspace):
+						continue
 				if e.is_dir():
 					dirs.append(f"[{e.name}]")
 				else:

@@ -45,8 +45,6 @@ type model struct {
 	autoMode    bool
 	hintVisible bool
 	hintCount   int
-	// status
-	thinkingEnabled  bool
 	// path
 	cwd          string
 	providerName string
@@ -134,7 +132,6 @@ func initialModel(modelName string) model {
 		viewport:        vp,
 		client:          NewClient("http://localhost:8765"),
 		messages:        []messageEntry{},
-		thinkingEnabled: true,
 		autoMode:        loadAutoMode(),
 		cwd:             cwd,
 		modelName:       modelName,
@@ -727,11 +724,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.brief {
 			line = msg.provider + " · " + msg.model
 		} else {
-			thinkStr := "off"
-			if msg.thinking {
-				thinkStr = "on"
-			}
-			line = "model: " + msg.model + "  provider: " + msg.provider + "  mode: " + msg.mode + "  thinking: " + thinkStr + "  cwd: " + msg.cwd
+			line = "model: " + msg.model + "  provider: " + msg.provider + "  mode: " + msg.mode + "  cwd: " + msg.cwd
 		}
 
 		m.appendText(m.wardenLine(DimStyle().Render(line)))
@@ -988,7 +981,6 @@ type statusResultMsg struct {
 	model      string
 	provider   string
 	mode       string
-	thinking   bool
 	cwd        string
 	brief      bool
 	tokenCount int

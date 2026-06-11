@@ -92,13 +92,6 @@ func saveAutoMode(auto bool) {
 	os.WriteFile(path, data, 0644)
 }
 
-func (m model) setThinking(enabled bool) tea.Cmd {
-	return func() tea.Msg {
-		m.client.SetThinking(enabled)
-		return nil
-	}
-}
-
 func readNext(ch <-chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		inner, ok := <-ch

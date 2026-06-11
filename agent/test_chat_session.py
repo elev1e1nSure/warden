@@ -133,29 +133,6 @@ class TestChatSessionStream:
         assert session.history[-1]["role"] == "assistant"
 
     @pytest.mark.asyncio
-    async def test_stream_think_content_not_in_history(self) -> None:
-        fake = FakeLLMClient(chunks=[LLMChunk(thinking="deep thought")])
-        session = ChatSession("test", fake)
-        session.thinking_enabled = True
-        events = []
-        async for ev in session.stream("hello"):
-            events.append(ev)
-        think_events = [e for e in events if e[0] == "think"]
-        assert len(think_events) == 1
-        assert think_events[0][1] == "deep thought"
-
-    @pytest.mark.asyncio
-    async def test_stream_skips_think_when_disabled(self) -> None:
-        fake = FakeLLMClient(chunks=[LLMChunk(thinking="deep thought")])
-        session = ChatSession("test", fake)
-        session.thinking_enabled = False
-        events = []
-        async for ev in session.stream("hello"):
-            events.append(ev)
-        think_events = [e for e in events if e[0] == "think"]
-        assert len(think_events) == 0
-
-    @pytest.mark.asyncio
     async def test_stream_token_count_updated(self) -> None:
         fake = FakeLLMClient(chunks=[LLMChunk(content="hello world")])
         session = ChatSession("test", fake)

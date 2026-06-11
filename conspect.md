@@ -41,7 +41,6 @@ Go TUI <-> Python backend (HTTP NDJSON) <-> Ollama <-> Tools (PowerShell, filesy
 - `/auto` - Disable confirmations
 - `/ask` - Enable confirmations
 - `/reset` - Clear pending actions
-- `/thinking` - Toggle model reasoning
 
 ## Security
 - **Safe**: Read-only operations

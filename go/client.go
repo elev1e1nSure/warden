@@ -74,19 +74,6 @@ func (c *Client) SetMode(auto bool) error {
 	return nil
 }
 
-func (c *Client) SetThinking(enabled bool) error {
-	body, err := json.Marshal(map[string]any{"enabled": enabled})
-	if err != nil {
-		return err
-	}
-	resp, err := http.Post(c.BaseURL+"/thinking", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	return nil
-}
-
 func (c *Client) SendQuestion(id string, answers [][]string) error {
 	body, err := json.Marshal(map[string]any{"id": id, "answers": answers})
 	if err != nil {

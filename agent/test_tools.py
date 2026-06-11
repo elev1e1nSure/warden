@@ -19,6 +19,34 @@ def test_file_list_tool_lists_dirs_and_files() -> None:
 	assert "alpha.txt" in out
 
 
+def test_file_list_tool_blocks_outside_workspace(monkeypatch) -> None:
+	base = Path(".tmp") / "test_tools_file_list_outside"
+	base.mkdir(parents=True, exist_ok=True)
+	outside = (Path(".tmp") / "test_tools_file_list_outside_other").resolve()
+	outside.mkdir(parents=True, exist_ok=True)
+	monkeypatch.chdir(base)
+
+	out = asyncio.run(FileListTool().execute({"path": str(outside)}))
+	assert "outside allowed scope" in out
+
+
+def test_file_list_tool_skips_symlink_escape(monkeypatch) -> None:
+	import os
+	base = Path(".tmp") / "test_tools_file_list_symlink"
+	base.mkdir(parents=True, exist_ok=True)
+	outside = (Path(".tmp") / "test_tools_file_list_symlink_other").resolve()
+	outside.mkdir(parents=True, exist_ok=True)
+	(outside / "secret.txt").write_text("secret", encoding="utf-8")
+	link = base / "escape"
+	if link.exists() or link.is_symlink():
+		link.unlink()
+	os.symlink(str(outside), str(link))
+	monkeypatch.chdir(base)
+
+	out = asyncio.run(FileListTool().execute({"path": str(base)}))
+	assert "secret.txt" not in out
+
+
 def test_todowrite_tool_persists_state() -> None:
 	tools_mod._TODO_STORE.clear()
 	tools_mod._TODO_STORE["default"] = []

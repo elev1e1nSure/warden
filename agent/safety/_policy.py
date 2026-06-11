@@ -84,6 +84,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
         if is_dangerous_path(path):
             return _d("blocked", "dangerous path", "Path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
+        if not is_path_within_workspace(path, workspace):
+            return _d("confirm", "lists outside workspace", "Listing directory outside workspace", [f"path: {path}"])
         return _d("safe", "read-only", "Listing directory", [f"path: {path}"])
 
     # todowrite / skill

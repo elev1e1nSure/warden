@@ -94,14 +94,6 @@ class TestCallLlm:
 		assert any("connection error" in s for s in token_texts)
 		assert result.get("error") is True
 
-	async def test_thinking_disabled_suppresses_think_events(self):
-		session = _session([LLMChunk(reasoning="secret")])
-		session.set_thinking_enabled(False)
-		result = {}
-		events = [e async for e in session._call_llm([], result)]
-		think_texts = [p for t, p in events if t == "think"]
-		assert len(think_texts) == 0
-
 
 # ── _execute_tool_call branches ───────────────────────────────────────────────
 

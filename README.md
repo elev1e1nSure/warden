@@ -42,7 +42,6 @@ $env:OPENROUTER_API_KEY="sk-or-v1-..."
 | `Esc` | interrupt |
 | `Esc` ×2 | force-interrupt |
 | `Shift+Tab` | toggle Ask / Auto mode |
-| `F2` | expand thinking or last tool result |
 | `↑` / `↓` | scroll |
 | `Ctrl+C` | exit |
 
@@ -53,7 +52,6 @@ $env:OPENROUTER_API_KEY="sk-or-v1-..."
 | `/auto` | Auto mode — dangerous commands run without confirmation |
 | `/ask` | Ask mode — confirmation for dangerous commands |
 | `/reset` | reset session |
-| `/thinking` | toggle model reasoning |
 | `/provider <name>` | switch provider (`ollama` or `openrouter`) |
 | `/api <url>` | set API base URL (e.g. for OpenRouter) |
 

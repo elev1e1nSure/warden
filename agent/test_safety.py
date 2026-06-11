@@ -309,3 +309,7 @@ class TestToolAssessment:
 		]:
 			d = _decision(tool, args)
 			assert d.risk == "safe", f"{tool}: expected safe, got {d.risk}"
+
+	def test_file_list_outside_workspace_confirm(self) -> None:
+		d = _decision("file_list", {"path": "D:/outside"})
+		assert d.risk == "confirm"

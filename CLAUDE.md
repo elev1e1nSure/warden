@@ -59,7 +59,7 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 - **input:** `RoundedBorder`, green-faint when idle, faint when streaming; prompt `> `
 - **user messages:** `  > text` — dim `>`
 - **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, content rendered as markdown
-- **think line:** `[HH:MM]  + Thought: Xs` dim; F2 expands (no hint shown in UI)
+- **think line:** `[HH:MM]  + Thought: Xs` dim (no hint shown in UI)
 - **tool lines:** `▶ name  args` → `  ✓ name → result`; name in yellow, result dim, errors red
 - **slash hints:** 2 columns — command name (green, 14-char left-aligned) + description (dim)
 - controls: arrows, Enter, Esc, Ctrl+C

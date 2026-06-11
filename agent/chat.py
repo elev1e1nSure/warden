@@ -114,7 +114,6 @@ class ChatSession:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
 		self._client = client
-		self.thinking_enabled: bool = True
 		self.confirmation_manager = confirmation_manager
 		self.question_manager = question_manager
 		self.token_count: int = 0
@@ -161,9 +160,6 @@ class ChatSession:
 		self.token_count = self._estimate_tokens()
 		return {"summary": summary, "tokens_before": tokens_before, "tokens_after": self.token_count}
 
-	def set_thinking_enabled(self, enabled: bool) -> None:
-		self.thinking_enabled = enabled
-
 	def add_user(self, text: str) -> None:
 		self.history.append({"role": "user", "content": text})
 
@@ -209,15 +205,14 @@ class ChatSession:
 				thinking = chunk.thinking
 				content = chunk.content
 
-				if thinking and self.thinking_enabled:
+				if thinking:
 					yield ("think", thinking)
 				elif chunk.reasoning:
 					full_reasoning += chunk.reasoning
-					if self.thinking_enabled:
-						yield ("think", chunk.reasoning)
+					yield ("think", chunk.reasoning)
 				elif chunk.reasoning_details:
 					reasoning_text = _reasoning_details_text(chunk.reasoning_details)
-					if reasoning_text and self.thinking_enabled:
+					if reasoning_text:
 						yield ("think", reasoning_text)
 
 				if chunk.reasoning_details:
