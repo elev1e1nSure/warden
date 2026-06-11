@@ -7,7 +7,7 @@
 
 CLI-агент для управления компьютером. Go TUI + Python-бэкенд + Ollama.
 
-<video src="assets/warden-gif.mp4"></video>
+![demo](assets/warden-gif.gif)
 
 ## стек
 

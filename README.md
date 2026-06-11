@@ -4,7 +4,7 @@
 
 CLI computer control agent for Windows. Go TUI + Python backend + Ollama.
 
-<video src="assets/warden-gif.mp4"></video>
+![demo](assets/warden-gif.gif)
 
 ## install
 
