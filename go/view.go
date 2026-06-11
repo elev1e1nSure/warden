@@ -520,19 +520,31 @@ func (m model) renderStatusBar() string {
 
 	// Line 2: confirmation or wave spinner + hint
 	if m.escPending {
-		return line1 + "\n" + ErrorStyle().Render("  esc") + DimStyle().Render(" cancel · ") + DimStyle().Render("ctrl+c quit")
+		return line1 + "\n" + ErrorStyle().Render("  Esc") + DimStyle().Render(" cancel · ") + DimStyle().Render("ctrl+c quit")
 	}
 	if m.quitPending {
 		return line1 + "\n" + ErrorStyle().Render("  ctrl+c") + DimStyle().Render(" quit · ") + DimStyle().Render("any key abort")
+	}
+	if m.selectMode {
+		line2 := m.renderWaveSpinner() + DimStyle().Render("  select mode · ") + lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Esc") + DimStyle().Render(" to exit")
+		return line1 + "\n" + line2
 	}
 	var line2suffix string
 	switch {
 	case m.confirming:
 		line2suffix = DimStyle().Render("  Y run  N cancel")
 	case m.streaming:
-		line2suffix = DimStyle().Render("  esc interrupt")
+		keyColor := Amber
+		if !m.autoMode {
+			keyColor = Green
+		}
+		line2suffix = "  " + lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
 	default:
-		key := lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Shift Tab")
+		keyColor := Amber
+		if !m.autoMode {
+			keyColor = Green
+		}
+		key := lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Shift Tab")
 		if m.autoMode {
 			line2suffix = "  " + key + DimStyle().Render("  to Ask mode")
 		} else {
