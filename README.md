@@ -1,6 +1,10 @@
 # warden
 
+[Читать на английском](README.md)
+
 CLI computer control agent for Windows. Go TUI + Python backend + Ollama.
+
+<video src="assets/warden-gif.mp4"></video>
 
 ## install
 
