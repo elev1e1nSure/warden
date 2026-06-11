@@ -557,8 +557,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.streamStart = len(m.messages)
-			m.appendText(UserStyle().Render("  you"))
-			m.appendText("  " + text)
+			m.appendText(UserStyle().Render("> ") + text)
 			m.appendText("")
 			m.textinput.Reset()
 			m.streaming = true

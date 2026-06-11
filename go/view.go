@@ -336,7 +336,7 @@ func (m *model) renderMessages() []string {
 		case messageThink:
 			rendered = m.renderThinkEntry(entry)
 		case messageAssistant:
-			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
+			rendered = WardenBgStyle().Render(indentLines(m.renderMarkdown(entry.text), "  "))
 		case messageToolActivity:
 			rendered = entry.text
 		case messageToolDiff:
