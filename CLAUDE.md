@@ -39,6 +39,7 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 go/        — bubbletea frontend
 agent/     — backend: server, chat, tools, safety, logs
 .warden/   — runtime reference docs (powershell-reference.md)
+opencode/  — reference: opencode-ai/opencode repo for feature research
 ```
 
 ## visual
