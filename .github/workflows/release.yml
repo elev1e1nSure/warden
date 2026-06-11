@@ -103,7 +103,6 @@ jobs:
           notes = "\n".join(lines) if lines else "No changes."
           with open("release_notes.md", "w", encoding="utf-8") as f:
               f.write(notes)
-          print(notes)
 
       - name: Create GitHub release
         env:
