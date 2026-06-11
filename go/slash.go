@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -155,6 +158,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.SetAPIURL(url)
+			_ = saveWardenAPIURL(url)
 			return nil
 		}
 	}
@@ -174,4 +178,33 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	m.appendText(m.wardenLine(ErrorStyle().Render("unknown command")))
 	m.syncViewport()
 	return false, nil
+}
+
+func wardenConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".warden-config.json"), nil
+}
+
+func saveWardenAPIURL(url string) error {
+	path, err := wardenConfigPath()
+	if err != nil {
+		return err
+	}
+	var cfg map[string]any
+	data, err := os.ReadFile(path)
+	if err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	cfg["api_url"] = url
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0600)
 }
