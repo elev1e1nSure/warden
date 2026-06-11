@@ -104,15 +104,15 @@ class TestEnsureRunning:
 class TestHasModel:
 	def test_model_present(self):
 		from agent.ollama_process import OllamaProcessManager
-		models_resp = {"models": [{"model": "qwen3:8b"}, {"model": "llama3"}]}
+		models_resp = {"models": [{"model": "test-model"}, {"model": "other-model"}]}
 		with patch("agent.ollama_process.ollama.list", return_value=models_resp):
-			m = OllamaProcessManager(model="qwen3:8b")
+			m = OllamaProcessManager(model="test-model")
 			assert m.has_model() is True
 
 	def test_model_absent(self):
 		from agent.ollama_process import OllamaProcessManager
 		with patch("agent.ollama_process.ollama.list", return_value={"models": [{"model": "other:7b"}]}):
-			m = OllamaProcessManager(model="qwen3:8b")
+			m = OllamaProcessManager(model="test-model")
 			assert m.has_model() is False
 
 	def test_exception_returns_false(self):
@@ -126,9 +126,9 @@ class TestPullModel:
 	async def test_calls_ollama_pull(self):
 		from agent.ollama_process import OllamaProcessManager
 		with patch("agent.ollama_process.ollama.pull") as mock_pull:
-			m = OllamaProcessManager(model="qwen3:8b")
+			m = OllamaProcessManager(model="test-model")
 			await m.pull_model()
-		mock_pull.assert_called_once_with("qwen3:8b")
+		mock_pull.assert_called_once_with("test-model")
 
 
 class TestShutdown:

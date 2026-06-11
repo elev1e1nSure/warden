@@ -57,24 +57,17 @@ _COMPACT_PROMPT = (
 	"Discard chatty filler."
 )
 
-_CONTEXT_LIMITS: dict[str, int] = {
-	"llama3": 8192,
-	"llama2": 4096,
-	"mistral": 8192,
-	"mixtral": 32768,
-	"codellama": 16384,
-	"deepseek": 16384,
-	"qwen": 32768,
-	"gemma": 8192,
-	"phi": 4096,
-}
-
-
 def _guess_context_limit(model: str) -> int:
 	lower = model.lower()
-	for key, limit in _CONTEXT_LIMITS.items():
-		if key in lower:
-			return limit
+	# rough heuristics without hardcoded lists
+	if "128k" in lower or "128k" in lower:
+		return 128000
+	if "32k" in lower or "32k" in lower:
+		return 32768
+	if "8k" in lower or "8k" in lower:
+		return 8192
+	if "4k" in lower or "4k" in lower:
+		return 4096
 	return 128000
 
 def _clean_visible_text(text: str) -> str:

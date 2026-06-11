@@ -81,10 +81,6 @@ type model struct {
 	confirmDetails []string
 	confirmPreview string
 	confirmDefault string
-	// input history
-	history    []string
-	historyIdx int
-	historySav string
 	// slash command cycling
 	slashIdx   int
 	slashTyped string
@@ -148,7 +144,6 @@ func initialModel(modelName string, connected bool) model {
 		cwd:            cwd,
 		modelName:      modelName,
 		connected:      connected,
-		history:        []string{},
 		loading:        true,
 		runningToolIdx: -1,
 		slashIdx:       -1,
@@ -227,45 +222,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-
 			if m.streaming {
 				m.userScrolled = true
 				m.viewport.LineUp(3)
 				return m, nil
-			}
-			if m.questioning || m.confirming {
-				break
-			}
-			val := m.textinput.Value()
-			matches := matchSlash(val)
-			if len(matches) > 0 {
-				if m.slashIdx == -1 {
-					m.slashTyped = val
-					m.slashIdx = len(matches) - 1
-				} else if m.slashIdx > 0 {
-					m.slashIdx--
-				} else {
-					m.slashIdx = -1
-					m.textinput.SetValue(m.slashTyped)
-					m.textinput.CursorEnd()
-					break
-				}
-				m.textinput.SetValue(matches[m.slashIdx].name)
-				m.textinput.CursorEnd()
-				break
-			}
-			m.slashIdx = -1
-			if len(m.history) > 0 {
-				if m.historyIdx == len(m.history) {
-					m.historySav = val
-				}
-				if m.historyIdx > 0 {
-					m.historyIdx--
-					m.textinput.SetValue(m.history[m.historyIdx])
-					m.textinput.CursorEnd()
-				} else if m.historyIdx == 0 {
-					m.textinput.Placeholder = DimStyle().Render("(start of history)")
-				}
 			}
 
 		case tea.KeyDown:
@@ -287,45 +247,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.userScrolled = false
 				}
 				return m, nil
-			}
-
-		case tea.KeyRight:
-			if m.streaming {
-				m.viewport.LineDown(3)
-				if m.viewport.AtBottom() {
-					m.userScrolled = false
-				}
-				return m, nil
-			}
-			if m.questioning || m.confirming {
-				break
-			}
-			val := m.textinput.Value()
-			matches := matchSlash(val)
-			if m.slashIdx >= 0 && len(matches) > 0 {
-				if m.slashIdx < len(matches)-1 {
-					m.slashIdx++
-					m.textinput.SetValue(matches[m.slashIdx].name)
-					m.textinput.CursorEnd()
-				} else {
-					m.slashIdx = -1
-					m.textinput.SetValue(m.slashTyped)
-					m.textinput.CursorEnd()
-				}
-				break
-			}
-			m.slashIdx = -1
-			if len(m.history) > 0 {
-				if m.historyIdx < len(m.history) {
-					m.historyIdx++
-					m.textinput.Placeholder = ""
-					if m.historyIdx < len(m.history) {
-						m.textinput.SetValue(m.history[m.historyIdx])
-					} else {
-						m.textinput.SetValue(m.historySav)
-					}
-					m.textinput.CursorEnd()
-				}
 			}
 
 		case tea.KeyCtrlW:
@@ -409,7 +330,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.questioning {
 				ch := m.questionCh
 				id := m.questionID
-				m.historySav = m.textinput.Value()
 				m = m.clearQuestionState()
 				m.updateViewportHeight()
 				m.syncViewport()
@@ -535,10 +455,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.Reset()
 				return m, cmd
 			}
-
-			m.history = append(m.history, text)
-			m.historyIdx = len(m.history)
-			m.historySav = ""
 
 			if strings.HasPrefix(text, "!") {
 				if handled, cmd := m.handleBang(text); handled {

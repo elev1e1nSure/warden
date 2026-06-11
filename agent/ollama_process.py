@@ -7,8 +7,8 @@ import ollama
 
 
 class OllamaProcessManager:
-	def __init__(self, model: str = "qwen3:8b") -> None:
-		self.model = model
+	def __init__(self, model: str | None = None) -> None:
+		self.model = model or ""
 		self._process: Optional[subprocess.Popen] = None
 		self._we_started = False
 

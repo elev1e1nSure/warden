@@ -74,7 +74,7 @@ func v1() string {
 	activeLabel := cGreen.Render(pad("> model", 10))
 	idleLabel := cDim.Render(pad("  provider", 10))
 	prov := cWhite.Render("ollama") + "  " + cDim.Render("openrouter")
-	modelVal := cWhite.Render("qwen3:8b")
+	modelVal := cWhite.Render("<model>")
 
 	body := strings.Join([]string{
 		"  " + cDim.Render("warden setup"),
@@ -112,7 +112,7 @@ func v2() string {
 		"  " + idleLab + prov,
 		"",
 		g2,
-		"  " + activeLab + cWhite.Render("qwen3:8b"),
+		"  " + activeLab + cWhite.Render("<model>"),
 		"",
 		cFaint.Render(sep),
 		cDim.Render("  enter  save     esc  cancel"),
@@ -131,7 +131,7 @@ func v3() string {
 	title := cGreen.Render("setup")
 
 	prov := cWhite.Render("ollama") + "  " + cDim.Render("openrouter")
-	modelLine := cGreen.Render("> ") + cDim.Render("model     ") + cWhite.Render("qwen3:8b")
+	modelLine := cGreen.Render("> ") + cDim.Render("model     ") + cWhite.Render("<model>")
 	provLine := "  " + cDim.Render("provider  ") + prov
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
@@ -198,7 +198,7 @@ func v5() string {
 		"  " + cFaint.Render(pad("field")+"│ value"),
 		"  " + cFaint.Render(strings.Repeat("─", colL)+"─┼"+strings.Repeat("─", 30)),
 		row(false, "provider", prov),
-		row(true, "model", "qwen3:8b"),
+		row(true, "model", "<model>"),
 		row(false, "api url", "https://openrouter.ai/api/v1"),
 		row(false, "api key", apiKey),
 		"",

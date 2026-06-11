@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -102,16 +103,6 @@ func readNext(ch <-chan tea.Msg) tea.Cmd {
 	}
 }
 
-func (m model) initProvider() tea.Cmd {
-	return func() tea.Msg {
-		s, err := m.client.GetStatus()
-		if err != nil {
-			return providerInitMsg{provider: "ollama"}
-		}
-		return providerInitMsg{provider: s.Provider}
-	}
-}
-
 func (m model) fetchStatus(brief bool) tea.Cmd {
 	return func() tea.Msg {
 		s, err := m.client.GetStatus()
@@ -120,7 +111,6 @@ func (m model) fetchStatus(brief bool) tea.Cmd {
 		}
 		return statusResultMsg{
 			model:      s.Model,
-			provider:   s.Provider,
 			mode:       s.Mode,
 			cwd:        s.CWD,
 			brief:      brief,
@@ -191,30 +181,6 @@ func (m model) fetchModels() tea.Cmd {
 	}
 }
 
-func (m model) fetchProviders() tea.Cmd {
-	return func() tea.Msg {
-		providers, current, err := m.client.ListProviders()
-		if err != nil {
-			return providersResultMsg{err: err.Error()}
-		}
-		return providersResultMsg{providers: providers, current: current}
-	}
-}
-
-func (m model) switchProvider(name string) tea.Cmd {
-	return func() tea.Msg {
-		if err := m.client.SetProvider(name); err != nil {
-			return providerSetMsg{err: err.Error()}
-		}
-		// reload models after switch
-		models, current, err := m.client.ListModels()
-		if err != nil {
-			return providerSetMsg{provider: name, err: err.Error()}
-		}
-		return providerSetMsg{provider: name, models: models, current: current}
-	}
-}
-
 func (m model) applyModel(name string) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.SetModel(name); err != nil {
@@ -241,5 +207,191 @@ func (m model) loadSkill(name string) tea.Cmd {
 			return skillLoadedMsg{name: name, err: err.Error()}
 		}
 		return skillLoadedMsg{name: name, content: content}
+	}
+}
+
+func cwProviderModels(provider string) []string {
+	_ = provider // no hardcoded lists — models are free-form
+	return []string{"enter custom..."}
+}
+
+func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
+	if msg.Type == tea.KeyCtrlC {
+		return false, nil
+	}
+	if m.cwErr != "" {
+		if msg.Type == tea.KeyEsc {
+			m.cwErr = ""
+			m.updateViewportHeight()
+			m.syncViewport()
+		}
+		return true, nil
+	}
+	if m.cwLoading {
+		return true, nil
+	}
+	switch m.cwStep {
+	case 0:
+		switch msg.Type {
+		case tea.KeyUp:
+			if m.cwPickIdx > 0 {
+				m.cwPickIdx--
+			}
+		case tea.KeyDown:
+			if m.cwPickIdx < 1 {
+				m.cwPickIdx++
+			}
+		case tea.KeyEnter:
+			providers := []string{"openrouter", "ollama"}
+			m.cwProvider = providers[m.cwPickIdx]
+			m.cwModels = cwProviderModels(m.cwProvider)
+			if m.cwProvider == "openrouter" {
+				ti := textinput.New()
+				ti.Prompt = ""
+				ti.EchoMode = textinput.EchoPassword
+				ti.EchoCharacter = '•'
+				ti.CharLimit = 256
+				ti.Width = 50
+				ti.Focus()
+				m.cwInput = ti
+				m.cwStep = 1
+			} else {
+				m.cwPickIdx = 0
+				m.cwCustom = false
+				m.cwStep = 2
+			}
+		case tea.KeyEsc:
+			m.cwOpen = false
+		}
+		m.updateViewportHeight()
+		m.syncViewport()
+		return true, nil
+
+	case 1:
+		switch msg.Type {
+		case tea.KeyEnter:
+			val := strings.TrimSpace(m.cwInput.Value())
+			if val != "" {
+				m.cwAPIKey = val
+				m.cwPickIdx = 0
+				m.cwCustom = false
+				m.cwStep = 2
+				m.updateViewportHeight()
+				m.syncViewport()
+			}
+		case tea.KeyEsc:
+			m.cwStep = 0
+			m.cwPickIdx = 0
+			m.cwInput.Reset()
+			m.updateViewportHeight()
+			m.syncViewport()
+		default:
+			var cmd tea.Cmd
+			m.cwInput, cmd = m.cwInput.Update(msg)
+			m.syncViewport()
+			return true, cmd
+		}
+		return true, nil
+
+	case 2:
+		if m.cwCustom {
+			switch msg.Type {
+			case tea.KeyEnter:
+				val := strings.TrimSpace(m.cwInput.Value())
+				if val != "" {
+					return true, m.submitConnect()
+				}
+			case tea.KeyEsc:
+				m.cwCustom = false
+				m.cwInput.Reset()
+				m.updateViewportHeight()
+				m.syncViewport()
+			default:
+				var cmd tea.Cmd
+				m.cwInput, cmd = m.cwInput.Update(msg)
+				m.syncViewport()
+				return true, cmd
+			}
+			return true, nil
+		}
+		switch msg.Type {
+		case tea.KeyUp:
+			if m.cwPickIdx > 0 {
+				m.cwPickIdx--
+				if m.cwPickIdx < m.cwScroll {
+					m.cwScroll = m.cwPickIdx
+				}
+			}
+			m.updateViewportHeight()
+			m.syncViewport()
+		case tea.KeyDown:
+			if m.cwPickIdx < len(m.cwModels)-1 {
+				m.cwPickIdx++
+				const maxVis = 7
+				if m.cwPickIdx >= m.cwScroll+maxVis {
+					m.cwScroll = m.cwPickIdx - maxVis + 1
+				}
+			}
+			m.updateViewportHeight()
+			m.syncViewport()
+		case tea.KeyEnter:
+			if m.cwPickIdx == len(m.cwModels)-1 {
+				ti := textinput.New()
+				ti.Prompt = ""
+				ti.CharLimit = 256
+				ti.Width = 50
+				ti.Focus()
+				m.cwInput = ti
+				m.cwCustom = true
+				m.updateViewportHeight()
+				m.syncViewport()
+			} else {
+				return true, m.submitConnect()
+			}
+		case tea.KeyEsc:
+			if m.cwProvider == "openrouter" {
+				m.cwStep = 1
+			} else {
+				m.cwStep = 0
+				m.cwPickIdx = 0
+			}
+			m.cwCustom = false
+			m.updateViewportHeight()
+			m.syncViewport()
+		}
+		return true, nil
+	}
+	return true, nil
+}
+
+func (m *model) submitConnect() tea.Cmd {
+	var modelName string
+	if m.cwCustom {
+		modelName = strings.TrimSpace(m.cwInput.Value())
+	} else {
+		modelName = m.cwModels[m.cwPickIdx]
+	}
+	provider := m.cwProvider
+	var apiKey, apiURL string
+	if provider == "openrouter" {
+		apiURL = "https://openrouter.ai/api/v1"
+		apiKey = m.cwAPIKey
+	}
+	m.cwLoading = true
+	m.cwErr = ""
+	m.updateViewportHeight()
+	m.syncViewport()
+	return func() tea.Msg {
+		err := m.client.Connect(provider, apiURL, apiKey, modelName)
+		if err != nil {
+			return connectResultMsg{ok: false, err: err.Error()}
+		}
+		return connectResultMsg{
+			ok:       true,
+			model:    modelName,
+			provider: provider,
+			apiURL:   apiURL,
+			apiKey:   apiKey,
+		}
 	}
 }
