@@ -296,6 +296,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
 	if cwd is None:
 		cwd = os.getcwd()
 	workspace = Path(cwd).resolve()
+	else:
+		workspace = Path(cwd).resolve()
 	normalized = dict(args)
 
 	# --- file_write ---

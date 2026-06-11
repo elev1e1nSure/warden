@@ -56,7 +56,10 @@ func (c *Client) ResetSession() error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 
@@ -69,7 +72,10 @@ func (c *Client) SetMode(auto bool) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 
@@ -82,7 +88,10 @@ func (c *Client) SendQuestion(id string, answers [][]string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 
@@ -95,7 +104,10 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 
@@ -156,7 +168,10 @@ func (c *Client) SetAPIURL(url string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("api_url/set: %s", resp.Status)
+	}
 	return nil
 }
 
@@ -169,7 +184,10 @@ func (c *Client) SetModel(model string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("model/set: %s", resp.Status)
+	}
 	return nil
 }
 
@@ -204,7 +222,10 @@ func (c *Client) Shutdown() error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("shutdown: %s", resp.Status)
+	}
 	return nil
 }
 
@@ -325,14 +346,14 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 					continue
 				}
 				ch <- confirmMsg{
-					id:      t.ID,
-					tool:    t.Tool,
-					risk:    t.Risk,
-					title:   t.Title,
-					summary: t.Summary,
-					details: t.Details,
-					args:    t.Args,
-					preview: t.Preview,
+					id:         t.ID,
+					tool:       t.Tool,
+					risk:       t.Risk,
+					title:      t.Title,
+					summary:    t.Summary,
+					details:    t.Details,
+					args:       t.Args,
+					preview:    t.Preview,
 					defaultVal: t.Default,
 				}
 			case "question":
