@@ -1,13 +1,42 @@
 import asyncio
+import base64
+import io
 import re
 from pathlib import Path
 from typing import AsyncIterator, List, Dict, Any
 
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.llm_client import LLMChunk, LLMClient
+from agent.logger import tool as log_tool
 from agent.prompt import SYSTEM
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
+
+_SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
+
+
+def _extract_saved_path(result: str) -> str | None:
+	if not result.startswith("saved: "):
+		return None
+	path_part = result.removeprefix("saved: ").split(" (")[0].strip()
+	p = Path(path_part)
+	return str(p) if p.exists() else None
+
+
+def _encode_image(path: str, max_side: int = 1280) -> str | None:
+	try:
+		from PIL import Image
+		img = Image.open(path)
+		w, h = img.size
+		if max(w, h) > max_side:
+			scale = max_side / max(w, h)
+			img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+		buf = io.BytesIO()
+		img.save(buf, format="PNG")
+		return base64.b64encode(buf.getvalue()).decode()
+	except Exception:
+		return None
+
 
 _EMOJI_RE = re.compile(
 	"["
@@ -321,8 +350,19 @@ class ChatSession:
 				result_val = f"error: {e}"
 		except Exception as e:
 			result_val = f"error: {e}"
+		log_tool(name, args_str, result_val[:200] if result_val else None)
 		yield ("tool", {"name": name, "args": args_str, "result": result_val})
 		self.add_tool_result(name, result_val, tool_call_id)
+		if name in _SCREENSHOT_TOOLS:
+			img_path = _extract_saved_path(result_val)
+			if img_path:
+				img_b64 = _encode_image(img_path)
+				if img_b64:
+					self.history.append({
+						"role": "user",
+						"content": "[screenshot attached]",
+						"images": [img_b64],
+					})
 
 	async def stream(self, text: str, auto_mode: bool = False) -> AsyncIterator[tuple[str, Any]]:
 		self.add_user(text)

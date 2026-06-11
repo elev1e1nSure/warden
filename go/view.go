@@ -2,14 +2,65 @@ package tui
 
 import (
 	"fmt"
-	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
+var diffStatsRe = regexp.MustCompile(`(\+\d+)\s+(-\d+)$`)
+
+// renderDiffStats finds "+N -N" at the end of s, returns (prefix, colored stats).
+func renderDiffStats(s string) (string, string) {
+	loc := diffStatsRe.FindStringIndex(s)
+	if loc == nil {
+		return s, ""
+	}
+	match := diffStatsRe.FindStringSubmatch(s)
+	prefix := strings.TrimRight(s[:loc[0]], " ")
+	add := lipgloss.NewStyle().Foreground(lipgloss.Color("#00D47A")).Render(match[1])
+	del := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444")).Render(match[2])
+	return prefix, add + "  " + del
+}
+
 const wardenVersion = "v0.1.0"
+
+var toolDisplayNames = map[string]string{
+	"google_search":      "Search",
+	"youtube_search":     "Search",
+	"grep":               "Search",
+	"glob":               "Find",
+	"browser_read":       "Read",
+	"file_read":          "Read",
+	"webfetch":           "Fetch",
+	"browser_open":       "Open",
+	"browser_screenshot": "Screenshot",
+	"screenshot":         "Screenshot",
+	"file_write":         "Write",
+	"file_delete":        "Delete",
+	"file_list":          "List",
+	"edit":               "Edit",
+	"apply_patch":        "Patch",
+	"powershell":         "Shell",
+	"bash":               "Shell",
+	"mouse":              "Mouse",
+	"keyboard":           "Type",
+	"clipboard":          "Clipboard",
+	"question":           "Ask",
+	"skill":              "Skill",
+	"todowrite":          "Todo",
+}
+
+func toolDisplayName(name string) string {
+	if d, ok := toolDisplayNames[name]; ok {
+		return d
+	}
+	if len(name) > 0 {
+		return strings.ToUpper(name[:1]) + name[1:]
+	}
+	return name
+}
 
 func truncateRunes(text string, limit int) string {
 	if limit < 1 {
@@ -37,15 +88,16 @@ func toolSummaryLine(name, args, result string) string {
 	}
 	isErr := toolResultIsError(result)
 	arrow := ToolStyle().Render("  → ")
+	display := toolDisplayName(name)
 
 	// Shell tools: show the command, append result only when it has content.
 	if (name == "powershell" || name == "bash") && args != "" {
 		cmd := truncateRunes(strings.TrimSpace(args), 80)
 		var nameRender string
 		if isErr {
-			nameRender = ErrorStyle().Render(name)
+			nameRender = ErrorStyle().Render(display)
 		} else {
-			nameRender = ToolStyle().Render(name)
+			nameRender = ToolStyle().Render(display)
 		}
 		line := arrow + nameRender + "  " + DimStyle().Render(cmd)
 		if result != "(no output)" && result != "(empty)" {
@@ -70,43 +122,57 @@ func toolSummaryLine(name, args, result string) string {
 		head += fmt.Sprintf("  +%d lines", len(lines)-1)
 	}
 	head = truncateRunes(head, 100)
+
 	if isErr {
-		return arrow + ErrorStyle().Render(name) + "  " + ErrorStyle().Render(head)
+		return arrow + ErrorStyle().Render(display) + "  " + ErrorStyle().Render(head)
 	}
-	return arrow + ToolStyle().Render(name) + "  " + DimStyle().Render(head)
+
+	text, diff := renderDiffStats(head)
+	nameRender := ToolStyle().Render(display)
+	if diff != "" {
+		return arrow + nameRender + "  " + DimStyle().Render(text) + "  " + diff
+	}
+	return arrow + nameRender + "  " + DimStyle().Render(head)
 }
 
-func toolResultBlock(result string) string {
-	trimmed := strings.TrimSpace(result)
-	if trimmed == "" {
-		return DimStyle().Render("  (empty)")
-	}
+var toolActivityVerbs = map[string]string{
+	"google_search":      "searching",
+	"youtube_search":     "searching",
+	"grep":               "searching",
+	"glob":               "searching files",
+	"file_read":          "reading",
+	"browser_read":       "reading",
+	"webfetch":           "fetching",
+	"browser_open":       "opening",
+	"browser_screenshot": "screenshotting",
+	"screenshot":         "screenshotting",
+	"file_write":         "writing",
+	"edit":               "editing",
+	"apply_patch":        "patching",
+	"powershell":         "running",
+	"bash":               "running",
+	"mouse":              "clicking",
+	"keyboard":           "typing",
+	"clipboard":          "clipboard",
+	"file_delete":        "deleting",
+	"file_list":          "listing",
+}
 
-	lines := strings.Split(trimmed, "\n")
-	hidden := 0
-	if len(lines) > 10 {
-		hidden = len(lines) - 10
-		lines = lines[:10]
+func toolActivityLine(name string) string {
+	verb, ok := toolActivityVerbs[name]
+	if !ok {
+		verb = "working"
 	}
-	for i, line := range lines {
-		lines[i] = "  " + truncateRunes(strings.TrimRight(line, " \t"), 160)
-	}
-	if hidden > 0 {
-		lines = append(lines, fmt.Sprintf("  … +%d lines", hidden))
-	}
-	if toolResultIsError(result) {
-		return ErrorStyle().Render(strings.Join(lines, "\n"))
-	}
-	return DimStyle().Render(strings.Join(lines, "\n"))
+	return DimStyle().Render("  " + verb + "...")
 }
 
 func toolStartLine(name, args string) string {
 	arrow := ToolStyle().Render("  → ")
-	toolName := ToolStyle().Render(name)
+	display := ToolStyle().Render(toolDisplayName(name))
 	if args == "" {
-		return arrow + toolName
+		return arrow + display
 	}
-	return arrow + toolName + "  " + DimStyle().Render(truncateRunes(args, 140))
+	return arrow + display + "  " + DimStyle().Render(truncateRunes(args, 140))
 }
 
 // wardenLine builds a labeled response line (used for slash command output).
@@ -176,17 +242,29 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 		duration = time.Since(entry.startedAt)
 	}
 	brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+	if !m.verboseMode {
+		if entry.duration > 0 {
+			return ""
+		}
+		if m.loading {
+			frame := brailleFrames[m.spinner%len(brailleFrames)]
+			verb := "Thinking"
+			if entry.activity != "" {
+				verb = entry.activity
+			}
+			return DimStyle().Render("  " + frame + "  " + verb + "...")
+		}
+		return ""
+	}
+
 	var summary string
 	if entry.duration == 0 && m.loading {
 		frame := brailleFrames[m.spinner%len(brailleFrames)]
-		summary = DimStyle().Render("  " + frame + "  thinking")
+		summary = DimStyle().Render("  " + frame + "  Thinking")
 	} else {
 		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
 	}
-	if !m.thinkingExpanded {
-		return summary
-	}
-
 	body := compactThinkText(entry.text)
 	if body == "" {
 		return summary
@@ -224,13 +302,20 @@ func (m *model) renderMessages() []string {
 	m.ensureMarkdownRenderer()
 	out := make([]string, 0, len(m.messages))
 	for _, entry := range m.messages {
+		var rendered string
 		switch entry.kind {
 		case messageThink:
-			out = append(out, m.renderThinkEntry(entry))
+			rendered = m.renderThinkEntry(entry)
 		case messageAssistant:
-			out = append(out, indentLines(m.renderMarkdown(entry.text), "  "))
+			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
+		case messageToolActivity:
+			rendered = entry.text
 		default:
-			out = append(out, entry.text)
+			rendered = entry.text
+		}
+		// always keep messageText (blank lines serve as turn separators)
+		if rendered != "" || entry.kind == messageText {
+			out = append(out, rendered)
 		}
 	}
 	return out
@@ -244,60 +329,48 @@ func (m *model) syncViewport() {
 	}
 }
 
-func renderedLineCount(text string) int {
-	return strings.Count(text, "\n") + 1
-}
-
-func (m *model) syncViewportToLatestThink() {
-	rendered := m.renderMessages()
-	target := -1
-	line := 0
-	for i, entry := range m.messages {
-		if i >= len(rendered) {
-			break
-		}
-		if entry.kind == messageThink {
-			target = line
-		}
-		line += renderedLineCount(rendered[i])
-	}
-	m.viewport = setContent(m.viewport, rendered)
-	if target >= 0 {
-		m.viewport.SetYOffset(target)
-	}
-}
-
 func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
 
-	b.WriteString(ErrorStyle().Bold(true).Render("⚠  ") + HeaderStyle().Render(inner.title))
+	// Tool name line — same style as chat tool lines
+	b.WriteString("  " + AccentStyle().Render("▶") + "  " + ToolStyle().Bold(true).Render(inner.tool))
 	b.WriteString("\n")
 
-	if inner.risk != "" {
-		b.WriteString(DimStyle().Render("   " + inner.risk))
-		b.WriteString("\n")
-	}
-
-	toolPart := "   " + ToolStyle().Bold(true).Render(inner.tool)
+	// Command / path preview — split into lines, show up to 4, dim + indented
 	if inner.preview != "" {
-		sep := DimStyle().Render("  ·  ")
-		filename := filepath.Base(inner.preview)
-		limit := width - lipgloss.Width(toolPart) - lipgloss.Width(sep) - 2
-		preview := truncateRunes(filename, limit)
-		toolPart += sep + preview
-	}
-	b.WriteString(toolPart)
-	b.WriteString("\n")
-
-	for _, d := range inner.details {
-		detail := d
-		if strings.HasPrefix(d, "path: ") && inner.preview != "" {
-			detail = "path: " + inner.preview
+		limit := width - 6
+		if limit < 10 {
+			limit = 10
 		}
-		b.WriteString(DimStyle().Render("   " + detail))
-		b.WriteString("\n")
+		shown := 0
+		for _, line := range strings.Split(inner.preview, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			b.WriteString(DimStyle().Render("    " + truncateRunes(line, limit)))
+			b.WriteString("\n")
+			shown++
+			if shown >= 4 {
+				break
+			}
+		}
 	}
 
+	// Details / reason
+	details := inner.details
+	if len(details) == 0 && inner.summary != "" {
+		details = []string{inner.summary}
+	}
+	if len(details) > 0 {
+		b.WriteString("\n")
+		for _, d := range details {
+			b.WriteString(DimStyle().Render("  " + d))
+			b.WriteString("\n")
+		}
+	}
+
+	// Buttons
 	b.WriteString("\n")
 	yBtn := ConfirmYStyle().Render("  Y  run  ")
 	nBtn := ConfirmNStyle().Render("  N  cancel  ")
@@ -343,16 +416,16 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 }
 
 // renderWaveSpinner renders a smooth bouncing wave with pulsing background dots.
-// Triangle-wave pos: -1..7 (overflows both edges for soft bounce).
+// Triangle-wave pos: -2..8 (overflows both edges for soft bounce).
 // Background dots (outside wave tail) slowly pulse for a "breathing" effect.
 func (m model) renderWaveSpinner() string {
 	const n = 7
-	const lo = -1
-	const hi = n         // =7
-	const span = hi - lo // 8
-	const cycle = span * 2 // 16
+	const lo = -2
+	const hi = n + 1     // =8
+	const span = hi - lo // 10
+	const cycle = span * 2 // 20
 	if !m.loading {
-		return FaintStyle().Render(strings.Repeat("·", n))
+		return FaintStyle().Render(strings.Repeat("░", n))
 	}
 	s := m.spinner % cycle
 	var pos int
@@ -362,6 +435,14 @@ func (m model) renderWaveSpinner() string {
 		pos = hi - (s - span)
 	}
 	var b strings.Builder
+	peak := Green
+	mid := GreenMid
+	faint := GreenFaint
+	if m.autoMode {
+		peak = Amber
+		mid = AmberMid
+		faint = AmberFaint
+	}
 	for i := 0; i < n; i++ {
 		dist := i - pos
 		if dist < 0 {
@@ -369,15 +450,15 @@ func (m model) renderWaveSpinner() string {
 		}
 		switch {
 		case dist == 0:
-			b.WriteString(lipgloss.NewStyle().Foreground(Green).Render("█"))
+			b.WriteString(lipgloss.NewStyle().Foreground(peak).Render("█"))
 		case dist == 1:
-			b.WriteString(lipgloss.NewStyle().Foreground(GreenMid).Render("▓"))
+			b.WriteString(lipgloss.NewStyle().Foreground(mid).Render("▓"))
 		case dist == 2:
-			b.WriteString(lipgloss.NewStyle().Foreground(GreenFaint).Render("▒"))
+			b.WriteString(lipgloss.NewStyle().Foreground(faint).Render("▒"))
 		case dist == 3:
 			b.WriteString(FaintStyle().Render("░"))
 		default:
-			b.WriteString(" ")
+			b.WriteString(FaintStyle().Render("░"))
 		}
 	}
 	return b.String()
@@ -418,14 +499,21 @@ func (m model) renderStatusBar() string {
 	if m.quitPending {
 		return line1 + "\n" + ErrorStyle().Render("  ctrl+c") + DimStyle().Render(" quit · ") + DimStyle().Render("any key abort")
 	}
-	var hint string
+	var line2suffix string
 	switch {
 	case m.confirming:
-		hint = "  Y run  N cancel"
+		line2suffix = DimStyle().Render("  Y run  N cancel")
 	case m.streaming:
-		hint = "  esc cancel"
+		line2suffix = DimStyle().Render("  esc interrupt")
+	default:
+		key := lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Shift Tab")
+		if m.autoMode {
+			line2suffix = "  " + key + DimStyle().Render("  to Ask mode")
+		} else {
+			line2suffix = "  " + key + DimStyle().Render("  to Auto mode")
+		}
 	}
-	line2 := m.renderWaveSpinner() + DimStyle().Render(hint)
+	line2 := m.renderWaveSpinner() + line2suffix
 
 	return line1 + "\n" + line2
 }
@@ -433,6 +521,9 @@ func (m model) renderStatusBar() string {
 // renderInput renders the bordered text input.
 func (m model) renderInput() string {
 	borderColor := GreenMid
+	if m.autoMode {
+		borderColor = AmberMid
+	}
 	if m.streaming || m.confirming {
 		borderColor = Faint
 	}
@@ -448,17 +539,6 @@ func (m model) renderInput() string {
 	return style.Render(m.textinput.View())
 }
 
-// renderLiveActivity shows the current tool activity as a single updating line.
-// F2 expands it to show the full result.
-func (m model) renderLiveActivity() string {
-	if m.liveActivity == "" {
-		return ""
-	}
-	if !m.toolExpanded || m.liveToolResult == "" {
-		return m.liveActivity
-	}
-	return m.liveActivity + "\n" + toolResultBlock(m.liveToolResult)
-}
 
 func (m *model) layoutViewportHeight() int {
 	if m.height < 1 {
@@ -479,11 +559,6 @@ func (m *model) layoutViewportHeight() int {
 		}, m.width))
 	}
 
-	liveHeight := 0
-	if m.liveActivity != "" {
-		liveHeight = lipgloss.Height(m.renderLiveActivity())
-	}
-
 	questionHeight := 0
 	if m.questioning && len(m.questionsData) > 0 {
 		questionHeight = lipgloss.Height(renderQuestionBlock(
@@ -491,9 +566,14 @@ func (m *model) layoutViewportHeight() int {
 		))
 	}
 
+	modelPickerHeight := 0
+	if m.modelPicking {
+		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.modelProviders, m.modelProviderIdx))
+	}
+
 	// input: 3 (border top + content + border bottom)
 	// status bar: 2 lines
-	reserved := hintHeight + confirmHeight + liveHeight + questionHeight + 3 + 2
+	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + 3 + 2
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -529,8 +609,8 @@ func (m model) View() string {
 		))
 	}
 
-	if live := m.renderLiveActivity(); live != "" {
-		layers = append(layers, live)
+	if m.modelPicking {
+		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.modelProviders, m.modelProviderIdx))
 	}
 
 	if m.hintVisible {
@@ -539,6 +619,56 @@ func (m model) View() string {
 
 	layers = append(layers, m.renderInput(), m.renderStatusBar())
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
+}
+
+var pickerKeyStyle = lipgloss.NewStyle().Foreground(Amber).Bold(true)
+var pickerTabActive = lipgloss.NewStyle().Foreground(Amber).Bold(true)
+
+func renderModelPicker(filtered []string, idx, scrollTop int, providers []string, providerIdx int) string {
+	const maxVisible = 8
+	start := scrollTop
+	end := start + maxVisible
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	lines := make([]string, 0, maxVisible+5)
+
+	// key hints — amber keys, dim descriptions
+	key := func(s string) string { return pickerKeyStyle.Render(s) }
+	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
+		key("Enter") + DimStyle().Render(" select   ") +
+		key("Esc") + DimStyle().Render(" cancel")
+	if len(providers) > 1 {
+		hint += "   " + key("←→") + DimStyle().Render(" provider")
+	}
+	lines = append(lines, "  "+hint)
+	lines = append(lines, "")
+
+	// model list
+	for i := start; i < end; i++ {
+		name := filtered[i]
+		if i == idx {
+			lines = append(lines, AccentStyle().Render("  › "+name))
+		} else {
+			lines = append(lines, DimStyle().Render("    "+name))
+		}
+	}
+
+	// provider tabs at bottom
+	if len(providers) > 1 {
+		lines = append(lines, "")
+		var tabs []string
+		for i, p := range providers {
+			if i == providerIdx {
+				tabs = append(tabs, pickerTabActive.Render(p))
+			} else {
+				tabs = append(tabs, DimStyle().Render(p))
+			}
+		}
+		lines = append(lines, "  "+strings.Join(tabs, FaintStyle().Render("  ·  ")))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (m model) renderHint() string {

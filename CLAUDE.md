@@ -56,7 +56,7 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 - **status bar line 2:** wave spinner (green `█▓▒░` bouncing) + hint (`esc interrupt` or confirm prompt)
 - **wave spinner:** 7 positions, peak bounces left-right using `█▓▒░░░░`; idle = `·······` faint
 - **input:** `RoundedBorder`, green-faint when idle, faint when streaming; prompt `> `
-- **user messages:** `[HH:MM]  you  text` — "you" in yellow bold
+- **user messages:** `  > text` — dim `>`
 - **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, content rendered as markdown
 - **think line:** `[HH:MM]  + Thought: Xs` dim; F2 expands (no hint shown in UI)
 - **tool lines:** `▶ name  args` → `  ✓ name → result`; name in yellow, result dim, errors red

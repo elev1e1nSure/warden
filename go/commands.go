@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,8 +52,44 @@ func (m model) sendConfirm(id string, ok bool) tea.Cmd {
 func (m model) setMode(auto bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SetMode(auto)
+		saveAutoMode(auto)
 		return modeMsg{auto: auto}
 	}
+}
+
+func settingsPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".warden-settings.json"), nil
+}
+
+func loadAutoMode() bool {
+	path, err := settingsPath()
+	if err != nil {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var s struct {
+		AutoMode bool `json:"auto_mode"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return false
+	}
+	return s.AutoMode
+}
+
+func saveAutoMode(auto bool) {
+	path, err := settingsPath()
+	if err != nil {
+		return
+	}
+	data, _ := json.Marshal(map[string]bool{"auto_mode": auto})
+	os.WriteFile(path, data, 0644)
 }
 
 func (m model) setThinking(enabled bool) tea.Cmd {
@@ -149,4 +187,47 @@ func (m model) tick() tea.Cmd {
 
 func (m model) advance() int {
 	return 1
+}
+
+func (m model) fetchModels() tea.Cmd {
+	return func() tea.Msg {
+		models, current, err := m.client.ListModels()
+		if err != nil {
+			return modelsResultMsg{err: err.Error()}
+		}
+		return modelsResultMsg{models: models, current: current}
+	}
+}
+
+func (m model) fetchProviders() tea.Cmd {
+	return func() tea.Msg {
+		providers, current, err := m.client.ListProviders()
+		if err != nil {
+			return providersResultMsg{err: err.Error()}
+		}
+		return providersResultMsg{providers: providers, current: current}
+	}
+}
+
+func (m model) switchProvider(name string) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.SetProvider(name); err != nil {
+			return providerSetMsg{err: err.Error()}
+		}
+		// reload models after switch
+		models, current, err := m.client.ListModels()
+		if err != nil {
+			return providerSetMsg{provider: name, err: err.Error()}
+		}
+		return providerSetMsg{provider: name, models: models, current: current}
+	}
+}
+
+func (m model) applyModel(name string) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.SetModel(name); err != nil {
+			return modelSetMsg{err: err.Error()}
+		}
+		return modelSetMsg{model: name}
+	}
 }

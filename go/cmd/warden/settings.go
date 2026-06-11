@@ -84,6 +84,13 @@ const (
 
 var setupProviders = []string{"ollama", "openrouter"}
 
+var setupFieldDescs = map[int]string{
+	sfProvider: "Where your model runs. Local server or cloud API.",
+	sfModel:    "Model identifier. e.g. qwen3:8b, llama3.1, gpt-4o.",
+	sfAPIURL:   "OpenAI-compatible endpoint. Default works for openrouter.",
+	sfAPIKey:   "Your provider's API key. Stored in ~/.warden-config.json.",
+}
+
 func newSettingsModel(cfg WardenConfig) settingsModel {
 	m := settingsModel{width: 80}
 
@@ -118,8 +125,7 @@ func newSettingsModel(cfg WardenConfig) settingsModel {
 		}
 	}
 
-	m.focusIdx = sfModel
-	m.inputs[0].Focus()
+	m.focusIdx = sfProvider
 
 	return m
 }
@@ -208,10 +214,6 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEnter:
-			if m.focusIdx == sfProvider {
-				m.providerIdx = (m.providerIdx + 1) % len(setupProviders)
-				return m, nil
-			}
 			if m.focusIdx == m.maxField() {
 				m.done = true
 				return m, tea.Quit
@@ -238,6 +240,8 @@ func (m settingsModel) View() string {
 	dimStyle := lipgloss.NewStyle().Foreground(faint)
 	greenStyle := lipgloss.NewStyle().Foreground(green)
 	whiteBoldStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	faintStyle := lipgloss.NewStyle().Foreground(faint)
+	sepStyle := lipgloss.NewStyle().Foreground(faint)
 
 	isActive := func(field int) bool { return m.focusIdx == field }
 
@@ -264,33 +268,48 @@ func (m settingsModel) View() string {
 				parts = append(parts, dimStyle.Render(p))
 			}
 		}
-		return strings.Join(parts, " ")
+		return strings.Join(parts, "  ")
 	}
 
-	renderField := func(label string, fieldID int, value string) string {
-		if isActive(fieldID) {
-			return greenStyle.Render("> " + label + ": ") + value
+	row := func(label string, fieldID int, value string) string {
+		pad := 10
+		padded := label
+		if w := lipgloss.Width(padded); w < pad {
+			padded += strings.Repeat(" ", pad-w)
 		}
-		return dimStyle.Render("  " + label + ": ") + value
+		if isActive(fieldID) {
+			return greenStyle.Render("●") + "  " + whiteBoldStyle.Render(padded) + "  " + value
+		}
+		return faintStyle.Render("○") + "  " + dimStyle.Render(padded) + "  " + value
 	}
 
-	var b strings.Builder
-	b.WriteString(dimStyle.Render("warden setup"))
-	b.WriteString("\n\n")
-
-	b.WriteString(renderField("provider", sfProvider, providerVal(isActive(sfProvider))))
-	b.WriteString("\n")
-	b.WriteString(renderField("model", sfModel, valueStr(0, sfModel)))
-	b.WriteString("\n")
-
+	total := 2
 	if m.isOpenRouter() {
-		b.WriteString(renderField("api url", sfAPIURL, valueStr(1, sfAPIURL)))
-		b.WriteString("\n")
-		b.WriteString(renderField("api key", sfAPIKey, valueStr(2, sfAPIKey)))
-		b.WriteString("\n")
+		total = 4
+	}
+	stepLine := dimStyle.Render(fmt.Sprintf("step %d/%d", m.focusIdx+1, total))
+
+	header := dimStyle.Render("warden setup")
+
+	gap := strings.Repeat(" ", max(1, m.width-lipgloss.Width(header)-lipgloss.Width(stepLine)))
+	title := header + gap + stepLine
+
+	var rows []string
+	rows = append(rows, title, "")
+	rows = append(rows, row("provider", sfProvider, providerVal(isActive(sfProvider))))
+	rows = append(rows, row("model", sfModel, valueStr(0, sfModel)))
+	if m.isOpenRouter() {
+		rows = append(rows, row("api url", sfAPIURL, valueStr(1, sfAPIURL)))
+		rows = append(rows, row("api key", sfAPIKey, valueStr(2, sfAPIKey)))
 	}
 
-	return b.String()
+	sep := sepStyle.Render(strings.Repeat("─", max(20, m.width-4)))
+	help := "  " + dimStyle.Render(setupFieldDescs[m.focusIdx])
+
+	hints := "  " + faintStyle.Render("← →  switch provider    tab  next field    enter  save    esc  cancel")
+
+	body := strings.Join(rows, "\n")
+	return body + "\n\n" + sep + "\n" + help + "\n\n" + sep + "\n" + hints
 }
 
 func (m settingsModel) result() WardenConfig {

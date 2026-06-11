@@ -23,6 +23,10 @@ class LLMClient(ABC):
 	) -> AsyncIterator[LLMChunk]:
 		...
 
+	@abstractmethod
+	async def list_models(self) -> List[str]:
+		...
+
 
 class OllamaClient(LLMClient):
 	def __init__(self, host: str | None = None) -> None:
@@ -43,6 +47,16 @@ class OllamaClient(LLMClient):
 			content = getattr(msg, "content", None) or msg.get("content", "")
 			tool_calls = getattr(msg, "tool_calls", None) or msg.get("tool_calls", [])
 			yield LLMChunk(thinking=thinking, content=content, tool_calls=tool_calls)
+
+	async def list_models(self) -> List[str]:
+		result = await self._client.list()
+		models = result.models if hasattr(result, "models") else result.get("models", [])
+		names: List[str] = []
+		for m in models:
+			name = getattr(m, "model", None) or (m.get("model") if isinstance(m, dict) else None)
+			if name:
+				names.append(name)
+		return sorted(names)
 
 
 class OpenAIClient(LLMClient):
@@ -98,6 +112,18 @@ class OpenAIClient(LLMClient):
 				if msg.get("reasoning_details"):
 					assistant_msg["reasoning_details"] = msg["reasoning_details"]
 				result.append(assistant_msg)
+			elif msg.get("role") == "user" and "images" in msg:
+				images = msg["images"]
+				text = msg.get("content", "")
+				content_list: List[Dict[str, Any]] = []
+				if text:
+					content_list.append({"type": "text", "text": str(text)})
+				for img_b64 in images:
+					content_list.append({
+						"type": "image_url",
+						"image_url": {"url": f"data:image/png;base64,{img_b64}"},
+					})
+				result.append({"role": "user", "content": content_list})
 			else:
 				result.append(dict(msg))
 		return result
@@ -161,3 +187,7 @@ class OpenAIClient(LLMClient):
 
 		if accumulated_tool_calls:
 			yield LLMChunk(tool_calls=accumulated_tool_calls)
+
+	async def list_models(self) -> List[str]:
+		result = await self._client.models.list()
+		return sorted(m.id for m in result.data)

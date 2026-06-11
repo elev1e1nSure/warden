@@ -7,6 +7,8 @@ var (
 	GreenMid   = lipgloss.Color("#2D8A5A")
 	GreenFaint = lipgloss.Color("#1A4D34")
 	Amber      = lipgloss.Color("#D4A576")
+	AmberMid   = lipgloss.Color("#A87A4A")
+	AmberFaint = lipgloss.Color("#5C3D1E")
 	Yellow     = Amber // alias kept for compat
 	Red        = lipgloss.Color("#ff4444")
 	Dim        = lipgloss.Color("#666666")

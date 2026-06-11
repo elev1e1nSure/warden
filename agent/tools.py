@@ -14,6 +14,19 @@ from typing import Any, Dict
 _ANSI = re.compile(r'\x1b\[[0-9;]*[mGKHFJABCDsu]|\x1b\][^\x07]*\x07|\x1b=|\x1b>')
 
 
+def _diff_stats(old: str, new: str) -> str:
+	import difflib
+	added = removed = 0
+	for line in difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm=""):
+		if line.startswith("+") and not line.startswith("+++"):
+			added += 1
+		elif line.startswith("-") and not line.startswith("---"):
+			removed += 1
+	if added == 0 and removed == 0:
+		return ""
+	return f"+{added} -{removed}"
+
+
 def _clean(text: str) -> str:
 	"""Strip ANSI codes and collapse \r-overwrites"""
 	text = _ANSI.sub('', text)
@@ -319,14 +332,16 @@ class EditTool(Tool):
 					new_content = norm_content.replace(norm_old, new.replace("\r\n", "\n"), 1)
 					with open(path, "w", encoding="utf-8") as f:
 						f.write(new_content)
-					return f"edited {path}"
+					stats = _diff_stats(old, new)
+					return f"edited {path}  {stats}" if stats else f"edited {path}"
 				return f"error: old_string not found in {path}"
 			if count > 1:
 				return f"error: old_string matches {count} times — make it more specific"
 			new_content = content.replace(old, new, 1)
 			with open(path, "w", encoding="utf-8") as f:
 				f.write(new_content)
-			return f"edited {path}"
+			stats = _diff_stats(old, new)
+			return f"edited {path}  {stats}" if stats else f"edited {path}"
 		except FileNotFoundError:
 			return f"error: file not found: {path}"
 		except Exception as e:
@@ -351,9 +366,16 @@ class FileWriteTool(Tool):
 			d = os.path.dirname(os.path.abspath(path))
 			if d:
 				os.makedirs(d, exist_ok=True)
+			old_content = ""
+			try:
+				with open(path, encoding="utf-8") as f:
+					old_content = f.read()
+			except (FileNotFoundError, OSError):
+				pass
 			with open(path, "w", encoding="utf-8") as f:
 				f.write(content)
-			return f"wrote {len(content)} chars → {path}"
+			stats = _diff_stats(old_content, content)
+			return f"wrote {path}  {stats}" if stats else f"wrote {path}"
 		except Exception as e:
 			return f"error: {e}"
 
@@ -807,9 +829,25 @@ class GoogleSearchTool(Tool):
 		query = args.get("query", "")
 		try:
 			from duckduckgo_search import DDGS
-			results = await asyncio.to_thread(
-				lambda: list(DDGS().text(query, max_results=5))
-			)
+			import time
+
+			def _search() -> list:
+				last_exc: Exception | None = None
+				for attempt in range(3):
+					try:
+						with DDGS() as ddgs:
+							results = list(ddgs.text(query, max_results=5))
+						if results:
+							return results
+					except Exception as e:
+						last_exc = e
+					if attempt < 2:
+						time.sleep(1.5)
+				if last_exc:
+					raise last_exc
+				return []
+
+			results = await asyncio.to_thread(_search)
 			if not results:
 				return "no results"
 			return "\n".join(
@@ -878,14 +916,17 @@ class ApplyPatchTool(Tool):
 		if not files:
 			return "error: no valid hunks found in patch"
 
+		added = sum(1 for l in patch.split("\n") if l.startswith("+") and not l.startswith("+++"))
+		removed = sum(1 for l in patch.split("\n") if l.startswith("-") and not l.startswith("---"))
+		stats = f"+{added} -{removed}" if added or removed else ""
+
 		results = []
 		for f in files:
-			path = f["path"]
 			result = await self._apply_file(f)
 			results.append(result)
 
 		out = "\n".join(results)
-		return out
+		return f"{out}  {stats}" if stats else out
 
 	def _parse_patch(self, patch: str) -> list:
 		files = []
@@ -1128,7 +1169,13 @@ class WebFetchTool(Tool):
 		if not url.startswith("http://") and not url.startswith("https://"):
 			return "error: URL must start with http:// or https://"
 
-		import urllib.request, urllib.error
+		import urllib.request, urllib.error, urllib.parse
+		# encode non-ASCII chars in path/query so urllib doesn't raise on Cyrillic etc.
+		_p = urllib.parse.urlparse(url)
+		url = urllib.parse.urlunparse(_p._replace(
+			path=urllib.parse.quote(_p.path, safe="/:@!$&'()*+,;=%"),
+			query=urllib.parse.quote(_p.query, safe="=&+%#"),
+		))
 
 		headers = {
 			"User-Agent": (
@@ -1146,8 +1193,12 @@ class WebFetchTool(Tool):
 		headers["Accept"] = accept_map.get(fmt, accept_map["markdown"])
 
 		try:
+			import ssl
+			ctx = ssl.create_default_context()
+			ctx.check_hostname = False
+			ctx.verify_mode = ssl.CERT_NONE
 			req = urllib.request.Request(url, headers=headers)
-			with await asyncio.to_thread(urllib.request.urlopen, req, timeout=timeout) as resp:
+			with await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout) as resp:
 				content_type = resp.headers.get("Content-Type", "text/plain")
 				raw = resp.read()
 			content = raw.decode("utf-8", errors="replace")[:10000]
