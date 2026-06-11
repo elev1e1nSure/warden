@@ -27,6 +27,27 @@ def _diff_stats(old: str, new: str) -> str:
 	return f"+{added} -{removed}"
 
 
+def _diff_full(old: str, new: str, path: str) -> str:
+	import difflib
+	lines = list(difflib.unified_diff(
+		old.splitlines(keepends=True),
+		new.splitlines(keepends=True),
+		fromfile=f"a/{path}",
+		tofile=f"b/{path}",
+	))
+	return "".join(lines)
+
+
+class ToolResult:
+	"""Wraps a tool result string with an optional unified diff."""
+	def __init__(self, result: str, diff: str | None = None):
+		self.result = result
+		self.diff = diff
+
+	def __str__(self) -> str:
+		return self.result
+
+
 def _clean(text: str) -> str:
 	"""Strip ANSI codes and collapse \r-overwrites"""
 	text = _ANSI.sub('', text)
@@ -333,7 +354,8 @@ class EditTool(Tool):
 					with open(path, "w", encoding="utf-8") as f:
 						f.write(new_content)
 					stats = _diff_stats(old, new)
-					return f"edited {path}  {stats}" if stats else f"edited {path}"
+					label = f"edited {path}  {stats}" if stats else f"edited {path}"
+					return ToolResult(label, _diff_full(old, new, path))
 				return f"error: old_string not found in {path}"
 			if count > 1:
 				return f"error: old_string matches {count} times — make it more specific"
@@ -341,7 +363,8 @@ class EditTool(Tool):
 			with open(path, "w", encoding="utf-8") as f:
 				f.write(new_content)
 			stats = _diff_stats(old, new)
-			return f"edited {path}  {stats}" if stats else f"edited {path}"
+			label = f"edited {path}  {stats}" if stats else f"edited {path}"
+			return ToolResult(label, _diff_full(old, new, path))
 		except FileNotFoundError:
 			return f"error: file not found: {path}"
 		except Exception as e:
@@ -375,7 +398,9 @@ class FileWriteTool(Tool):
 			with open(path, "w", encoding="utf-8") as f:
 				f.write(content)
 			stats = _diff_stats(old_content, content)
-			return f"wrote {path}  {stats}" if stats else f"wrote {path}"
+			label = f"wrote {path}  {stats}" if stats else f"wrote {path}"
+			diff = _diff_full(old_content, content, path) if stats else None
+			return ToolResult(label, diff)
 		except Exception as e:
 			return f"error: {e}"
 
@@ -879,7 +904,8 @@ class ApplyPatchTool(Tool):
 			results.append(result)
 
 		out = "\n".join(results)
-		return f"{out}  {stats}" if stats else out
+		label = f"{out}  {stats}" if stats else out
+		return ToolResult(label, patch if stats else None)
 
 	def _parse_patch(self, patch: str) -> list:
 		files = []

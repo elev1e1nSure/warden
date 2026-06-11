@@ -350,9 +350,15 @@ class ChatSession:
 				result_val = f"error: {e}"
 		except Exception as e:
 			result_val = f"error: {e}"
-		log_tool(name, args_str, result_val[:200] if result_val else None)
-		yield ("tool", {"name": name, "args": args_str, "result": result_val})
-		self.add_tool_result(name, result_val, tool_call_id)
+		from agent.tools import ToolResult
+		diff_str = result_val.diff if isinstance(result_val, ToolResult) else None
+		result_str = result_val.result if isinstance(result_val, ToolResult) else result_val
+		log_tool(name, args_str, result_str[:200] if result_str else None)
+		payload: dict = {"name": name, "args": args_str, "result": result_str}
+		if diff_str:
+			payload["diff"] = diff_str
+		yield ("tool", payload)
+		self.add_tool_result(name, result_str, tool_call_id)
 		if name in _SCREENSHOT_TOOLS:
 			img_path = _extract_saved_path(result_val)
 			if img_path:
