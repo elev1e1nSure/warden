@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -270,13 +269,13 @@ func extractToolDetail(name, args string) string {
 	if args == "" {
 		return ""
 	}
-	var obj map[string]any
-	if json.Unmarshal([]byte(args), &obj) == nil {
-		if q, ok := obj["query"].(string); ok && q != "" {
-			return q
-		}
-		if path, ok := obj["path"].(string); ok && path != "" {
-			return path
+	// args come as "key=value, key2=value2" from backend
+	parts := strings.SplitN(args, "=", 2)
+	if len(parts) == 2 {
+		v := strings.TrimSpace(parts[1])
+		v = strings.Trim(v, `"'`)
+		if v != "" {
+			return truncateRunes(v, 60)
 		}
 	}
 	return truncateRunes(args, 60)
@@ -286,15 +285,18 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	prefix := "  "
 	detail := extractToolDetail(entry.toolName, entry.toolArgs)
 	if detail != "" {
-		detail = " → " + detail
+		detail = " -> " + detail
 	}
 	if entry.toolDone {
 		return DimStyle().Render(prefix + "✓ " + entry.toolName + detail)
 	}
-	// Any active (not done) entry gets the animated ellipsis
-	dots := []string{".", "..", "..."}
-	dotIdx := (m.spinner / 3) % 3
-	return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
+	// Only the currently running tool gets the animated ellipsis
+	if idx == m.runningToolIdx {
+		dots := []string{".", "..", "..."}
+		dotIdx := (m.spinner / 3) % 3
+		return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
+	}
+	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
 func (m model) renderThinkEntry(entry messageEntry) string {

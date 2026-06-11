@@ -607,7 +607,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
-			m.compactToolFlow()
 			m.appendText("")
 			if inner.tokenLimit > 0 {
 				m.tokenCount = inner.tokenCount
@@ -630,7 +629,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
-			m.compactToolFlow()
 			m.appendText("")
 			if msg.tokenLimit > 0 {
 				m.tokenCount = msg.tokenCount
