@@ -198,7 +198,7 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 
 	// prefer bundled backend.exe next to warden.exe; fall back to python
 	var cmd *exec.Cmd
-	backendExe := filepath.Join(root, "backend.exe")
+	backendExe := filepath.Join(root, "warden-backend.exe")
 	if _, statErr := os.Stat(backendExe); statErr == nil {
 		cmd = exec.Command(backendExe)
 	} else {

@@ -35,15 +35,14 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt pyinstaller
 
-      - name: Build backend.exe
+      - name: Build warden-backend.exe
         run: |
-          pyinstaller --onefile --name backend `
+          pyinstaller --onefile --name warden-backend `
             --collect-all agent `
             --hidden-import=aiohttp `
             --hidden-import=PIL `
             --hidden-import=pyautogui `
             run_backend.py
-          copy dist\backend.exe backend.exe
 
       - name: Generate release notes
         shell: python
@@ -91,12 +90,12 @@ jobs:
 
           lines = []
           if breaking:
-              lines += ["### \U0001f4a5 Breaking Changes", *[f"- {b}" for b in breaking], ""]
+              lines += [f"### \U0001f4a5 Breaking Changes", *[f"- {b}" for b in breaking], ""]
           for type_, (emoji, title) in EMOJI_MAP.items():
               if type_ in groups:
                   lines += [f"### {emoji} {title}", *[f"- {m}" for m in groups[type_]], ""]
           if other:
-              lines += ["### \U0001f4cc Other", *[f"- {m}" for m in other], ""]
+              lines += [f"### \U0001f4cc Other", *[f"- {m}" for m in other], ""]
           while lines and not lines[-1]:
               lines.pop()
 
@@ -104,12 +103,62 @@ jobs:
           with open("release_notes.md", "w", encoding="utf-8") as f:
               f.write(notes)
 
+      - name: Package release zip
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $folder = "warden-$env:TAG-windows-x64"
+          New-Item -ItemType Directory -Path $folder | Out-Null
+          Copy-Item warden.exe "$folder\warden.exe"
+          Copy-Item dist\warden-backend.exe "$folder\warden-backend.exe"
+
+          $readme = @"
+          # warden $env:TAG
+
+          AI agent that controls your Windows PC via natural language.
+
+          ## Setup
+
+          1. Run **warden.exe** — a setup wizard will open on first launch
+          2. Enter your model, API URL, and API key (get a free key at openrouter.ai)
+          3. Start chatting
+
+          ## Files
+
+          | File | Description |
+          |---|---|
+          | ``warden.exe`` | TUI frontend — run this |
+          | ``warden-backend.exe`` | Python backend (started automatically) |
+
+          Keep both files in the same folder.
+
+          ## Controls
+
+          | Key | Action |
+          |---|---|
+          | Enter | Send message |
+          | Esc x2 | Stop generation |
+          | Shift+Tab | Toggle Ask / Auto mode |
+          | Ctrl+C | Exit |
+
+          ## Source
+
+          https://github.com/elev1e1nSure/warden
+          "@
+
+          $readme | Out-File -FilePath "$folder\README.md" -Encoding utf8
+
+          Compress-Archive -Path $folder -DestinationPath "$folder.zip"
+
       - name: Create GitHub release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release create "${{ github.ref_name }}" `
-            --title "${{ github.ref_name }}" `
+          $zip = "warden-$env:TAG-windows-x64.zip"
+          gh release create $env:TAG `
+            --title $env:TAG `
             --notes-file release_notes.md `
-            warden.exe `
-            backend.exe
+            $zip
