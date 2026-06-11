@@ -46,20 +46,19 @@ type model struct {
 	hintVisible bool
 	hintCount   int
 	// path
-	cwd          string
-	providerName string
+	cwd string
 	// index of the in-progress tool line in messages (-1 = none)
 	runningToolIdx int
 	// verbose mode — shows tool lines, errors, think duration
 	verboseMode bool
+	// select mode — mouse capture disabled so terminal can select text
+	selectMode bool
 	// model picker
-	modelPicking      bool
-	modelList         []string
-	modelFiltered     []string
-	modelPickIdx      int
-	modelScrollTop    int
-	modelProviders    []string
-	modelProviderIdx  int
+	modelPicking   bool
+	modelList      []string
+	modelFiltered  []string
+	modelPickIdx   int
+	modelScrollTop int
 	// activity tracking (index of current think/activity entry)
 	activityIdx int
 	// last raw assistant response (for /copy-last)
@@ -87,14 +86,28 @@ type model struct {
 	historyIdx int
 	historySav string
 	// slash command cycling
-	slashIdx     int
-	slashTyped   string
+	slashIdx   int
+	slashTyped string
 	// skills (fetched from backend on startup)
-	skills     []Skill
-	skillsErr  string
+	skills    []Skill
+	skillsErr string
 	// markdown
 	mdRenderer *glamour.TermRenderer
 	mdWidth    int
+	// connection
+	connected bool
+	// connect wizard
+	cwOpen     bool
+	cwStep     int    // 0=provider 1=apikey 2=model
+	cwProvider string // "openrouter" | "ollama"
+	cwInput    textinput.Model
+	cwModels   []string
+	cwPickIdx  int
+	cwScroll   int
+	cwCustom   bool
+	cwLoading  bool
+	cwErr      string
+	cwAPIKey   string
 }
 
 func filterModels(models []string, filter string) []string {
@@ -111,7 +124,7 @@ func filterModels(models []string, filter string) []string {
 	return result
 }
 
-func initialModel(modelName string) model {
+func initialModel(modelName string, connected bool) model {
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.Prompt = "> "
@@ -126,20 +139,25 @@ func initialModel(modelName string) model {
 	vp.MouseWheelEnabled = false
 
 	cwd, _ := os.Getwd()
-	return model{
-		textinput:       ti,
-		viewport:        vp,
-		client:          NewClient("http://localhost:8765"),
-		messages:        []messageEntry{},
-		autoMode:        loadAutoMode(),
-		cwd:             cwd,
-		modelName:       modelName,
-		history:         []string{},
-		loading:         true,
-		runningToolIdx:  -1,
-		slashIdx:        -1,
-		activityIdx:     -1,
+	m := model{
+		textinput:      ti,
+		viewport:       vp,
+		client:         NewClient("http://localhost:8765"),
+		messages:       []messageEntry{},
+		autoMode:       loadAutoMode(),
+		cwd:            cwd,
+		modelName:      modelName,
+		connected:      connected,
+		history:        []string{},
+		loading:        true,
+		runningToolIdx: -1,
+		slashIdx:       -1,
+		activityIdx:    -1,
 	}
+	if !connected {
+		m.appendText(m.wardenLine("not set up — type /connect to get started"))
+	}
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -161,6 +179,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	var cmds []tea.Cmd
+
+	// route key events to wizard when open
+	if key, ok := msg.(tea.KeyMsg); ok && m.cwOpen {
+		if handled, cmd := m.handleConnectWizardKey(key); handled {
+			return m, cmd
+		}
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -264,29 +289,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case tea.KeyLeft:
-			if m.modelPicking && len(m.modelProviders) > 1 {
-				m.modelProviderIdx = (m.modelProviderIdx - 1 + len(m.modelProviders)) % len(m.modelProviders)
-				m.modelList = nil
-				m.modelFiltered = nil
-				m.modelPickIdx = 0
-				m.modelScrollTop = 0
-				m.textinput.Reset()
-				m.syncViewport()
-				return m, m.switchProvider(m.modelProviders[m.modelProviderIdx])
-			}
-
 		case tea.KeyRight:
-			if m.modelPicking && len(m.modelProviders) > 1 {
-				m.modelProviderIdx = (m.modelProviderIdx + 1) % len(m.modelProviders)
-				m.modelList = nil
-				m.modelFiltered = nil
-				m.modelPickIdx = 0
-				m.modelScrollTop = 0
-				m.textinput.Reset()
-				m.syncViewport()
-				return m, m.switchProvider(m.modelProviders[m.modelProviderIdx])
-			}
 			if m.streaming {
 				m.viewport.LineDown(3)
 				if m.viewport.AtBottom() {
@@ -324,7 +327,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textinput.CursorEnd()
 				}
 			}
-
 
 		case tea.KeyCtrlW:
 			if !m.questioning && !m.confirming {
@@ -370,6 +372,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEsc:
+			if m.selectMode {
+				m.selectMode = false
+				return m, tea.EnableMouseCellMotion
+			}
+
 			if m.modelPicking {
 				m.modelPicking = false
 				m.modelList = nil
@@ -541,6 +548,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			if !m.connected {
+				m.appendText(UserStyle().Render("  > ") + text)
+				m.appendText(m.wardenLine(DimStyle().Render("not connected — run /connect to get started")))
+				m.textinput.Reset()
+				m.syncViewport()
+				return m, nil
+			}
+
 			m.streamStart = len(m.messages)
 			m.appendText(UserStyle().Render("  you"))
 			m.appendText("  " + text)
@@ -573,7 +588,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toolRunning = false
 			m.lastAssistantRaw = ""
 			if m.activityIdx == -1 {
-				m.appendText(WardenStyle().Render("  warden"))
+				m.appendText(WardenStyleAuto(m.autoMode).Render("  warden"))
 			}
 			m.activityIdx = m.resetOrAppendThink()
 			m.syncViewport()
@@ -748,16 +763,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		var line string
 		if msg.brief {
-			line = msg.provider + " · " + msg.model
+			line = msg.model
 		} else {
-			line = "model: " + msg.model + "  provider: " + msg.provider + "  mode: " + msg.mode + "  cwd: " + msg.cwd
+			line = "model: " + msg.model + "  mode: " + msg.mode + "  cwd: " + msg.cwd
 		}
 
 		m.appendText(m.wardenLine(DimStyle().Render(line)))
 		m.syncViewport()
 
 	case clipboardDoneMsg:
-		
+
 		if msg.err != nil {
 			m.appendText(m.wardenLine(ErrorStyle().Render("clipboard error: " + msg.err.Error())))
 		} else {
@@ -821,52 +836,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = saveWardenConfigField("model", msg.model)
 		}
 
-	case providersResultMsg:
-		if msg.err == "" && len(msg.providers) > 0 {
-			m.modelProviders = msg.providers
-			for i, p := range msg.providers {
-				if p == msg.current {
-					m.modelProviderIdx = i
-					break
-				}
+	case connectResultMsg:
+		if msg.ok {
+			m.connected = true
+			m.modelName = msg.model
+			m.cwOpen = false
+			m.cwLoading = false
+			m.cwErr = ""
+			_ = saveWardenConfigField("model", msg.model)
+			if msg.apiURL != "" {
+				_ = saveWardenConfigField("api_url", msg.apiURL)
 			}
-		}
-
-	case providerSetMsg:
-		if msg.err != "" {
-			m.modelPicking = false
-			m.modelList = nil
-			m.modelFiltered = nil
-			m.appendText(m.wardenLine(ErrorStyle().Render("provider: " + msg.err)))
+			if msg.apiKey != "" {
+				_ = saveWardenConfigField("api_key", msg.apiKey)
+			}
+			m.appendText(m.wardenLine(DimStyle().Render("connected  " + msg.model)))
+			m.updateViewportHeight()
 			m.syncViewport()
 		} else {
-			m.providerName = msg.provider
-			if len(msg.models) > 0 {
-				m.modelList = msg.models
-				filter := m.textinput.Value()
-				m.modelFiltered = filterModels(msg.models, filter)
-				m.modelPickIdx = 0
-				for i, name := range m.modelFiltered {
-					if name == msg.current {
-						m.modelPickIdx = i
-						break
-					}
-				}
-				m.modelScrollTop = 0
-				m.updateViewportHeight()
-				m.syncViewport()
-			}
+			m.cwErr = msg.err
+			m.cwLoading = false
+			m.updateViewportHeight()
+			m.syncViewport()
 		}
-
-	case providerInitMsg:
-		m.providerName = msg.provider
 
 	case backendReadyMsg:
 		m.loading = false
 		m.tokenCount = 0
 		m.client.ResetSession()
 		m.syncViewport()
-		cmds = append(cmds, m.initProvider())
 		if m.autoMode {
 			cmds = append(cmds, m.setMode(true))
 		}
@@ -956,14 +954,14 @@ type toolStartMsg struct {
 }
 type wardenStartMsg struct{ ch <-chan tea.Msg }
 type confirmMsg struct {
-	id      string
-	tool    string
-	risk    string
-	title   string
-	summary string
-	details []string
-	args    string
-	preview string
+	id         string
+	tool       string
+	risk       string
+	title      string
+	summary    string
+	details    []string
+	args       string
+	preview    string
 	defaultVal string
 }
 type modeMsg struct{ auto bool }
@@ -1004,7 +1002,6 @@ type questionMsg struct {
 
 type statusResultMsg struct {
 	model      string
-	provider   string
 	mode       string
 	cwd        string
 	brief      bool
@@ -1012,7 +1009,6 @@ type statusResultMsg struct {
 	tokenLimit int
 }
 type clipboardDoneMsg struct{ err error }
-type providerInitMsg struct{ provider string }
 type modelsResultMsg struct {
 	models  []string
 	current string
@@ -1022,16 +1018,13 @@ type modelSetMsg struct {
 	model string
 	err   string
 }
-type providersResultMsg struct {
-	providers []string
-	current   string
-	err       string
-}
-type providerSetMsg struct {
-	provider string
-	models   []string
-	current  string
+type connectResultMsg struct {
+	ok       bool
 	err      string
+	model    string
+	provider string
+	apiURL   string
+	apiKey   string
 }
 type skillsResultMsg struct {
 	skills []Skill
@@ -1064,7 +1057,6 @@ type messageEntry struct {
 func (m *model) appendText(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
 }
-
 
 func (m *model) appendToolActivity(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})

@@ -24,12 +24,20 @@ func WardenStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Green).Bold(true)
 }
 
+func WardenStyleAuto(autoMode bool) lipgloss.Style {
+	color := Green
+	if autoMode {
+		color = Amber
+	}
+	return lipgloss.NewStyle().Foreground(color).Bold(true)
+}
+
 func HeaderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(White).Bold(true)
 }
 
 func UserStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Yellow).Bold(true)
+	return lipgloss.NewStyle().Foreground(Dim).Bold(true)
 }
 
 func DimStyle() lipgloss.Style {
