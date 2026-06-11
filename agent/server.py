@@ -12,6 +12,7 @@ from agent.llm_client import OllamaClient, OpenAIClient
 from agent.ollama_process import OllamaProcessManager
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import info, warn, error, success, request as log_request
+from agent.tools import _get_screenshot_dir, _cleanup_old_screenshots
 
 _backend: Backend | None = None
 _shutdown_event: asyncio.Event | None = None
@@ -19,6 +20,10 @@ _shutdown_event: asyncio.Event | None = None
 
 class Backend:
 	def __init__(self) -> None:
+		try:
+			_cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
+		except Exception:
+			pass
 		self.model = os.environ.get("WARDEN_MODEL", "qwen3:8b")
 		self.api_url = os.environ.get("WARDEN_API_URL", "")
 		if self.api_url:
@@ -66,6 +71,10 @@ async def reset(request: web.Request) -> web.Response:
 	backend.confirmation_manager.cancel_all()
 	backend.question_manager.cancel_all()
 	backend.chat.reset()
+	try:
+		_cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
+	except Exception:
+		pass
 	log_request("POST", "/reset", 200)
 	info("session reset")
 	return web.Response(text="ok")

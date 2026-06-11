@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict
@@ -523,6 +524,28 @@ class ClipboardTool(Tool):
 			return f"error: {e}"
 
 
+def _get_screenshot_dir() -> Path:
+	"""Return (and create) the temp screenshots directory in LOCALAPPDATA."""
+	base = os.environ.get("LOCALAPPDATA") or os.environ.get("TEMP") or str(Path.home())
+	dir_path = Path(base) / "warden" / "temp_screenshots"
+	dir_path.mkdir(parents=True, exist_ok=True)
+	return dir_path
+
+
+def _cleanup_old_screenshots(dir_path: Path, max_age_seconds: float = 300) -> None:
+	"""Remove screenshot files older than max_age_seconds from dir_path."""
+	if not dir_path.exists():
+		return
+	now = time.time()
+	for f in dir_path.iterdir():
+		if f.is_file() and f.suffix.lower() == ".png":
+			try:
+				if now - f.stat().st_mtime > max_age_seconds:
+					f.unlink()
+			except OSError:
+				pass
+
+
 class ScreenshotTool(Tool):
 	name = "screenshot"
 	description = (
@@ -535,7 +558,9 @@ class ScreenshotTool(Tool):
 		try:
 			from PIL import ImageGrab
 			import datetime
-			name = f"screenshot_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
+			screenshot_dir = _get_screenshot_dir()
+			_cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
+			name = screenshot_dir / f"screenshot_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
 			img = await asyncio.to_thread(ImageGrab.grab)
 			await asyncio.to_thread(img.save, name)
 			return f"saved: {name} ({img.width}x{img.height})"
@@ -807,12 +832,14 @@ class BrowserScreenshotTool(Tool):
 		try:
 			from playwright.async_api import async_playwright
 			import datetime
-			name = f"browser_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
+			screenshot_dir = _get_screenshot_dir()
+			_cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
+			name = screenshot_dir / f"browser_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
 			async with async_playwright() as pw:
 				browser = await pw.chromium.launch(headless=True)
 				page = await browser.new_page()
 				await page.goto(url, timeout=20000)
-				await page.screenshot(path=name, full_page=True)
+				await page.screenshot(path=str(name), full_page=True)
 				await browser.close()
 			return f"saved: {name}"
 		except ImportError:
