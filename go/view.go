@@ -265,18 +265,19 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-func (m model) renderToolFlowEntry(entry messageEntry) string {
+func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	if entry.toolDone {
-		return ""
+		return DimStyle().Render("  ✓ " + entry.toolName)
 	}
-	arrow := ToolStyle().Render("  → ")
-	name := ToolStyle().Render(entry.toolName)
-	if m.loading && !entry.toolDone {
-		brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		frame := brailleFrames[m.spinner%len(brailleFrames)]
-		return ToolStyle().Render("  "+frame+" ") + name
+	// Active (latest) tool gets the animated ellipsis
+	if idx == m.runningToolIdx {
+		dots := []string{".", "..", "..."}
+		dotIdx := (m.spinner / 3) % 3
+		arrow := ToolStyle().Render("  → ")
+		name := ToolStyle().Render(entry.toolName + dots[dotIdx])
+		return arrow + name
 	}
-	return arrow + name
+	return ToolStyle().Render("  → ") + ToolStyle().Render(entry.toolName)
 }
 
 func (m model) renderThinkEntry(entry messageEntry) string {
@@ -284,27 +285,28 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
-	brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 	if !m.verboseMode {
 		if entry.duration > 0 {
 			return ""
 		}
 		if m.loading {
-			frame := brailleFrames[m.spinner%len(brailleFrames)]
+			dots := []string{".", "..", "..."}
+			dotIdx := (m.spinner / 3) % 3
 			verb := "Thinking"
 			if entry.activity != "" {
 				verb = entry.activity
 			}
-			return DimStyle().Render("  " + frame + "  " + verb + "...")
+			return DimStyle().Render("  " + verb + dots[dotIdx])
 		}
 		return ""
 	}
 
 	var summary string
 	if entry.duration == 0 && m.loading {
-		frame := brailleFrames[m.spinner%len(brailleFrames)]
-		summary = DimStyle().Render("  " + frame + "  Thinking")
+		dots := []string{".", "..", "..."}
+		dotIdx := (m.spinner / 3) % 3
+		summary = DimStyle().Render("  Thinking" + dots[dotIdx])
 	} else {
 		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
 	}
@@ -344,7 +346,7 @@ func indentLines(text string, prefix string) string {
 func (m *model) renderMessages() []string {
 	m.ensureMarkdownRenderer()
 	out := make([]string, 0, len(m.messages))
-	for _, entry := range m.messages {
+	for i, entry := range m.messages {
 		var rendered string
 		switch entry.kind {
 		case messageThink:
@@ -354,7 +356,7 @@ func (m *model) renderMessages() []string {
 		case messageToolActivity:
 			rendered = entry.text
 		case messageToolFlow:
-			rendered = m.renderToolFlowEntry(entry)
+			rendered = m.renderToolFlowEntry(i, entry)
 		case messageToolDiff:
 			rendered = renderUnifiedDiff(entry.text)
 		default:
