@@ -134,15 +134,11 @@ func (m launchModel) View() string {
 }
 
 func findProjectRoot() (string, error) {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("unable to get caller")
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("unable to get executable path: %w", err)
 	}
-	dir := filepath.Dir(filename)
-	for i := 0; i < 3; i++ {
-		dir = filepath.Dir(dir)
-	}
-	return dir, nil
+	return filepath.Dir(filepath.Clean(exe)), nil
 }
 
 func preCheck() (alreadyRunning bool, err error) {
