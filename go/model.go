@@ -236,6 +236,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.CursorEnd()
 			}
 
+		case tea.KeyShiftTab:
+			if !m.streaming {
+				m.autoMode = !m.autoMode
+				return m, m.setMode(m.autoMode)
+			}
+
 		case tea.KeyEsc:
 			if m.streaming && !m.questioning && !m.confirming {
 				if !m.escPending {
@@ -558,11 +564,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case modeMsg:
 		m.autoMode = msg.auto
-		label := "Ask"
-		if m.autoMode {
-			label = "Auto"
-		}
-		m.appendText(DimStyle().Render("  Mode: " + label))
 		m.syncViewport()
 
 	case statusResultMsg:
