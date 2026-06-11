@@ -60,13 +60,13 @@ _COMPACT_PROMPT = (
 def _guess_context_limit(model: str) -> int:
 	lower = model.lower()
 	# rough heuristics without hardcoded lists
-	if "128k" in lower or "128k" in lower:
+	if "128k" in lower or "128000" in lower:
 		return 128000
-	if "32k" in lower or "32k" in lower:
+	if "32k" in lower or "32768" in lower:
 		return 32768
-	if "8k" in lower or "8k" in lower:
+	if "8k" in lower or "8192" in lower:
 		return 8192
-	if "4k" in lower or "4k" in lower:
+	if "4k" in lower or "4096" in lower:
 		return 4096
 	return 128000
 

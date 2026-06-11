@@ -16,7 +16,7 @@ var (
 	diffRemoveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444")).Background(lipgloss.Color("#1f0d0d"))
 	diffHunkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#569CD6"))
 	diffFileStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Bold(true)
-	diffCtxStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	diffCtxStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555")).Background(lipgloss.Color("#161616"))
 )
 
 func renderUnifiedDiff(diff string) string {
@@ -56,9 +56,9 @@ func renderDiffStats(s string) (string, string) {
 const wardenVersion = "v0.1.0"
 
 var toolDisplayNames = map[string]string{
-	"google_search":      "Search",
-	"youtube_search":     "Search",
-	"grep":               "Search",
+	"google_search":  "Web Search",
+	"youtube_search": "Web Search",
+	"grep":           "Search",
 	"glob":               "Find",
 	"browser_read":       "Read",
 	"file_read":          "Read",
@@ -217,22 +217,24 @@ func formatThinkDuration(d time.Duration) string {
 	if d < 0 {
 		d = 0
 	}
-	if d < time.Second {
-		ms := d.Round(10 * time.Millisecond)
-		if ms < 10*time.Millisecond {
-			ms = 10 * time.Millisecond
-		}
-		return fmt.Sprintf("%dms", ms/time.Millisecond)
+	ms := d.Round(10 * time.Millisecond).Milliseconds()
+	if ms < 10 {
+		ms = 10
 	}
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
+	if ms < 10_000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	// only switch to seconds for thinks > 10s
+	secs := d.Seconds()
+	if secs < 60 {
+		return fmt.Sprintf("%.0fs", secs)
 	}
 	mins := int(d / time.Minute)
-	secs := int((d % time.Minute) / time.Second)
-	if secs == 0 {
+	sec := int((d % time.Minute) / time.Second)
+	if sec == 0 {
 		return fmt.Sprintf("%dm", mins)
 	}
-	return fmt.Sprintf("%dm%02ds", mins, secs)
+	return fmt.Sprintf("%dm%02ds", mins, sec)
 }
 
 func wrapWords(text string, width int) []string {
@@ -277,6 +279,8 @@ func toolPastTense(name string) string {
 		return "Searched"
 	case "Glob":
 		return "Found"
+	case "Edit":
+		return "Edited"
 	case "Patch":
 		return "Patched"
 	case "Browser":
@@ -297,7 +301,7 @@ func extractToolDetail(name, args string) string {
 	if args == "" {
 		return ""
 	}
-	// Fetch sends "text, timeout=15, url=https://..." — extract only URL
+	// Fetch: extract only the URL
 	if name == "Fetch" {
 		for _, part := range strings.Split(args, ",") {
 			part = strings.TrimSpace(part)
@@ -309,16 +313,40 @@ func extractToolDetail(name, args string) string {
 		}
 		return ""
 	}
-	// args come as "key=value, key2=value2" from backend
+	// Edit/Patch: show only filename, not old_string/new_string
+	if name == "Edit" || name == "Patch" {
+		for _, part := range strings.Split(args, ", ") {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "file_path=") {
+				v := strings.TrimSpace(part[10:])
+				v = strings.Trim(v, `"'`)
+				return truncateRunes(pathBase(v), 50)
+			}
+		}
+	}
+	// default: take the first key=value, strip the key
 	parts := strings.SplitN(args, "=", 2)
 	if len(parts) == 2 {
 		v := strings.TrimSpace(parts[1])
+		// drop any subsequent key=value pairs
+		if comma := strings.Index(v, ", "); comma >= 0 {
+			v = v[:comma]
+		}
 		v = strings.Trim(v, `"'`)
 		if v != "" {
 			return truncateRunes(v, 60)
 		}
 	}
 	return truncateRunes(args, 60)
+}
+
+// pathBase returns the last component of a file path (handles both / and \).
+func pathBase(p string) string {
+	p = strings.TrimRight(p, "/\\")
+	if i := strings.LastIndexAny(p, "/\\"); i >= 0 {
+		return p[i+1:]
+	}
+	return p
 }
 
 func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
@@ -343,30 +371,30 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
-func (m model) renderThinkEntry(entry messageEntry) string {
+func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 	duration := entry.duration
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
 	}
 
+	// only the active (latest) think animates; finished or orphaned thinks freeze
+	animating := active && entry.duration == 0 && m.loading
+
 	if !m.verboseMode {
-		if entry.duration > 0 {
-			return DimStyle().Render("  Thought")
+		if !animating {
+			return DimStyle().Render("  Thought: " + formatThinkDuration(duration))
 		}
-		if m.loading {
-			dots := []string{".", "..", "..."}
-			dotIdx := ((m.spinner / 3) + 1) % 3
-			verb := "Thinking"
-			if entry.activity != "" {
-				verb = entry.activity
-			}
-			return DimStyle().Render("  " + verb + dots[dotIdx])
+		dots := []string{".", "..", "..."}
+		dotIdx := ((m.spinner / 3) + 1) % 3
+		verb := "Thinking"
+		if entry.activity != "" {
+			verb = entry.activity
 		}
-		return ""
+		return DimStyle().Render("  " + verb + dots[dotIdx])
 	}
 
 	var summary string
-	if entry.duration == 0 && m.loading {
+	if animating {
 		dots := []string{".", "..", "..."}
 		dotIdx := ((m.spinner / 3) + 1) % 3
 		summary = DimStyle().Render("  Thinking" + dots[dotIdx])
@@ -406,14 +434,67 @@ func indentLines(text string, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
+var (
+	userMsgBg   = lipgloss.NewStyle().Background(lipgloss.Color("#242424"))
+	assistantBg = lipgloss.NewStyle().Background(lipgloss.Color("#1a1a1a"))
+)
+
+// bgLine pads a single pre-rendered string to full terminal width with a background.
+func (m *model) bgLine(style lipgloss.Style, content string) string {
+	return style.Width(m.width).Render(content)
+}
+
+// applyBgLines applies background to each line of a multi-line string.
+func (m *model) applyBgLines(style lipgloss.Style, content string) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = style.Width(m.width).Render(l)
+	}
+	return strings.Join(out, "\n")
+}
+
+func (m *model) renderUserMsg(text string) string {
+	bgColor := lipgloss.Color("#242424")
+	dimOnBg := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555")).Background(bgColor)
+	plainOnBg := lipgloss.NewStyle().Background(bgColor)
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for i, l := range lines {
+		var line string
+		if i == 0 {
+			// "> " with dim fg + bg; remaining text with just bg — no inner reset breaks outer bg
+			prefix := dimOnBg.Render("> ")
+			rest := plainOnBg.Width(m.width - 2).Render(l)
+			line = prefix + rest
+		} else {
+			line = plainOnBg.Width(m.width).Render("  " + l)
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
 func (m *model) renderMessages() []string {
 	m.ensureMarkdownRenderer()
+	// index of the latest think entry — only it may animate
+	lastThinkIdx := -1
+	for i := len(m.messages) - 1; i >= 0; i-- {
+		if m.messages[i].kind == messageThink {
+			lastThinkIdx = i
+			break
+		}
+	}
 	out := make([]string, 0, len(m.messages))
 	for i, entry := range m.messages {
 		var rendered string
 		switch entry.kind {
+		case messageUser:
+			rendered = m.renderUserMsg(entry.text)
+		case messageWarden:
+			// label removed, skip
 		case messageThink:
-			rendered = m.renderThinkEntry(entry)
+			rendered = m.renderThinkEntry(entry, i == lastThinkIdx)
 		case messageAssistant:
 			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
 		case messageToolActivity:
@@ -694,9 +775,10 @@ func (m *model) layoutViewportHeight() int {
 		cwHeight = lipgloss.Height(m.renderConnectWizard())
 	}
 
-	// input: 3 (border top + content + border bottom)
+	// input: border top + N content lines + border bottom
 	// status bar: 2 lines
-	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + 3 + 2
+	inputHeight := m.inputLineCount() + 2
+	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 2
 	height := m.height - reserved
 	if height < 1 {
 		height = 1

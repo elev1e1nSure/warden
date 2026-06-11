@@ -12,7 +12,6 @@ import (
 
 type StatusResult struct {
 	Model      string `json:"model"`
-	Provider   string `json:"provider"`
 	Mode       string `json:"mode"`
 	CWD        string `json:"cwd"`
 	TokenCount int    `json:"token_count"`
@@ -120,32 +119,31 @@ func (c *Client) ListModels() ([]string, string, error) {
 	return result.Models, result.Current, nil
 }
 
-func (c *Client) ListProviders() ([]string, string, error) {
-	resp, err := http.Get(c.BaseURL + "/providers")
+func (c *Client) Connect(provider, apiURL, apiKey, model string) error {
+	body, err := json.Marshal(map[string]any{
+		"provider": provider,
+		"api_url":  apiURL,
+		"api_key":  apiKey,
+		"model":    model,
+	})
 	if err != nil {
-		return nil, "", err
+		return err
+	}
+	resp, err := http.Post(c.BaseURL+"/connect", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
 	var result struct {
-		Providers []string `json:"providers"`
-		Current   string   `json:"current"`
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, "", err
-	}
-	return result.Providers, result.Current, nil
-}
-
-func (c *Client) SetProvider(name string) error {
-	body, err := json.Marshal(map[string]any{"provider": name})
-	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/provider/set", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
+	if !result.OK {
+		return fmt.Errorf("%s", result.Error)
 	}
-	resp.Body.Close()
 	return nil
 }
 

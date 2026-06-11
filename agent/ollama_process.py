@@ -22,12 +22,11 @@ class OllamaProcessManager:
 	def start(self) -> None:
 		import sys
 		if sys.platform == "win32":
-			import subprocess as sp
-			self._process = sp.Popen(
+			self._process = subprocess.Popen(
 				["ollama", "serve"],
-				creationflags=sp.CREATE_NEW_PROCESS_GROUP,
-				stdout=sp.DEVNULL,
-				stderr=sp.DEVNULL,
+				creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+				stdout=subprocess.DEVNULL,
+				stderr=subprocess.DEVNULL,
 			)
 		else:
 			self._process = subprocess.Popen(

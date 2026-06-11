@@ -1,22 +1,23 @@
 package tui
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
 	viewport  viewport.Model
-	textinput textinput.Model
+	textinput textarea.Model
 	client    *Client
 	messages  []messageEntry
 	streaming bool
@@ -74,6 +75,9 @@ type model struct {
 	// token tracking
 	tokenCount int
 	tokenLimit int
+	// paste buffering (Windows coninput sends paste as individual KeyRunes)
+	pasteBuf []rune
+	pasteSeq int
 	// confirm dialog data
 	confirmRisk    string
 	confirmTitle   string
@@ -121,13 +125,29 @@ func filterModels(models []string, filter string) []string {
 }
 
 func initialModel(modelName string, connected bool) model {
-	ti := textinput.New()
+	ti := textarea.New()
 	ti.Placeholder = ""
 	ti.Prompt = "> "
+	ti.ShowLineNumbers = false
 	ti.CharLimit = 0
-	ti.Width = 80
+	ti.EndOfBufferCharacter = 0
+
+	// strip textarea default styles: no backgrounds, no borders
+	plain := lipgloss.NewStyle()
+	dimPrompt := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	for _, s := range []*textarea.Style{&ti.FocusedStyle, &ti.BlurredStyle} {
+		s.Base = plain
+		s.CursorLine = plain
+		s.CursorLineNumber = plain
+		s.EndOfBuffer = plain
+		s.LineNumber = plain
+		s.Prompt = dimPrompt
+		s.Text = plain
+	}
+
+	ti.SetWidth(80)
+	ti.SetHeight(1)
 	ti.Focus()
-	ti.BlinkSpeed = 0
 
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
@@ -148,9 +168,6 @@ func initialModel(modelName string, connected bool) model {
 		runningToolIdx: -1,
 		slashIdx:       -1,
 		activityIdx:    -1,
-	}
-	if !connected {
-		m.appendText(m.wardenLine("not set up — type /connect to get started"))
 	}
 	return m
 }
@@ -187,11 +204,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		m.textinput.Width = msg.Width - 6
+		m.textinput.SetWidth(msg.Width - 6)
 		m.updateViewportHeight()
 		m.syncViewport()
 
 	case tea.KeyMsg:
+		// Windows coninput sends paste as individual KeyRunes.
+		// Buffer single runes briefly and flush as one paste event.
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && !m.confirming && !m.questioning && !m.modelPicking {
+			m.pasteBuf = append(m.pasteBuf, msg.Runes[0])
+			m.pasteSeq++
+			seq := m.pasteSeq
+			return m, tea.Tick(40*time.Millisecond, func(t time.Time) tea.Msg {
+				return pasteFlushMsg{seq: seq}
+			})
+		}
+		if len(m.pasteBuf) > 0 {
+			paste := string(m.pasteBuf)
+			m.pasteBuf = nil
+			m.textinput.SetValue(m.textinput.Value() + paste)
+			m.textinput.CursorEnd()
+		}
 		// Clear pending confirmations if user presses a different key
 		if msg.Type != tea.KeyEsc {
 			m.escPending = false
@@ -273,7 +306,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.textinput.SetValue(string(runes[:idx]))
 				m.textinput.CursorEnd()
+				m.syncInputHeight()
 			}
+			return m, nil
 
 		case tea.KeyTab:
 			val := m.textinput.Value()
@@ -302,7 +337,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.modelPicking = false
 				m.modelList = nil
 				m.modelFiltered = nil
-				m.textinput.Reset()
+				m.resetInput()
 				m.updateViewportHeight()
 				m.syncViewport()
 				return m, m.focusInput()
@@ -343,12 +378,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirmCh = nil
 				m.confirmTool = ""
 				m.textinput.Placeholder = ""
-				m.textinput.Reset()
+				m.resetInput()
 				m.updateViewportHeight()
 				m.syncViewport()
 				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch))
 			}
-			m.textinput.Reset()
+			m.resetInput()
 
 		case tea.KeyRunes:
 			if m.confirming {
@@ -362,7 +397,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.confirmCh = nil
 					m.confirmTool = ""
 					m.textinput.Placeholder = ""
-					m.textinput.Reset()
+					m.resetInput()
 					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
 				}
 				if r == "n" || r == "т" {
@@ -374,7 +409,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.confirmCh = nil
 					m.confirmTool = ""
 					m.textinput.Placeholder = ""
-					m.textinput.Reset()
+					m.resetInput()
 					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
 				}
 				return m, nil
@@ -412,7 +447,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.modelPicking = false
 					m.modelList = nil
 					m.modelFiltered = nil
-					m.textinput.Reset()
+					m.resetInput()
 					m.updateViewportHeight()
 					return m, tea.Batch(m.focusInput(), m.applyModel(chosen))
 				}
@@ -422,7 +457,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				q := m.questionsData[m.questionIdx]
 				if len(q.Options) == 0 {
 					text := strings.TrimSpace(m.textinput.Value())
-					m.textinput.Reset()
+					m.resetInput()
 					m.questionAnswers = append(m.questionAnswers, []string{text})
 					m.questionIdx++
 					if m.questionIdx >= len(m.questionsData) {
@@ -447,35 +482,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.streaming {
 				return m, nil
 			}
-			text := strings.TrimSpace(m.textinput.Value())
+			// flush paste buffer before checking value
+			if len(m.pasteBuf) > 0 {
+				paste := string(m.pasteBuf)
+				m.pasteBuf = nil
+				m.textinput.SetValue(m.textinput.Value() + paste)
+				m.textinput.CursorEnd()
+			}
+			val := m.textinput.Value()
+			// \ at end of line + Enter = shell-style line continuation
+			if strings.HasSuffix(val, "\\") {
+				m.textinput.SetValue(val[:len(val)-1] + "\n")
+				m.textinput.CursorEnd()
+				m.syncInputHeight()
+				return m, nil
+			}
+			text := strings.TrimSpace(val)
 			if text == "" {
 				return m, nil
 			}
 			if handled, cmd := m.handleSlash(text); handled {
-				m.textinput.Reset()
+				m.resetInput()
 				return m, cmd
 			}
 
 			if strings.HasPrefix(text, "!") {
 				if handled, cmd := m.handleBang(text); handled {
-					m.textinput.Reset()
+					m.resetInput()
 					return m, cmd
 				}
 				return m, nil
 			}
 
 			if !m.connected {
-				m.appendText(UserStyle().Render("  > ") + text)
-				m.appendText(m.wardenLine(DimStyle().Render("not connected — run /connect to get started")))
-				m.textinput.Reset()
-				m.syncViewport()
+				m.resetInput()
 				return m, nil
 			}
 
 			m.streamStart = len(m.messages)
-			m.appendText(UserStyle().Render("> ") + text)
+			m.messages = append(m.messages, messageEntry{kind: messageUser, text: text})
 			m.appendText("")
-			m.textinput.Reset()
+			m.resetInput()
 			m.streaming = true
 			m.loading = true
 			m.spinner = 0
@@ -503,7 +550,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toolRunning = false
 			m.lastAssistantRaw = ""
 			if m.activityIdx == -1 {
-				m.appendText(WardenStyleAuto(m.autoMode).Render("  warden"))
+				// warden label removed
 			}
 			m.activityIdx = m.resetOrAppendThink()
 			m.syncViewport()
@@ -528,10 +575,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case toolStartMsg:
 			m.toolRunning = true
+			// finalize the active think so it stops animating once the
+			// model switches to a tool
+			if len(m.messages) > 0 {
+				m.finishThink()
+			}
 			if m.verboseMode {
-				if !m.thinkDone && len(m.messages) > 0 {
-					m.finishThink()
-				}
 				m.appendToolActivity(toolStartLine(inner.name, inner.args))
 				m.runningToolIdx = len(m.messages) - 1
 			} else {
@@ -578,7 +627,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateViewportHeight()
 			m.syncViewport()
 			m.textinput.Placeholder = ""
-			m.textinput.Reset()
+			m.resetInput()
 			if inner.defaultVal != "" && inner.defaultVal != "cancel" {
 				m.textinput.SetValue(inner.defaultVal)
 				m.textinput.CursorEnd()
@@ -592,7 +641,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.questionIdx = 0
 			m.questionAnswers = nil
 			m.textinput.Placeholder = ""
-			m.textinput.Reset()
+			m.resetInput()
 			m.updateViewportHeight()
 			m.syncViewport()
 
@@ -615,7 +664,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
 				m.loading = true
-				m.appendText(m.wardenLine(DimStyle().Render("context at " + fmt.Sprintf("%d%%", m.tokenCount*100/m.tokenLimit) + ", compacting...")))
 				cmds = append(cmds, m.runCompact(), m.tick())
 			}
 		}
@@ -637,7 +685,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
 				m.loading = true
-				m.appendText(m.wardenLine(DimStyle().Render("context at " + fmt.Sprintf("%d%%", m.tokenCount*100/m.tokenLimit) + ", compacting...")))
 				cmds = append(cmds, m.runCompact(), m.tick())
 			}
 		}
@@ -649,7 +696,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.finishThink()
 		m.thinkBuf = ""
 		m.thinkDone = false
-		m.appendText(DimStyle().Render("  ── output ──\n" + msg.output))
+		m.appendText(DimStyle().Render(strings.TrimRight(msg.output, "\n")))
 		m.appendText("")
 		m.syncViewport()
 
@@ -672,44 +719,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tokenCount = msg.tokenCount
 			m.tokenLimit = msg.tokenLimit
 		}
-		var line string
-		if msg.brief {
-			line = msg.model
-		} else {
-			line = "model: " + msg.model + "  mode: " + msg.mode + "  cwd: " + msg.cwd
+		if msg.model != "" {
+			m.modelName = msg.model
 		}
-
-		m.appendText(m.wardenLine(DimStyle().Render(line)))
 		m.syncViewport()
 
 	case clipboardDoneMsg:
-
-		if msg.err != nil {
-			m.appendText(m.wardenLine(ErrorStyle().Render("clipboard error: " + msg.err.Error())))
-		} else {
-			m.appendText(m.wardenLine(DimStyle().Render("copied")))
-		}
 		m.syncViewport()
 
 	case compactResultMsg:
 		m.loading = false
-		if msg.err != "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("compact: " + msg.err)))
-		} else {
-			before := fmt.Sprintf("%.1fK", float64(msg.tokensBefore)/1000)
-			after := fmt.Sprintf("%.1fK", float64(msg.tokensAfter)/1000)
+		if msg.err == "" {
 			m.tokenCount = msg.tokensAfter
-			m.appendText(m.wardenLine(DimStyle().Render("compacted  " + before + " → " + after)))
 		}
 		m.syncViewport()
 
 	case modelsResultMsg:
-		if msg.err != "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("models: " + msg.err)))
-			m.syncViewport()
-		} else if len(msg.models) == 0 {
-			m.appendText(m.wardenLine(DimStyle().Render("no models found")))
-			m.syncViewport()
+		if msg.err != "" || len(msg.models) == 0 {
+			break
 		} else {
 			m.modelList = msg.models
 			m.modelFiltered = msg.models
@@ -731,17 +758,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.modelScrollTop = 0
 				}
 			}
-			m.textinput.Reset()
+			m.resetInput()
 			m.modelPicking = true
 			m.updateViewportHeight()
 			m.syncViewport()
 		}
 
 	case modelSetMsg:
-		if msg.err != "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("model: " + msg.err)))
-			m.syncViewport()
-		} else {
+		if msg.err == "" {
 			m.modelName = msg.model
 			m.messages = []messageEntry{}
 			_ = saveWardenConfigField("model", msg.model)
@@ -761,8 +785,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.apiKey != "" {
 				_ = saveWardenConfigField("api_key", msg.apiKey)
 			}
-			m.appendText(m.wardenLine(DimStyle().Render("connected  " + msg.model)))
-			m.updateViewportHeight()
+				m.updateViewportHeight()
 			m.syncViewport()
 		} else {
 			m.cwErr = msg.err
@@ -792,22 +815,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streaming = false
 		m.loading = false
 		if msg.err != "" {
-			m.appendText(ErrorStyle().Render("error: " + msg.err))
-			m.syncViewport()
 			break
 		}
-		// update the "! name (loading)" text line
-		for i := len(m.messages) - 1; i >= 0; i-- {
-			if m.messages[i].kind == messageText && strings.HasPrefix(m.messages[i].text, "! ") {
-				m.messages[i].text = "! " + msg.name
-				break
-			}
-		}
-		// send skill body as user message
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
 		m.streamStart = len(m.messages)
-		m.appendText(UserStyle().Render("  > ") + body[:min(len(body), 200)])
-		m.textinput.Reset()
+		m.resetInput()
 		m.streaming = true
 		m.loading = true
 		m.spinner = 0
@@ -816,8 +828,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case backendErrorMsg:
 		m.loading = false
-		m.appendText(ErrorStyle().Render("Error: backend unavailable"))
 		m.syncViewport()
+
+	case pasteFlushMsg:
+		if msg.seq == m.pasteSeq && len(m.pasteBuf) > 0 {
+			paste := string(m.pasteBuf)
+			m.pasteBuf = nil
+			m.textinput.SetValue(m.textinput.Value() + paste)
+			m.textinput.CursorEnd()
+		}
 	}
 
 	cmds = append(cmds, m.focusInput())
@@ -826,6 +845,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	oldVal := m.textinput.Value()
 	m.textinput, cmd = m.textinput.Update(msg)
 	cmds = append(cmds, cmd)
+	m.syncInputHeight()
 	if m.slashIdx >= 0 && m.textinput.Value() != oldVal {
 		m.slashIdx = -1
 	}
@@ -856,6 +876,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // message types
+type pasteFlushMsg struct{ seq int }
 type tokenMsg struct{ text string }
 type thinkMsg struct{ text string }
 type toolMsg struct{ tool ToolMsg }
@@ -950,7 +971,9 @@ type skillLoadedMsg struct {
 type messageKind int
 
 const (
-	messageText messageKind = iota
+	messageText     messageKind = iota
+	messageUser     // user input, rendered with background
+	messageWarden   // warden label, first line of response block
 	messageThink
 	messageAssistant
 	messageToolActivity // tool line, filtered out at turn end in normal mode
@@ -1057,10 +1080,6 @@ func (m *model) compactToolFlow() {
 		}
 	}
 	m.messages = filtered
-	if len(tools) > 0 {
-		summary := strings.Join(tools, " · ")
-		m.appendText(DimStyle().Render("  " + summary))
-	}
 }
 
 func (m *model) appendToLastText(text string) {
@@ -1104,7 +1123,7 @@ func (m model) clearQuestionState() model {
 	m.questionIdx = 0
 	m.questionAnswers = nil
 	m.textinput.Placeholder = ""
-	m.textinput.Reset()
+	m.resetInput()
 	return m
 }
 
@@ -1129,4 +1148,46 @@ func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) 
 
 func parseOptionNumber(input string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(input))
+}
+
+// inputLineCount returns the number of visual lines the textarea content
+// occupies, accounting for soft wrapping. Capped at 8.
+func (m *model) inputLineCount() int {
+	val := m.textinput.Value()
+	if val == "" {
+		return 1
+	}
+	// content width = textarea render width (m.width-6) minus prompt "> " (2)
+	contentW := m.width - 8
+	if contentW < 1 {
+		contentW = 1
+	}
+	lines := strings.Split(val, "\n")
+	total := 0
+	for _, line := range lines {
+		runes := []rune(line)
+		if len(runes) == 0 {
+			total++
+			continue
+		}
+		wrapped := (len(runes) + contentW - 1) / contentW
+		total += wrapped
+	}
+	if total < 1 {
+		total = 1
+	}
+	if total > 8 {
+		total = 8
+	}
+	return total
+}
+
+func (m *model) syncInputHeight() {
+	n := m.inputLineCount()
+	m.textinput.SetHeight(n)
+}
+
+func (m *model) resetInput() {
+	m.textinput.Reset()
+	m.textinput.SetHeight(1)
 }

@@ -96,10 +96,12 @@ var wardenMarkdownStyle = []byte(`{
     "color": "#52B788"
   },
   "code_block": {
-    "color": "#a0ccb4",
+    "color": "#666666",
+    "indent": 1,
+    "indent_token": "│ ",
     "margin_left": 0,
     "margin_right": 0,
-    "padding_left": 1,
+    "padding_left": 0,
     "padding_right": 1,
     "padding_top": 0,
     "padding_bottom": 0,

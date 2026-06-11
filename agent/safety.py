@@ -543,16 +543,6 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
 			normalized_args=normalized,
 		), tool_name, mode)
 
-	# --- todowrite ---
-	if tool_name == "todowrite":
-		return _apply_mode(SafetyDecision(
-			risk="safe",
-			reason="read-only",
-			summary="Updating task list",
-			details=[],
-			normalized_args=normalized,
-		), tool_name, mode)
-
 	# --- webfetch ---
 	if tool_name == "webfetch":
 		url = str(normalized.get("url", "")).lower()

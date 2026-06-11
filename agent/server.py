@@ -24,29 +24,54 @@ class Backend:
 			_cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
 		except Exception:
 			pass
-		self.model = os.environ.get("WARDEN_MODEL", "qwen3:8b")
-		self.api_url = os.environ.get("WARDEN_API_URL", "")
-		if self.api_url:
-			self.llm = OpenAIClient(self.api_url)
-			self.ollama: OllamaProcessManager | None = None
-			info(f"using remote API: {self.api_url}")
-		else:
-			self.llm = OllamaClient()
-			self.ollama = OllamaProcessManager(model=self.model)
+		self.model: str = os.environ.get("WARDEN_MODEL", "")
+		self.api_url: str = os.environ.get("WARDEN_API_URL", "")
+		self.api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
+		self.llm: OllamaClient | OpenAIClient | None = None
+		self.ollama: OllamaProcessManager | None = None
+		self.chat: ChatSession | None = None
+		self.auto_mode: bool = False
 		self.confirmation_manager = ConfirmationManager()
 		self.question_manager = QuestionManager()
-		self.chat = ChatSession(model=self.model, client=self.llm,
-		                        confirmation_manager=self.confirmation_manager,
-		                        question_manager=self.question_manager)
-		self.auto_mode: bool = False
+		if self.model and self.api_url:
+			self._init_openrouter(self.api_url, self.api_key, self.model)
+		elif self.model:
+			self._init_ollama(self.model)
+
+	def _init_openrouter(self, api_url: str, api_key: str, model: str) -> None:
+		self.llm = OpenAIClient(api_url, api_key=api_key or None)
+		self.api_url = api_url
+		self.api_key = api_key
+		self.model = model
+		self.ollama = None
+		self.chat = ChatSession(
+			model=self.model,
+			client=self.llm,
+			confirmation_manager=self.confirmation_manager,
+			question_manager=self.question_manager,
+		)
+
+	def _init_ollama(self, model: str) -> None:
+		self.llm = OllamaClient()
+		self.model = model
+		self.api_url = ""
+		self.api_key = ""
+		self.ollama = OllamaProcessManager(model=model)
+		self.chat = ChatSession(
+			model=self.model,
+			client=self.llm,
+			confirmation_manager=self.confirmation_manager,
+			question_manager=self.question_manager,
+		)
 
 	async def setup(self) -> None:
-		if self.ollama is not None:
-			ok = await self.ollama.ensure_running()
-			if not ok:
-				raise RuntimeError("failed to connect to ollama")
-			if not self.ollama.has_model():
-				await self.ollama.pull_model()
+		if self.ollama is None:
+			return
+		ok = await self.ollama.ensure_running()
+		if not ok:
+			raise RuntimeError("failed to connect to ollama")
+		if not self.ollama.has_model():
+			await self.ollama.pull_model()
 
 	def set_auto_mode(self, enabled: bool) -> None:
 		self.auto_mode = enabled
@@ -88,12 +113,11 @@ async def set_mode(request: web.Request) -> web.Response:
 async def status(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	data = {
-		"provider": "openrouter" if backend.api_url else "ollama",
 		"model": backend.model,
 		"mode": "auto" if backend.auto_mode else "ask",
 		"cwd": os.getcwd(),
-		"token_count": backend.chat.token_count,
-		"token_limit": backend.chat.token_limit,
+		"token_count": backend.chat.token_count if backend.chat else 0,
+		"token_limit": backend.chat.token_limit if backend.chat else 0,
 	}
 	log_request("GET", "/status", 200)
 	return web.json_response(data)
@@ -112,6 +136,8 @@ async def shutdown_handler(request: web.Request) -> web.Response:
 
 async def compact_handler(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
+	if backend.chat is None:
+		return web.json_response({"error": "not connected"}, status=400)
 	log_request("POST", "/compact")
 	result = await backend.chat.compact()
 	info(f"compacted: {result['tokens_before']} → {result['tokens_after']} tokens")
@@ -153,6 +179,8 @@ async def api_url_set(request: web.Request) -> web.Response:
 
 async def models_list(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
+	if backend.llm is None:
+		return web.json_response({"models": [], "current": "", "error": "not connected"})
 	error = ""
 	try:
 		models = await backend.llm.list_models()
@@ -171,15 +199,64 @@ async def model_set(request: web.Request) -> web.Response:
 	if not model:
 		return web.Response(status=400, text="model required")
 	backend.model = model
-	backend.chat = ChatSession(
-		model=model,
-		client=backend.llm,
-		confirmation_manager=backend.confirmation_manager,
-		question_manager=backend.question_manager,
-	)
+	if backend.llm is not None:
+		backend.chat = ChatSession(
+			model=model,
+			client=backend.llm,
+			confirmation_manager=backend.confirmation_manager,
+			question_manager=backend.question_manager,
+		)
 	info(f"model changed to {model}")
 	log_request("POST", "/model/set", 200)
 	return web.Response(text="ok")
+
+
+async def connect_handler(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	provider = data.get("provider", "").strip()
+	api_key = data.get("api_key", "").strip()
+	model = data.get("model", "").strip()
+
+	if not model:
+		return web.json_response({"ok": False, "error": "model name is required"})
+
+	if provider == "openrouter":
+		if not api_key:
+			return web.json_response({"ok": False, "error": "api key is required"})
+		api_url = "https://openrouter.ai/api/v1"
+		try:
+			test_client = OpenAIClient(api_url, api_key=api_key)
+			await asyncio.wait_for(test_client.list_models(), timeout=10.0)
+		except asyncio.TimeoutError:
+			return web.json_response({"ok": False, "error": "connection timed out — check your internet"})
+		except Exception as e:
+			msg = str(e).lower()
+			if any(x in msg for x in ("401", "unauthorized", "api key", "authentication", "invalid_api_key", "forbidden")):
+				return web.json_response({"ok": False, "error": "invalid api key — check it at openrouter.ai/keys"})
+			return web.json_response({"ok": False, "error": "could not reach openrouter — check your internet"})
+		backend._init_openrouter(api_url, api_key, model)
+
+	elif provider == "ollama":
+		try:
+			test_client = OllamaClient()
+			await asyncio.wait_for(test_client.list_models(), timeout=5.0)
+		except asyncio.TimeoutError:
+			return web.json_response({"ok": False, "error": "ollama is not responding — is it running?"})
+		except Exception:
+			return web.json_response({"ok": False, "error": "cannot reach ollama — install it from ollama.com and run it"})
+		backend._init_ollama(model)
+		if backend.ollama is not None:
+			try:
+				await asyncio.wait_for(backend.setup(), timeout=120.0)
+			except Exception as e:
+				return web.json_response({"ok": False, "error": f"ollama setup failed: {str(e)[:100]}"})
+	else:
+		return web.json_response({"ok": False, "error": f"unknown provider: {provider}"})
+
+	log_request("POST", "/connect", 200)
+	info(f"connected: {provider} / {model}")
+	return web.json_response({"ok": True})
 
 
 async def tools_list(request: web.Request) -> web.Response:
@@ -254,6 +331,11 @@ async def chat(request: web.Request) -> web.StreamResponse:
 		headers={"Content-Type": "application/x-ndjson"},
 	)
 	await response.prepare(request)
+
+	if backend.chat is None:
+		await response.write(json.dumps({"type": "token", "text": "not connected — run /connect to get started"}).encode() + b"\n")
+		await response.write(json.dumps({"type": "done", "token_count": 0, "token_limit": 0}).encode() + b"\n")
+		return response
 
 	try:
 		async for type_, payload in backend.chat.stream(text, auto_mode=backend.auto_mode):
@@ -341,6 +423,7 @@ async def main() -> None:
 	app.router.add_get("/models", models_list)
 	app.router.add_post("/model/set", model_set)
 	app.router.add_post("/api_url/set", api_url_set)
+	app.router.add_post("/connect", connect_handler)
 	app.router.add_post("/question", question_handler)
 	app.router.add_post("/compact", compact_handler)
 	app.router.add_post("/shutdown", shutdown_handler)

@@ -85,6 +85,10 @@ class TestParseArgs:
         from agent.tools import parse_args
         assert parse_args(None) == {}
 
+    def test_null_json_string_returns_empty(self):
+        from agent.tools import parse_args
+        assert parse_args("null") == {}
+
 
 class TestToolDefinition:
     def test_structure(self):

@@ -83,7 +83,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		m.messages = []messageEntry{}
 		m.lastAssistantRaw = ""
-		m.appendText(m.wardenLine(DimStyle().Render("cleared")))
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.ResetSession()
@@ -93,7 +92,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		m.loading = true
 		m.spinner = 0
-		m.appendText(m.wardenLine(DimStyle().Render("compacting...")))
 		m.syncViewport()
 		return true, tea.Batch(m.runCompact(), m.tick())
 	case "/models":
@@ -106,21 +104,14 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		m.selectMode = true
 		m.syncViewport()
-		return true, nil
+		return true, tea.DisableMouse
 	case "/verbose":
 		m.verboseMode = !m.verboseMode
 		m.clearHintState()
-		status := "off"
-		if m.verboseMode {
-			status = "on"
-		}
-		m.appendText(m.wardenLine(DimStyle().Render("verbose " + status)))
 		m.syncViewport()
 		return true, nil
 	}
-	m.appendText(m.wardenLine(ErrorStyle().Render("unknown command")))
-	m.syncViewport()
-	return false, nil
+	return true, nil
 }
 
 // handleBang processes !<name> skill invocations and `! <cmd>` shell shortcuts.
@@ -128,7 +119,6 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 	// `! <cmd>` (with leading space) = shell shortcut, preserved from before skills
 	if strings.HasPrefix(text, "! ") {
 		cmdText := strings.TrimPrefix(text, "! ")
-		m.appendText(UserStyle().Render("  you"))
 		m.appendText("  " + cmdText)
 		m.appendText("")
 		m.streaming = true
@@ -141,18 +131,9 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 	// `!<name>` (no space) = skill invocation
 	if strings.HasPrefix(text, "!") {
 		name := strings.TrimSpace(strings.TrimPrefix(text, "!"))
-		if name == "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("usage: !<skill-name>")))
-			m.syncViewport()
+		if name == "" || !m.hasSkill(name) {
 			return true, nil
 		}
-		if !m.hasSkill(name) {
-			m.appendText(m.wardenLine(ErrorStyle().Render("unknown skill: " + name)))
-			m.syncViewport()
-			return true, nil
-		}
-		m.appendText(m.wardenLine(DimStyle().Render("! " + name + " (loading)")))
-		m.syncViewport()
 		return true, m.loadSkill(name)
 	}
 

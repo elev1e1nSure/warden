@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import os
 import re
@@ -767,41 +768,43 @@ class YouTubeSearchTool(Tool):
 			from playwright.async_api import async_playwright
 			async with async_playwright() as pw:
 				browser = await pw.chromium.launch(headless=True)
-				ctx = await browser.new_context(locale="en-US")
-				page = await ctx.new_page()
-				await page.goto(
-					f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}",
-					timeout=20000,
-				)
-				for sel in [
-					'button:has-text("Accept all")',
-					'button:has-text("Reject all")',
-					'button[aria-label*="Accept"]',
-				]:
+				try:
+					ctx = await browser.new_context(locale="en-US")
+					page = await ctx.new_page()
+					await page.goto(
+						f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}",
+						timeout=20000,
+					)
+					for sel in [
+						'button:has-text("Accept all")',
+						'button:has-text("Reject all")',
+						'button[aria-label*="Accept"]',
+					]:
+						try:
+							await page.click(sel, timeout=2000)
+							break
+						except Exception:
+							pass
 					try:
-						await page.click(sel, timeout=2000)
-						break
+						await page.wait_for_selector("ytd-video-renderer", timeout=8000)
 					except Exception:
 						pass
-				try:
-					await page.wait_for_selector("ytd-video-renderer", timeout=8000)
-				except Exception:
-					pass
-				results = await page.evaluate("""
-					() => {
-						const items = document.querySelectorAll('ytd-video-renderer');
-						return [...items].slice(0, 8).map(item => {
-							const a = item.querySelector('a#video-title');
-							const meta = item.querySelector('#metadata-line');
-							return {
-								title: (a?.textContent || '').trim(),
-								url: a?.href || '',
-								meta: (meta?.textContent || '').trim().replace(/\\s+/g, ' ')
-							};
-						}).filter(r => r.title && r.url);
-					}
-				""")
-				await browser.close()
+					results = await page.evaluate("""
+						() => {
+							const items = document.querySelectorAll('ytd-video-renderer');
+							return [...items].slice(0, 8).map(item => {
+								const a = item.querySelector('a#video-title');
+								const meta = item.querySelector('#metadata-line');
+								return {
+									title: (a?.textContent || '').trim(),
+									url: a?.href || '',
+									meta: (meta?.textContent || '').trim().replace(/\\s+/g, ' ')
+								};
+							}).filter(r => r.title && r.url);
+						}
+					""")
+				finally:
+					await browser.close()
 			if not results:
 				return "no results"
 			return "\n".join(
@@ -823,7 +826,6 @@ class GoogleSearchTool(Tool):
 		query = args.get("query", "")
 		try:
 			from duckduckgo_search import DDGS
-			import time
 
 			def _search() -> list:
 				last_exc: Exception | None = None
@@ -863,7 +865,6 @@ class BrowserScreenshotTool(Tool):
 		url = args.get("url", "")
 		try:
 			from playwright.async_api import async_playwright
-			import datetime
 			screenshot_dir = _get_screenshot_dir()
 			_cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
 			name = screenshot_dir / f"browser_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
@@ -1320,6 +1321,9 @@ def parse_args(arguments: Any) -> dict:
 	if isinstance(arguments, dict):
 		return arguments
 	try:
-		return json.loads(arguments)
+		result = json.loads(arguments)
+		if isinstance(result, dict):
+			return result
+		return {}
 	except Exception:
 		return {}
