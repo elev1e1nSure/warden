@@ -51,8 +51,10 @@ type model struct {
 	// path
 	cwd          string
 	providerName string
-	// live tool activity line shown during streaming (replaces tool_start/pending in messages)
-	liveActivity string
+	// live tool activity line — single updating line, never appended to messages
+	liveActivity     string
+	liveToolResult   string // full result for F2 expansion
+	toolExpanded     bool   // F2 toggled
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
 	// interrupt / rollback state
@@ -133,7 +135,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.Type != tea.KeyF2 && msg.String() == "f2" {
-			m = m.toggleThinkingExpanded()
+			m = m.toggleF2()
 			return m, m.focusInput()
 		}
 		// Clear pending confirmations if user presses a different key
@@ -155,7 +157,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyF2:
-			m = m.toggleThinkingExpanded()
+			m = m.toggleF2()
 			return m, m.focusInput()
 
 		case tea.KeyUp:
@@ -254,6 +256,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.streaming = false
 				m.loading = false
 				m.liveActivity = ""
+				m.liveToolResult = ""
+				m.toolExpanded = false
 				m.thinkBuf = ""
 				m.thinkDone = false
 				m.toolRunning = false
@@ -422,12 +426,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkDone = false
 			m.toolRunning = false
 			m.liveActivity = ""
+			m.liveToolResult = ""
+			m.toolExpanded = false
 			m.lastAssistantRaw = ""
 			m.appendThink()
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case thinkMsg:
+			if !m.toolRunning && m.liveActivity != "" {
+				m.liveActivity = ""
+				m.liveToolResult = ""
+				m.toolExpanded = false
+				m.updateViewportHeight()
+			}
 			m.thinkBuf += inner.text
 			m.updateThink(inner.text)
 			m.syncViewport()
@@ -439,6 +451,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendText("")
 				m.appendAssistant("")
 				m.thinkDone = true
+			}
+			if m.liveActivity != "" {
+				m.liveActivity = ""
+				m.liveToolResult = ""
+				m.toolExpanded = false
+				m.updateViewportHeight()
 			}
 			m.appendToLastAssistant(inner.text)
 			m.lastAssistantRaw += inner.text
@@ -456,12 +474,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case toolMsg:
 			m.toolRunning = false
-			m.liveActivity = ""
-			if stickyTool(inner.tool.Name) {
-				m.appendText(toolResultBlock(inner.tool.Result))
-			} else {
-				m.appendText(toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result))
-			}
+			m.liveActivity = toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
+			m.liveToolResult = inner.tool.Result
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
@@ -500,6 +514,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = false
 			m.toolRunning = false
 			m.liveActivity = ""
+			m.liveToolResult = ""
+			m.toolExpanded = false
 			m.escPending = false
 			m.quitPending = false
 			m.userScrolled = false
@@ -525,6 +541,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = false
 			m.toolRunning = false
 			m.liveActivity = ""
+			m.liveToolResult = ""
+			m.toolExpanded = false
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
@@ -731,6 +749,16 @@ type messageEntry struct {
 
 func (m *model) appendText(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
+}
+
+func (m model) toggleF2() model {
+	if m.liveActivity != "" {
+		m.toolExpanded = !m.toolExpanded
+		m.updateViewportHeight()
+		m.syncViewport()
+		return m
+	}
+	return m.toggleThinkingExpanded()
 }
 
 func (m model) toggleThinkingExpanded() model {

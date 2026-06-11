@@ -11,20 +11,6 @@ import (
 
 const wardenVersion = "v0.1.0"
 
-func stickyTool(name string) bool {
-	switch name {
-	case "browser_screenshot", "youtube_search", "google_search",
-		"apply_patch", "question":
-		return true
-	default:
-		return false
-	}
-}
-
-func toolPendingLine() string {
-	return DimStyle().Render("  …")
-}
-
 func truncateRunes(text string, limit int) string {
 	if limit < 1 {
 		return text
@@ -462,12 +448,16 @@ func (m model) renderInput() string {
 	return style.Render(m.textinput.View())
 }
 
-// renderLiveActivity shows the current tool/think activity as a single updating line.
+// renderLiveActivity shows the current tool activity as a single updating line.
+// F2 expands it to show the full result.
 func (m model) renderLiveActivity() string {
 	if m.liveActivity == "" {
 		return ""
 	}
-	return m.liveActivity
+	if !m.toolExpanded || m.liveToolResult == "" {
+		return m.liveActivity
+	}
+	return m.liveActivity + "\n" + toolResultBlock(m.liveToolResult)
 }
 
 func (m *model) layoutViewportHeight() int {
@@ -491,7 +481,7 @@ func (m *model) layoutViewportHeight() int {
 
 	liveHeight := 0
 	if m.liveActivity != "" {
-		liveHeight = 1
+		liveHeight = lipgloss.Height(m.renderLiveActivity())
 	}
 
 	questionHeight := 0
