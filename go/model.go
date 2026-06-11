@@ -994,17 +994,22 @@ func (m *model) appendThink() {
 	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
 }
 
-// resetOrAppendThink reuses the existing think entry for the current turn (keeps
-// original startedAt so total duration is correct), or creates a new one if none
-// exists yet. Old text is cleared since this is a fresh thinking phase.
+// resetOrAppendThink reuses the last think entry only if it is still at the
+// tail of the message list (no tools were added after it). Otherwise creates a
+// new entry so the new Thinking line appears after completed tools.
 func (m *model) resetOrAppendThink() int {
+	lastThinkIdx := -1
 	for i := len(m.messages) - 1; i >= m.streamStart; i-- {
 		if m.messages[i].kind == messageThink {
-			m.messages[i].duration = 0
-			m.messages[i].activity = ""
-			m.messages[i].text = ""
-			return i
+			lastThinkIdx = i
+			break
 		}
+	}
+	if lastThinkIdx >= 0 && lastThinkIdx == len(m.messages)-1 {
+		m.messages[lastThinkIdx].duration = 0
+		m.messages[lastThinkIdx].activity = ""
+		m.messages[lastThinkIdx].text = ""
+		return lastThinkIdx
 	}
 	m.appendThink()
 	return len(m.messages) - 1
