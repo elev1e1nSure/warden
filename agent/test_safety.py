@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 
+import pytest
+
 from agent.safety import (
 	assess_tool_call,
 	SafetyDecision,
@@ -54,6 +56,9 @@ class TestPathSafety:
 
 	def test_traversal_blocked(self) -> None:
 		assert _is_dangerous_path(r"..\..\secret.txt")
+
+	@pytest.mark.skipif(os.name != "nt", reason="bare-/ check is Windows-only")
+	def test_bare_slash_blocked_on_windows(self) -> None:
 		assert _is_dangerous_path(r"/etc/passwd")
 
 
