@@ -206,13 +206,15 @@ async def api_url_set(request: web.Request) -> web.Response:
 
 async def models_list(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
+	error = ""
 	try:
 		models = await backend.llm.list_models()
 	except Exception as e:
 		warn(f"list_models failed: {e}")
+		error = str(e)
 		models = []
 	log_request("GET", "/models", 200)
-	return web.json_response({"models": models, "current": backend.model})
+	return web.json_response({"models": models, "current": backend.model, "error": error})
 
 
 async def model_set(request: web.Request) -> web.Response:

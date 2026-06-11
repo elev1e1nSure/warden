@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -115,9 +116,13 @@ func (c *Client) ListModels() ([]string, string, error) {
 	var result struct {
 		Models  []string `json:"models"`
 		Current string   `json:"current"`
+		Error   string   `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, "", err
+	}
+	if result.Error != "" {
+		return nil, "", fmt.Errorf(result.Error)
 	}
 	return result.Models, result.Current, nil
 }
