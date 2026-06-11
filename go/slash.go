@@ -12,16 +12,17 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/auto", "Auto mode — autonomous, no confirmations except delete"},
-	{"/ask", "Ask mode — confirm before any destructive action"},
 	{"/reset", "Reset session"},
 	{"/thinking", "Toggle model reasoning"},
-	{"/model", "Show current provider and model"},
 	{"/status", "Show backend status"},
 	{"/copy-last", "Copy last response to clipboard"},
 	{"/clear", "Clear screen without resetting session"},
 	{"/pwd", "Show current working directory"},
 	{"/compact", "Summarize conversation to free up context"},
+	{"/models", "Switch model"},
+	{"/provider", "Switch provider (ollama | openrouter)"},
+	{"/api", "Set API base URL"},
+	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -66,14 +67,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		return false, nil
 	}
 	switch trimmed {
-	case "/auto":
-		m.autoMode = true
-		m.clearHintState()
-		return true, m.setMode(true)
-	case "/ask":
-		m.autoMode = false
-		m.clearHintState()
-		return true, m.setMode(false)
 	case "/reset":
 		m.clearHintState()
 		m.messages = []messageEntry{}
@@ -96,9 +89,6 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.appendText(m.wardenLine("Thinking " + status))
 		m.syncViewport()
 		return true, m.setThinking(m.thinkingEnabled)
-	case "/model":
-		m.clearHintState()
-		return true, m.fetchStatus(true)
 	case "/status":
 		m.clearHintState()
 		return true, m.fetchStatus(false)
@@ -131,6 +121,55 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.appendText(m.wardenLine(DimStyle().Render("compacting...")))
 		m.syncViewport()
 		return true, tea.Batch(m.runCompact(), m.tick())
+	case "/models":
+		m.clearHintState()
+		return true, tea.Batch(m.fetchModels(), m.fetchProviders())
+	}
+
+	// prefix commands with arguments
+	if strings.HasPrefix(trimmed, "/provider ") {
+		m.clearHintState()
+		name := strings.TrimSpace(strings.TrimPrefix(trimmed, "/provider "))
+		if name == "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("usage: /provider <ollama|openrouter>")))
+			m.syncViewport()
+			return true, nil
+		}
+		m.appendText(m.wardenLine(DimStyle().Render("provider → " + name)))
+		m.syncViewport()
+		return true, func() tea.Msg {
+			m.client.SetProvider(name)
+			return nil
+		}
+	}
+
+	if strings.HasPrefix(trimmed, "/api ") {
+		m.clearHintState()
+		url := strings.TrimSpace(strings.TrimPrefix(trimmed, "/api "))
+		if url == "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("usage: /api <url>")))
+			m.syncViewport()
+			return true, nil
+		}
+		m.appendText(m.wardenLine(DimStyle().Render("api url → " + url)))
+		m.syncViewport()
+		return true, func() tea.Msg {
+			m.client.SetAPIURL(url)
+			return nil
+		}
+	}
+
+	switch trimmed {
+	case "/verbose":
+		m.verboseMode = !m.verboseMode
+		m.clearHintState()
+		status := "off"
+		if m.verboseMode {
+			status = "on"
+		}
+		m.appendText(m.wardenLine(DimStyle().Render("verbose " + status)))
+		m.syncViewport()
+		return true, nil
 	}
 	m.appendText(m.wardenLine(ErrorStyle().Render("unknown command")))
 	m.syncViewport()

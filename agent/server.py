@@ -28,10 +28,12 @@ class Backend:
 		self.api_url = os.environ.get("WARDEN_API_URL", "")
 		if self.api_url:
 			self.llm = OpenAIClient(self.api_url)
+			self.provider = "openrouter"
 			self.ollama: OllamaProcessManager | None = None
 			info(f"using remote API: {self.api_url}")
 		else:
 			self.llm = OllamaClient()
+			self.provider = "ollama"
 			self.ollama = OllamaProcessManager(model=self.model)
 		self.confirmation_manager = ConfirmationManager()
 		self.question_manager = QuestionManager()
@@ -147,6 +149,88 @@ async def question_handler(request: web.Request) -> web.Response:
 		return web.Response(text="ok")
 	log_request("POST", "/question", 404)
 	return web.Response(status=404, text="not found")
+
+
+async def providers_list(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	providers = ["ollama"]
+	if backend.api_url:
+		providers.append("openrouter")
+	log_request("GET", "/providers", 200)
+	return web.json_response({"providers": providers, "current": backend.provider})
+
+
+async def provider_set(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	name = data.get("provider", "").strip()
+	if name == "openrouter":
+		if not backend.api_url:
+			return web.Response(status=400, text="openrouter not configured")
+		backend.llm = OpenAIClient(backend.api_url)
+	elif name == "ollama":
+		backend.llm = OllamaClient()
+	else:
+		return web.Response(status=400, text=f"unknown provider: {name}")
+	backend.provider = name
+	backend.chat = ChatSession(
+		model=backend.model,
+		client=backend.llm,
+		confirmation_manager=backend.confirmation_manager,
+		question_manager=backend.question_manager,
+	)
+	info(f"provider changed to {name}")
+	log_request("POST", "/provider/set", 200)
+	return web.Response(text="ok")
+
+
+async def api_url_set(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	url = data.get("api_url", "").strip()
+	if not url:
+		return web.Response(status=400, text="api_url required")
+	backend.api_url = url
+	if backend.provider == "openrouter":
+		backend.llm = OpenAIClient(url)
+		backend.chat = ChatSession(
+			model=backend.model,
+			client=backend.llm,
+			confirmation_manager=backend.confirmation_manager,
+			question_manager=backend.question_manager,
+		)
+	info(f"api_url changed to {url}")
+	log_request("POST", "/api_url/set", 200)
+	return web.Response(text="ok")
+
+
+async def models_list(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	try:
+		models = await backend.llm.list_models()
+	except Exception as e:
+		warn(f"list_models failed: {e}")
+		models = []
+	log_request("GET", "/models", 200)
+	return web.json_response({"models": models, "current": backend.model})
+
+
+async def model_set(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	model = data.get("model", "").strip()
+	if not model:
+		return web.Response(status=400, text="model required")
+	backend.model = model
+	backend.chat = ChatSession(
+		model=model,
+		client=backend.llm,
+		confirmation_manager=backend.confirmation_manager,
+		question_manager=backend.question_manager,
+	)
+	info(f"model changed to {model}")
+	log_request("POST", "/model/set", 200)
+	return web.Response(text="ok")
 
 
 async def tools_list(request: web.Request) -> web.Response:
@@ -269,6 +353,11 @@ async def main() -> None:
 	app.router.add_post("/thinking", set_thinking)
 	app.router.add_get("/status", status)
 	app.router.add_get("/tools", tools_list)
+	app.router.add_get("/models", models_list)
+	app.router.add_post("/model/set", model_set)
+	app.router.add_get("/providers", providers_list)
+	app.router.add_post("/provider/set", provider_set)
+	app.router.add_post("/api_url/set", api_url_set)
 	app.router.add_post("/question", question_handler)
 	app.router.add_post("/compact", compact_handler)
 	app.router.add_post("/shutdown", shutdown_handler)

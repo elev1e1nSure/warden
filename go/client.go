@@ -106,6 +106,77 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	return nil
 }
 
+func (c *Client) ListModels() ([]string, string, error) {
+	resp, err := http.Get(c.BaseURL + "/models")
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Models  []string `json:"models"`
+		Current string   `json:"current"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, "", err
+	}
+	return result.Models, result.Current, nil
+}
+
+func (c *Client) ListProviders() ([]string, string, error) {
+	resp, err := http.Get(c.BaseURL + "/providers")
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Providers []string `json:"providers"`
+		Current   string   `json:"current"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, "", err
+	}
+	return result.Providers, result.Current, nil
+}
+
+func (c *Client) SetProvider(name string) error {
+	body, err := json.Marshal(map[string]any{"provider": name})
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(c.BaseURL+"/provider/set", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func (c *Client) SetAPIURL(url string) error {
+	body, err := json.Marshal(map[string]any{"api_url": url})
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(c.BaseURL+"/api_url/set", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func (c *Client) SetModel(model string) error {
+	body, err := json.Marshal(map[string]any{"model": model})
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(c.BaseURL+"/model/set", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 func (c *Client) GetStatus() (*StatusResult, error) {
 	resp, err := http.Get(c.BaseURL + "/status")
 	if err != nil {

@@ -54,6 +54,8 @@ $env:OPENROUTER_API_KEY="sk-or-v1-..."
 | `/ask` | Ask mode — confirmation for dangerous commands |
 | `/reset` | reset session |
 | `/thinking` | toggle model reasoning |
+| `/provider <name>` | switch provider (`ollama` or `openrouter`) |
+| `/api <url>` | set API base URL (e.g. for OpenRouter) |
 
 ## safety
 
