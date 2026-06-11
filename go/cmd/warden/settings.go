@@ -67,28 +67,23 @@ func saveConfig(cfg WardenConfig) error {
 
 // settingsModel is the setup screen shown on first run or --setup.
 type settingsModel struct {
-	providerIdx int
-	inputs      [3]textinput.Model // 0=model, 1=api_url, 2=api_key
-	focusIdx    int                // sfProvider=0, sfModel=1, sfAPIURL=2, sfAPIKey=3
-	done        bool
-	cancelled   bool
-	width       int
+	inputs    [3]textinput.Model // 0=model, 1=api_url, 2=api_key
+	focusIdx  int
+	done      bool
+	cancelled bool
+	width     int
 }
 
 const (
-	sfProvider = 0
-	sfModel    = 1
-	sfAPIURL   = 2
-	sfAPIKey   = 3
+	sfModel  = 0
+	sfAPIURL = 1
+	sfAPIKey = 2
 )
 
-var setupProviders = []string{"ollama", "openrouter"}
-
-var setupFieldDescs = map[int]string{
-	sfProvider: "Where your model runs. Local server or cloud API.",
-	sfModel:    "Model identifier. e.g. qwen3:8b, llama3.1, gpt-4o.",
-	sfAPIURL:   "OpenAI-compatible endpoint. Default works for openrouter.",
-	sfAPIKey:   "Your provider's API key. Stored in ~/.warden-config.json.",
+var setupFieldDescs = [3]string{
+	"Model identifier. e.g. gpt-4o, deepseek/deepseek-r1, llama-3.3-70b.",
+	"OpenAI-compatible endpoint URL.",
+	"Your API key. Stored in ~/.warden-config.json.",
 }
 
 func newSettingsModel(cfg WardenConfig) settingsModel {
@@ -103,7 +98,7 @@ func newSettingsModel(cfg WardenConfig) settingsModel {
 		m.inputs[i] = ti
 	}
 
-	m.inputs[0].Placeholder = "qwen3:8b"
+	m.inputs[0].Placeholder = "deepseek/deepseek-r1"
 	m.inputs[0].SetValue(cfg.Model)
 
 	m.inputs[1].Placeholder = "https://openrouter.ai/api/v1"
@@ -118,14 +113,8 @@ func newSettingsModel(cfg WardenConfig) settingsModel {
 	m.inputs[2].EchoCharacter = '•'
 	m.inputs[2].SetValue(cfg.APIKey)
 
-	for i, p := range setupProviders {
-		if p == cfg.Provider {
-			m.providerIdx = i
-			break
-		}
-	}
-
-	m.focusIdx = sfProvider
+	m.focusIdx = sfModel
+	m.inputs[0].Focus()
 
 	return m
 }
@@ -134,29 +123,11 @@ func (m settingsModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m settingsModel) isOpenRouter() bool {
-	return setupProviders[m.providerIdx] == "openrouter"
-}
-
-func (m settingsModel) maxField() int {
-	if m.isOpenRouter() {
-		return sfAPIKey
-	}
-	return sfModel
-}
-
 func (m *settingsModel) syncFocus() {
 	for i := range m.inputs {
 		m.inputs[i].Blur()
 	}
-	switch m.focusIdx {
-	case sfModel:
-		m.inputs[0].Focus()
-	case sfAPIURL:
-		m.inputs[1].Focus()
-	case sfAPIKey:
-		m.inputs[2].Focus()
-	}
+	m.inputs[m.focusIdx].Focus()
 }
 
 func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -178,43 +149,17 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyTab:
-			m.focusIdx++
-			if m.focusIdx > m.maxField() {
-				m.focusIdx = sfProvider
-			}
+			m.focusIdx = (m.focusIdx + 1) % 3
 			m.syncFocus()
 			return m, nil
 
 		case tea.KeyShiftTab:
-			m.focusIdx--
-			if m.focusIdx < sfProvider {
-				m.focusIdx = m.maxField()
-			}
+			m.focusIdx = (m.focusIdx + 2) % 3
 			m.syncFocus()
 			return m, nil
 
-		case tea.KeyLeft:
-			if m.focusIdx == sfProvider {
-				m.providerIdx = (m.providerIdx - 1 + len(setupProviders)) % len(setupProviders)
-				if m.focusIdx > m.maxField() {
-					m.focusIdx = m.maxField()
-					m.syncFocus()
-				}
-				return m, nil
-			}
-
-		case tea.KeyRight:
-			if m.focusIdx == sfProvider {
-				m.providerIdx = (m.providerIdx + 1) % len(setupProviders)
-				if m.focusIdx > m.maxField() {
-					m.focusIdx = m.maxField()
-					m.syncFocus()
-				}
-				return m, nil
-			}
-
 		case tea.KeyEnter:
-			if m.focusIdx == m.maxField() {
+			if m.focusIdx == sfAPIKey {
 				m.done = true
 				return m, tea.Quit
 			}
@@ -225,14 +170,7 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	switch m.focusIdx {
-	case sfModel:
-		m.inputs[0], cmd = m.inputs[0].Update(msg)
-	case sfAPIURL:
-		m.inputs[1], cmd = m.inputs[1].Update(msg)
-	case sfAPIKey:
-		m.inputs[2], cmd = m.inputs[2].Update(msg)
-	}
+	m.inputs[m.focusIdx], cmd = m.inputs[m.focusIdx].Update(msg)
 	return m, cmd
 }
 
@@ -245,87 +183,61 @@ func (m settingsModel) View() string {
 
 	isActive := func(field int) bool { return m.focusIdx == field }
 
-	valueStr := func(inputIdx, field int) string {
+	valueStr := func(field int) string {
 		if isActive(field) {
-			return m.inputs[inputIdx].View()
+			return m.inputs[field].View()
 		}
-		v := m.inputs[inputIdx].Value()
+		v := m.inputs[field].Value()
 		if v == "" {
-			return dimStyle.Render(m.inputs[inputIdx].Placeholder)
+			return dimStyle.Render(m.inputs[field].Placeholder)
 		}
-		if m.inputs[inputIdx].EchoMode == textinput.EchoPassword {
+		if m.inputs[field].EchoMode == textinput.EchoPassword {
 			return dimStyle.Render(strings.Repeat("•", len([]rune(v))))
 		}
 		return dimStyle.Render(v)
 	}
 
-	providerVal := func(active bool) string {
-		var parts []string
-		for i, p := range setupProviders {
-			if i == m.providerIdx && active {
-				parts = append(parts, whiteBoldStyle.Render(p))
-			} else {
-				parts = append(parts, dimStyle.Render(p))
-			}
-		}
-		return strings.Join(parts, "  ")
-	}
-
-	row := func(label string, fieldID int, value string) string {
+	row := func(label string, fieldID int) string {
 		pad := 10
 		padded := label
 		if w := lipgloss.Width(padded); w < pad {
 			padded += strings.Repeat(" ", pad-w)
 		}
 		if isActive(fieldID) {
-			return greenStyle.Render("●") + "  " + whiteBoldStyle.Render(padded) + "  " + value
+			return greenStyle.Render("●") + "  " + whiteBoldStyle.Render(padded) + "  " + valueStr(fieldID)
 		}
-		return faintStyle.Render("○") + "  " + dimStyle.Render(padded) + "  " + value
+		return faintStyle.Render("○") + "  " + dimStyle.Render(padded) + "  " + valueStr(fieldID)
 	}
 
-	total := 2
-	if m.isOpenRouter() {
-		total = 4
-	}
-	stepLine := dimStyle.Render(fmt.Sprintf("step %d/%d", m.focusIdx+1, total))
-
+	stepLine := dimStyle.Render(fmt.Sprintf("step %d/3", m.focusIdx+1))
 	header := dimStyle.Render("warden setup")
-
 	gap := strings.Repeat(" ", max(1, m.width-lipgloss.Width(header)-lipgloss.Width(stepLine)))
 	title := header + gap + stepLine
 
 	var rows []string
 	rows = append(rows, title, "")
-	rows = append(rows, row("provider", sfProvider, providerVal(isActive(sfProvider))))
-	rows = append(rows, row("model", sfModel, valueStr(0, sfModel)))
-	if m.isOpenRouter() {
-		rows = append(rows, row("api url", sfAPIURL, valueStr(1, sfAPIURL)))
-		rows = append(rows, row("api key", sfAPIKey, valueStr(2, sfAPIKey)))
-	}
+	rows = append(rows, row("model", sfModel))
+	rows = append(rows, row("api url", sfAPIURL))
+	rows = append(rows, row("api key", sfAPIKey))
 
 	sep := sepStyle.Render(strings.Repeat("─", max(20, m.width-4)))
 	help := "  " + dimStyle.Render(setupFieldDescs[m.focusIdx])
+	hints := "  " + faintStyle.Render("tab  next field    enter  save    esc  cancel")
 
-	hints := "  " + faintStyle.Render("← →  switch provider    tab  next field    enter  save    esc  cancel")
-
-	body := strings.Join(rows, "\n")
-	return body + "\n\n" + sep + "\n" + help + "\n\n" + sep + "\n" + hints
+	return strings.Join(rows, "\n") + "\n\n" + sep + "\n" + help + "\n\n" + sep + "\n" + hints
 }
 
 func (m settingsModel) result() WardenConfig {
-	model := strings.TrimSpace(m.inputs[0].Value())
+	model := strings.TrimSpace(m.inputs[sfModel].Value())
 	if model == "" {
-		model = "qwen3:8b"
+		model = "deepseek/deepseek-r1"
 	}
-	cfg := WardenConfig{
-		Provider: setupProviders[m.providerIdx],
+	return WardenConfig{
+		Provider: "openrouter",
 		Model:    model,
+		APIURL:   strings.TrimSpace(m.inputs[sfAPIURL].Value()),
+		APIKey:   strings.TrimSpace(m.inputs[sfAPIKey].Value()),
 	}
-	if m.isOpenRouter() {
-		cfg.APIURL = strings.TrimSpace(m.inputs[1].Value())
-		cfg.APIKey = strings.TrimSpace(m.inputs[2].Value())
-	}
-	return cfg
 }
 
 func runSetup(cfg WardenConfig) WardenConfig {

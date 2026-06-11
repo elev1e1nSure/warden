@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v5
@@ -22,29 +22,95 @@ jobs:
         with:
           go-version-file: go/go.mod
 
-      - name: Build Windows binary
+      - name: Build warden.exe
         run: |
           cd go
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../warden.exe ./cmd/warden
+          go build -ldflags="-s -w" -o ..\warden.exe .\cmd\warden
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      - name: Install Python deps
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build backend.exe
+        run: |
+          pyinstaller --onefile --name backend `
+            --collect-all agent `
+            --hidden-import=aiohttp `
+            --hidden-import=PIL `
+            --hidden-import=pyautogui `
+            run_backend.py
+          copy dist\backend.exe backend.exe
+
       - name: Generate release notes
+        shell: python
         env:
           CURRENT_TAG: ${{ github.ref_name }}
         run: |
-          python3 .github/scripts/release_notes.py > release_notes.md
-          echo "--- release notes ---"
-          cat release_notes.md
+          import os, re, subprocess
+
+          EMOJI_MAP = {
+              "feat":     ("✨", "New Features"),
+              "fix":      ("\U0001f41b", "Bug Fixes"),
+              "perf":     ("⚡", "Performance"),
+              "refactor": ("♻️", "Refactoring"),
+              "test":     ("\U0001f9ea", "Tests"),
+              "docs":     ("\U0001f4da", "Documentation"),
+              "ci":       ("\U0001f477", "CI/CD"),
+              "build":    ("\U0001f4e6", "Build"),
+              "style":    ("\U0001f3a8", "Style"),
+              "chore":    ("\U0001f527", "Chores"),
+          }
+
+          def run(cmd):
+              return subprocess.run(cmd, capture_output=True, text=True, shell=True).stdout.strip()
+
+          current = os.environ.get("CURRENT_TAG", "")
+          tags = [t for t in run("git tag --sort=-version:refname").splitlines() if t and t != current]
+          prev = tags[0] if tags else ""
+          range_ = f"{prev}..HEAD" if prev else "HEAD"
+          commits = [l for l in run(f"git log {range_} --pretty=format:%s --no-merges").splitlines() if l.strip()]
+
+          groups, breaking, other = {}, [], []
+          for msg in commits:
+              m = re.match(r"^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$", msg)
+              if m:
+                  type_, scope, bang, desc = m.groups()
+                  label = f"**{scope}:** {desc}" if scope else desc
+                  if bang:
+                      breaking.append(label)
+                  if type_.lower() in EMOJI_MAP:
+                      groups.setdefault(type_.lower(), []).append(label)
+                  else:
+                      other.append(desc)
+              else:
+                  other.append(msg)
+
+          lines = []
+          if breaking:
+              lines += ["### \U0001f4a5 Breaking Changes", *[f"- {b}" for b in breaking], ""]
+          for type_, (emoji, title) in EMOJI_MAP.items():
+              if type_ in groups:
+                  lines += [f"### {emoji} {title}", *[f"- {m}" for m in groups[type_]], ""]
+          if other:
+              lines += ["### \U0001f4cc Other", *[f"- {m}" for m in other], ""]
+          while lines and not lines[-1]:
+              lines.pop()
+
+          notes = "\n".join(lines) if lines else "No changes."
+          with open("release_notes.md", "w", encoding="utf-8") as f:
+              f.write(notes)
+          print(notes)
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-file release_notes.md \
-            warden.exe
+          gh release create "${{ github.ref_name }}" `
+            --title "${{ github.ref_name }}" `
+            --notes-file release_notes.md `
+            warden.exe `
+            backend.exe
