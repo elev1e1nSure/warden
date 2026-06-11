@@ -236,7 +236,8 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m settingsModel) View() string {
 	dimStyle := lipgloss.NewStyle().Foreground(faint)
-	activeVal := lipgloss.NewStyle().Foreground(green).Bold(true)
+	greenStyle := lipgloss.NewStyle().Foreground(green)
+	whiteBoldStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 
 	isActive := func(field int) bool { return m.focusIdx == field }
 
@@ -254,36 +255,38 @@ func (m settingsModel) View() string {
 		return dimStyle.Render(v)
 	}
 
+	providerVal := func(active bool) string {
+		var parts []string
+		for i, p := range setupProviders {
+			if i == m.providerIdx && active {
+				parts = append(parts, whiteBoldStyle.Render(p))
+			} else {
+				parts = append(parts, dimStyle.Render(p))
+			}
+		}
+		return strings.Join(parts, " ")
+	}
+
+	renderField := func(label string, fieldID int, value string) string {
+		if isActive(fieldID) {
+			return greenStyle.Render("> " + label + ": ") + value
+		}
+		return dimStyle.Render("  " + label + ": ") + value
+	}
+
 	var b strings.Builder
 	b.WriteString(dimStyle.Render("warden setup"))
 	b.WriteString("\n\n")
 
-	// Provider
-	b.WriteString(dimStyle.Render("provider: "))
-	for i, p := range setupProviders {
-		if i > 0 {
-			b.WriteString(dimStyle.Render(" "))
-		}
-		if i == m.providerIdx {
-			b.WriteString(activeVal.Render(p))
-		} else {
-			b.WriteString(dimStyle.Render(p))
-		}
-	}
+	b.WriteString(renderField("provider", sfProvider, providerVal(isActive(sfProvider))))
+	b.WriteString("\n")
+	b.WriteString(renderField("model", sfModel, valueStr(0, sfModel)))
 	b.WriteString("\n")
 
-	// Model
-	b.WriteString(dimStyle.Render("model: "))
-	b.WriteString(valueStr(0, sfModel))
-	b.WriteString("\n")
-
-	// OpenRouter-only fields
 	if m.isOpenRouter() {
-		b.WriteString(dimStyle.Render("api url: "))
-		b.WriteString(valueStr(1, sfAPIURL))
+		b.WriteString(renderField("api url", sfAPIURL, valueStr(1, sfAPIURL)))
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("api key: "))
-		b.WriteString(valueStr(2, sfAPIKey))
+		b.WriteString(renderField("api key", sfAPIKey, valueStr(2, sfAPIKey)))
 		b.WriteString("\n")
 	}
 
