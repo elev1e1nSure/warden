@@ -987,13 +987,14 @@ func (m *model) appendThink() {
 }
 
 // resetOrAppendThink reuses the existing think entry for the current turn (keeps
-// accumulated text and original startedAt so total duration is correct), or
-// creates a new one if none exists yet.
+// original startedAt so total duration is correct), or creates a new one if none
+// exists yet. Old text is cleared since this is a fresh thinking phase.
 func (m *model) resetOrAppendThink() int {
 	for i := len(m.messages) - 1; i >= m.streamStart; i-- {
 		if m.messages[i].kind == messageThink {
 			m.messages[i].duration = 0
 			m.messages[i].activity = ""
+			m.messages[i].text = ""
 			return i
 		}
 	}
