@@ -12,7 +12,7 @@ var (
 	Yellow     = Amber // alias kept for compat
 	Red        = lipgloss.Color("#ff4444")
 	Dim        = lipgloss.Color("#666666")
-	Faint      = lipgloss.Color("#444444")
+	Faint      = lipgloss.Color("#2a2a2a")
 	White      = lipgloss.Color("#ffffff")
 )
 

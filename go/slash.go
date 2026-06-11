@@ -15,15 +15,11 @@ type slashCmd struct {
 }
 
 var slashCommands = []slashCmd{
-	{"/reset", "Reset session"},
-	{"/status", "Show backend status"},
-	{"/copy-last", "Copy last response to clipboard"},
-	{"/clear", "Clear screen without resetting session"},
-	{"/pwd", "Show current working directory"},
+	{"/connect", "Set up provider and model"},
+	{"/clear", "Clear chat and reset session"},
 	{"/compact", "Summarize conversation to free up context"},
 	{"/models", "Switch model"},
-	{"/provider", "Switch provider (ollama | openrouter)"},
-	{"/api", "Set API base URL"},
+	{"/select", "Enable text selection (disables mouse capture)"},
 	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
 
@@ -69,42 +65,30 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		return false, nil
 	}
 	switch trimmed {
-	case "/reset":
+	case "/connect":
+		m.clearHintState()
+		m.cwOpen = true
+		m.cwStep = 0
+		m.cwPickIdx = 0
+		m.cwProvider = ""
+		m.cwErr = ""
+		m.cwCustom = false
+		m.cwLoading = false
+		m.cwAPIKey = ""
+		m.cwModels = nil
+		m.updateViewportHeight()
+		m.syncViewport()
+		return true, nil
+	case "/clear":
 		m.clearHintState()
 		m.messages = []messageEntry{}
-		m.syncViewport()
-		
-		m.appendText(m.wardenLine("Reset"))
+		m.lastAssistantRaw = ""
+		m.appendText(m.wardenLine(DimStyle().Render("cleared")))
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.ResetSession()
 			return nil
 		}
-	case "/status":
-		m.clearHintState()
-		return true, m.fetchStatus(false)
-	case "/copy-last":
-		m.clearHintState()
-		if m.lastAssistantRaw == "" {
-			
-			m.appendText(m.wardenLine(DimStyle().Render("nothing to copy")))
-			m.syncViewport()
-			return true, nil
-		}
-		return true, m.copyToClipboard(m.lastAssistantRaw)
-	case "/clear":
-		m.clearHintState()
-		m.messages = []messageEntry{}
-		m.lastAssistantRaw = ""
-		m.appendText(m.wardenLine(DimStyle().Render("screen cleared")))
-		m.syncViewport()
-		return true, nil
-	case "/pwd":
-		m.clearHintState()
-		
-		m.appendText(m.wardenLine(DimStyle().Render(m.cwd)))
-		m.syncViewport()
-		return true, nil
 	case "/compact":
 		m.clearHintState()
 		m.loading = true
@@ -114,45 +98,15 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		return true, tea.Batch(m.runCompact(), m.tick())
 	case "/models":
 		m.clearHintState()
-		return true, tea.Batch(m.fetchModels(), m.fetchProviders())
-	}
-
-	// prefix commands with arguments
-	if strings.HasPrefix(trimmed, "/provider ") {
-		m.clearHintState()
-		name := strings.TrimSpace(strings.TrimPrefix(trimmed, "/provider "))
-		if name == "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("usage: /provider <ollama|openrouter>")))
-			m.syncViewport()
-			return true, nil
-		}
-		m.appendText(m.wardenLine(DimStyle().Render("provider → " + name)))
-		m.syncViewport()
-		return true, func() tea.Msg {
-			m.client.SetProvider(name)
-			_ = saveWardenConfigField("provider", name)
-			return nil
-		}
-	}
-
-	if strings.HasPrefix(trimmed, "/api ") {
-		m.clearHintState()
-		url := strings.TrimSpace(strings.TrimPrefix(trimmed, "/api "))
-		if url == "" {
-			m.appendText(m.wardenLine(ErrorStyle().Render("usage: /api <url>")))
-			m.syncViewport()
-			return true, nil
-		}
-		m.appendText(m.wardenLine(DimStyle().Render("api url → " + url)))
-		m.syncViewport()
-		return true, func() tea.Msg {
-			m.client.SetAPIURL(url)
-			_ = saveWardenConfigField("api_url", url)
-			return nil
-		}
+		return true, m.fetchModels()
 	}
 
 	switch trimmed {
+	case "/select":
+		m.clearHintState()
+		m.selectMode = true
+		m.syncViewport()
+		return true, nil
 	case "/verbose":
 		m.verboseMode = !m.verboseMode
 		m.clearHintState()
