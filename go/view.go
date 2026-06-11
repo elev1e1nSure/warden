@@ -265,6 +265,34 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
+func toolPastTense(name string) string {
+	switch name {
+	case "Search":
+		return "searched"
+	case "Read":
+		return "read"
+	case "Write":
+		return "wrote"
+	case "Grep":
+		return "searched"
+	case "Glob":
+		return "found"
+	case "Patch":
+		return "patched"
+	case "Browser":
+		return "browsed"
+	case "Fetch":
+		return "fetched"
+	case "Screenshot":
+		return "screenshot"
+	case "Keyboard":
+		return "typed"
+	case "Todo":
+		return "listed"
+	}
+	return "ran " + strings.ToLower(name)
+}
+
 func extractToolDetail(name, args string) string {
 	if args == "" {
 		return ""
@@ -284,16 +312,20 @@ func extractToolDetail(name, args string) string {
 func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	prefix := "  "
 	detail := extractToolDetail(entry.toolName, entry.toolArgs)
+	if entry.toolDone {
+		past := toolPastTense(entry.toolName)
+		if detail != "" {
+			past += " " + detail
+		}
+		return DimStyle().Render(prefix + past)
+	}
 	if detail != "" {
 		detail = " -> " + detail
-	}
-	if entry.toolDone {
-		return DimStyle().Render(prefix + "✓ " + entry.toolName + detail)
 	}
 	// Only the currently running tool gets the animated ellipsis
 	if idx == m.runningToolIdx {
 		dots := []string{".", "..", "..."}
-		dotIdx := (m.spinner / 3) % 3
+		dotIdx := ((m.spinner / 3) + idx) % 3
 		return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
 	}
 	return DimStyle().Render(prefix + entry.toolName + detail)
@@ -307,11 +339,11 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 
 	if !m.verboseMode {
 		if entry.duration > 0 {
-			return ""
+			return DimStyle().Render("  thought")
 		}
 		if m.loading {
 			dots := []string{".", "..", "..."}
-			dotIdx := (m.spinner / 3) % 3
+			dotIdx := ((m.spinner / 3) + 1) % 3
 			verb := "Thinking"
 			if entry.activity != "" {
 				verb = entry.activity
@@ -324,7 +356,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 	var summary string
 	if entry.duration == 0 && m.loading {
 		dots := []string{".", "..", "..."}
-		dotIdx := (m.spinner / 3) % 3
+		dotIdx := ((m.spinner / 3) + 1) % 3
 		summary = DimStyle().Render("  Thinking" + dots[dotIdx])
 	} else {
 		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
