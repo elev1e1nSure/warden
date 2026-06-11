@@ -235,7 +235,6 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m settingsModel) View() string {
-	titleStyle := lipgloss.NewStyle().Bold(true)
 	dimStyle := lipgloss.NewStyle().Foreground(faint)
 	labelActive := lipgloss.NewStyle().Foreground(amber).Width(10)
 	labelInactive := lipgloss.NewStyle().Foreground(faint).Width(10)
@@ -264,7 +263,7 @@ func (m settingsModel) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("warden") + dimStyle.Render("  setup"))
+	b.WriteString(dimStyle.Render("warden setup"))
 	b.WriteString("\n\n\n")
 
 	// Provider
