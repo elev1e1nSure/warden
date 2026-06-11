@@ -605,7 +605,7 @@ func (m *model) layoutViewportHeight() int {
 
 	modelPickerHeight := 0
 	if m.modelPicking {
-		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop))
+		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode))
 	}
 
 	cwHeight := 0
@@ -652,7 +652,7 @@ func (m model) View() string {
 	}
 
 	if m.modelPicking {
-		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop))
+		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode))
 	}
 
 	if m.cwOpen {
@@ -744,7 +744,7 @@ func (m model) renderConnectWizard() string {
 	return strings.Join(lines, "\n")
 }
 
-func renderModelPicker(filtered []string, idx, scrollTop int) string {
+func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) string {
 	const maxVisible = 8
 	start := scrollTop
 	end := start + maxVisible
@@ -753,6 +753,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int) string {
 	}
 	lines := make([]string, 0, maxVisible+4)
 
+	accent := WardenStyleAuto(autoMode)
 	key := func(s string) string { return pickerKeyStyle.Render(s) }
 	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
 		key("Enter") + DimStyle().Render(" select   ") +
@@ -763,7 +764,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int) string {
 	for i := start; i < end; i++ {
 		name := filtered[i]
 		if i == idx {
-			lines = append(lines, AccentStyle().Render("  › "+name))
+			lines = append(lines, accent.Render("  › "+name))
 		} else {
 			lines = append(lines, DimStyle().Render("    "+name))
 		}
@@ -774,13 +775,14 @@ func renderModelPicker(filtered []string, idx, scrollTop int) string {
 
 func (m model) renderHint() string {
 	val := m.textinput.Value()
+	accent := WardenStyleAuto(m.autoMode)
 	if strings.HasPrefix(val, "/") {
 		matches := matchSlash(val)
 		lines := make([]string, 0, len(matches))
 		for _, cmd := range matches {
 			name := fmt.Sprintf("/%-13s", cmd.name[1:])
 			lines = append(lines,
-				AccentStyle().Render(name)+"  "+DimStyle().Render(cmd.desc),
+				accent.Render(name)+"  "+DimStyle().Render(cmd.desc),
 			)
 		}
 		return strings.Join(lines, "\n")
@@ -791,7 +793,7 @@ func (m model) renderHint() string {
 		for _, s := range skills {
 			name := fmt.Sprintf("!%-13s", s.Name)
 			lines = append(lines,
-				AccentStyle().Render(name)+"  "+DimStyle().Render(s.Description),
+				accent.Render(name)+"  "+DimStyle().Render(s.Description),
 			)
 		}
 		return strings.Join(lines, "\n")
