@@ -66,6 +66,12 @@ class TestParsePatch:
         files = self._tool()._parse_patch(patch)
         assert len(files) == 2
 
+    def test_git_prefix_stripped(self):
+        patch = "--- a/src/file.py\n+++ b/src/file.py\n@@ -1,1 +1,1 @@\n-old\n+new\n"
+        files = self._tool()._parse_patch(patch)
+        assert len(files) == 1
+        assert files[0]["path"] == "src/file.py"
+
 
 class TestApplyHunk:
     def _tool(self):
@@ -201,6 +207,24 @@ class TestApplyPatchExecute:
         patch = "--- ghost.txt\n+++ new.txt\n@@ -1,1 +1,1 @@\n line\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "not found" in result.lower()
+
+    async def test_multi_hunk_offset_drift(self, tmp_path, monkeypatch):
+        from agent.tools import ApplyPatchTool
+        monkeypatch.chdir(tmp_path)
+        f = tmp_path / "src.py"
+        f.write_text("line1\nOLD_A\nline3\nOLD_B\nline5\n")
+        patch = (
+            "--- src.py\n+++ src.py\n"
+            "@@ -1,3 +1,3 @@\n line1\n-OLD_A\n+NEW_A\n line3\n"
+            "@@ -3,3 +3,3 @@\n line3\n-OLD_B\n+NEW_B\n line5\n"
+        )
+        result = await ApplyPatchTool().execute({"patch_text": patch})
+        assert "patched" in result
+        text = f.read_text()
+        assert "NEW_A" in text
+        assert "NEW_B" in text
+        assert "OLD_A" not in text
+        assert "OLD_B" not in text
 
     async def test_hunk_match_failure(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool

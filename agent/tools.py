@@ -938,6 +938,8 @@ class ApplyPatchTool(Tool):
 				})
 
 			path = target.lstrip("/")  # strip leading slash
+			# Strip git diff a/ b/ prefixes
+			path = re.sub(r'^[ab]/', '', path)
 			# Handle Windows paths like /c:/foo
 			if re.match(r'^[a-zA-Z]:/', path):
 				pass  # keep as-is
@@ -982,10 +984,17 @@ class ApplyPatchTool(Tool):
 				return f"patch: {f['path']} — not found (skipped)"
 			new_content = path.read_text(encoding="utf-8")
 
+		delta = 0
 		for hunk in f["hunks"]:
-			new_content = self._apply_hunk(new_content, hunk)
+			adjusted = dict(hunk)
+			adjusted["old_start"] = hunk["old_start"] + delta
+			new_content = self._apply_hunk(new_content, adjusted)
 			if new_content is None:
 				return f"patch: {f['path']} — hunk @@ -{hunk['old_start']},{hunk['old_count']} +{hunk['new_start']},{hunk['new_count']} @@ failed to match"
+			# Update delta for subsequent hunks
+			old_lines = sum(1 for l in hunk["lines"] if not l or l[0] in " -")
+			new_lines = sum(1 for l in hunk["lines"] if not l or l[0] in " +")
+			delta += new_lines - old_lines
 
 		d = os.path.dirname(abspath)
 		if d:
