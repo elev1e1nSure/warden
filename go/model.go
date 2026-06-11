@@ -460,7 +460,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.focusInput()
 					}
 				}
-				return m, nil
 			}
 			m.textinput.Placeholder = ""
 
