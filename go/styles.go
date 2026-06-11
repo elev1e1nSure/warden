@@ -53,7 +53,7 @@ func ErrorStyle() lipgloss.Style {
 }
 
 func WardenBgStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Background(lipgloss.Color("#1a1a2a"))
+	return lipgloss.NewStyle().Background(lipgloss.Color("#262626"))
 }
 
 func ToolStyle() lipgloss.Style {
