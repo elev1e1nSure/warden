@@ -23,6 +23,7 @@ func renderUnifiedDiff(diff string) string {
 	lines := strings.Split(strings.TrimRight(diff, "\n"), "\n")
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
 		switch {
 		case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
 			out = append(out, diffFileStyle.Render("  "+line))

@@ -360,7 +360,7 @@ class ChatSession:
 		yield ("tool", payload)
 		self.add_tool_result(name, result_str, tool_call_id)
 		if name in _SCREENSHOT_TOOLS:
-			img_path = _extract_saved_path(result_val)
+			img_path = _extract_saved_path(result_str)
 			if img_path:
 				img_b64 = _encode_image(img_path)
 				if img_b64:
