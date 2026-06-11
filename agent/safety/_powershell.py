@@ -102,6 +102,16 @@ def classify(command: str) -> tuple[str, str, List[str]]:
     if re.search(r"\b(format\s+[a-z]:|mkfs|diskpart|cipher\s+/w)\b", norm, re.IGNORECASE):
         return "blocked", "disk destruction command", ["can erase drives or volumes"]
 
+    # Subexpression operator $(...) containing blocked cmdlets
+    for subexpr in re.finditer(r"\$\(([^)]+)\)", norm):
+        sub_tokens = _tokens(subexpr.group(1))
+        if _has_any(sub_tokens, _BLOCKED_CMDLETS | _DELETE_ALIASES | _KILL_ALIASES | _INVOKE_ALIASES):
+            return "blocked", "blocked command inside subexpression", ["$(...) contains restricted cmdlet"]
+
+    # Dynamic cmdlet invocation via string concatenation: & ("Remove-" + "Item")
+    if re.search(r"&\s*\([^)]*\+[^)]*\)", norm, re.IGNORECASE):
+        return "blocked", "dynamic command construction", ["& with string concatenation can bypass safety filters"]
+
     if re.search(r"\bshutdown\b.*\s/[srph]\b", norm, re.IGNORECASE):
         return "blocked", "system power command", ["shuts down, restarts, or powers off the machine"]
 
@@ -115,13 +125,6 @@ def classify(command: str) -> tuple[str, str, List[str]]:
     ):
         return "blocked", "system/registry modification", ["changes system configuration"]
 
-    if re.search(
-        r"\b(remove-item|rm|del|rmdir|rd|ri)\b.*(-recurse|-r)\s+.*(-force|-f)|"
-        r"\b(remove-item|rm|del|rmdir|rd|ri)\b.*(-force|-f)\s+.*(-recurse|-r)",
-        norm, re.IGNORECASE,
-    ):
-        return "blocked", "recursive forced deletion", ["uses -Recurse and -Force on delete"]
-
     if _CHAIN_RE.search(norm):
         return "confirm", "chained command", ["contains command chains (;/&)"]
 
@@ -129,6 +132,22 @@ def classify(command: str) -> tuple[str, str, List[str]]:
     rest = tokens[1:]
 
     if exe in _DELETE_ALIASES:
+        has_recurse = any(
+            re.match(r"^-(r(?:ecurse)?|rf?|fr?)\b", t, re.IGNORECASE)
+            for t in tokens
+        )
+        has_force = any(
+            re.match(r"^-(f(?:orce)?|rf?|fr?)\b", t, re.IGNORECASE)
+            for t in tokens
+        )
+        # Combined flags like -rf / -rF / -fr count for both
+        for t in tokens:
+            if re.match(r"^-rf?\b", t, re.IGNORECASE) or re.match(r"^-fr?\b", t, re.IGNORECASE):
+                has_recurse = True
+                has_force = True
+                break
+        if has_recurse and has_force:
+            return "blocked", "recursive forced deletion", ["uses -Recurse and -Force on delete"]
         return "confirm", "file deletion", ["deletes files or directories"]
     if exe in _KILL_ALIASES or "taskkill" in tokens:
         return "confirm", "process termination", ["stops a running process"]

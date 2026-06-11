@@ -87,9 +87,31 @@ class TestPowerShellClassification:
 			"rm -r -fo",
 			"del /f /s *.tmp",
 			"rd /s /q folder",
+			"rm -rf /",
+			"rm -rF C:\\temp",
+			"del -fr *.tmp",
+			"Remove-Item foo -rf",
 		]:
 			risk, reason, details = _classify_powershell(cmd)
-			assert risk in ("blocked", "confirm"), f"{cmd}: expected blocked/confirm, got {risk}"
+			assert risk == "blocked", f"{cmd}: expected blocked, got {risk}"
+
+	def test_subexpression_blocked(self) -> None:
+		for cmd in [
+			"$(Remove-Item C:\\Windows)",
+			"Write-Output $(rm -rf /)",
+			"$x = $(Invoke-Expression 'evil')",
+		]:
+			risk, reason, details = _classify_powershell(cmd)
+			assert risk == "blocked", f"{cmd}: expected blocked, got {risk}"
+
+	def test_dynamic_string_concat_blocked(self) -> None:
+		for cmd in [
+			'& ("Remove-" + "Item") $path',
+			'& ("Stop-" + "Process") notepad',
+			'& ($a + $b)',
+		]:
+			risk, reason, details = _classify_powershell(cmd)
+			assert risk == "blocked", f"{cmd}: expected blocked, got {risk}"
 
 	def test_iwr_iex_blocked(self) -> None:
 		risk, reason, details = _classify_powershell(
