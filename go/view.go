@@ -672,13 +672,28 @@ func renderModelPicker(filtered []string, idx, scrollTop int, providers []string
 }
 
 func (m model) renderHint() string {
-	matches := matchSlash(m.textinput.Value())
-	lines := make([]string, 0, len(matches))
-	for _, cmd := range matches {
-		name := fmt.Sprintf("%-14s", cmd.name)
-		lines = append(lines,
-			AccentStyle().Render(name)+"  "+DimStyle().Render(cmd.desc),
-		)
+	val := m.textinput.Value()
+	if strings.HasPrefix(val, "/") {
+		matches := matchSlash(val)
+		lines := make([]string, 0, len(matches))
+		for _, cmd := range matches {
+			name := fmt.Sprintf("/%-13s", cmd.name[1:])
+			lines = append(lines,
+				AccentStyle().Render(name)+"  "+DimStyle().Render(cmd.desc),
+			)
+		}
+		return strings.Join(lines, "\n")
 	}
-	return strings.Join(lines, "\n")
+	if strings.HasPrefix(val, "!") {
+		skills := matchBang(val, m.skills)
+		lines := make([]string, 0, len(skills))
+		for _, s := range skills {
+			name := fmt.Sprintf("!%-13s", s.Name)
+			lines = append(lines,
+				AccentStyle().Render(name)+"  "+DimStyle().Render(s.Description),
+			)
+		}
+		return strings.Join(lines, "\n")
+	}
+	return ""
 }

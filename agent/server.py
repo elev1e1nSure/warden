@@ -241,6 +241,36 @@ async def tools_list(request: web.Request) -> web.Response:
 	return web.json_response({"tools": list(REGISTRY.keys())})
 
 
+async def skills_list(request: web.Request) -> web.Response:
+	from agent.skills import discover_skills
+	skills = discover_skills()
+	log_request("GET", "/skills", 200)
+	return web.json_response({
+		"skills": [
+			{
+				"name": s.name,
+				"description": s.description,
+				"location": s.location,
+			}
+			for s in skills
+		]
+	})
+
+
+async def skill_get(request: web.Request) -> web.Response:
+	from agent.skills import find_skill, wrap_skill_content
+	name = request.match_info.get("name", "")
+	skill = find_skill(name)
+	if skill is None:
+		log_request("GET", f"/skill/{name}", 404)
+		return web.json_response({"error": "skill not found"}, status=404)
+	log_request("GET", f"/skill/{name}", 200)
+	return web.json_response({
+		"name": skill.name,
+		"content": wrap_skill_content(skill),
+	})
+
+
 async def confirm(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	data = await request.json()
@@ -355,6 +385,8 @@ async def main() -> None:
 	app.router.add_post("/thinking", set_thinking)
 	app.router.add_get("/status", status)
 	app.router.add_get("/tools", tools_list)
+	app.router.add_get("/skills", skills_list)
+	app.router.add_get("/skill/{name}", skill_get)
 	app.router.add_get("/models", models_list)
 	app.router.add_post("/model/set", model_set)
 	app.router.add_get("/providers", providers_list)

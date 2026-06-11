@@ -92,6 +92,9 @@ type model struct {
 	// slash command cycling
 	slashIdx     int
 	slashTyped   string
+	// skills (fetched from backend on startup)
+	skills     []Skill
+	skillsErr  string
 	// markdown
 	mdRenderer *glamour.TermRenderer
 	mdWidth    int
@@ -144,7 +147,7 @@ func initialModel(modelName string) model {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.checkBackend(), m.tick())
+	return tea.Batch(m.checkBackend(), m.tick(), m.fetchSkills())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -512,17 +515,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.historyIdx = len(m.history)
 			m.historySav = ""
 
-			if strings.HasPrefix(text, "! ") {
-				cmdText := strings.TrimPrefix(text, "! ")
-				m.appendText(UserStyle().Render("  you"))
-				m.appendText("  " + cmdText)
-				m.appendText("")
-				m.textinput.Reset()
-				m.streaming = true
-				m.loading = true
-				m.spinner = 0
-				m.syncViewport()
-				return m, tea.Batch(m.execShell(cmdText), m.tick())
+			if strings.HasPrefix(text, "!") {
+				if handled, cmd := m.handleBang(text); handled {
+					m.textinput.Reset()
+					return m, cmd
+				}
+				return m, nil
 			}
 
 			m.lastUserInput = text
@@ -855,6 +853,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.setMode(true))
 		}
 
+	case skillsResultMsg:
+		if msg.err != "" {
+			m.skillsErr = msg.err
+			break
+		}
+		m.skills = msg.skills
+		m.skillsErr = ""
+
+	case skillLoadedMsg:
+		m.streaming = false
+		m.loading = false
+		if msg.err != "" {
+			m.appendText(ErrorStyle().Render("error: " + msg.err))
+			m.syncViewport()
+			break
+		}
+		// update the "! name (loading)" text line
+		for i := len(m.messages) - 1; i >= 0; i-- {
+			if m.messages[i].kind == messageText && strings.HasPrefix(m.messages[i].text, "! ") {
+				m.messages[i].text = "! " + msg.name
+				break
+			}
+		}
+		// send skill body as user message
+		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
+		m.lastUserInput = body
+		m.streamStart = len(m.messages)
+		m.appendText(UserStyle().Render("  > ") + body[:min(len(body), 200)])
+		m.textinput.Reset()
+		m.streaming = true
+		m.loading = true
+		m.spinner = 0
+		m.syncViewport()
+		cmds = append(cmds, tea.Batch(m.sendMessage(body), m.tick()))
+
 	case backendErrorMsg:
 		m.loading = false
 		m.appendText(ErrorStyle().Render("Error: backend unavailable"))
@@ -881,8 +914,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	// sync hint visibility and viewport height
-	matches := matchSlash(m.textinput.Value())
-	newCount := len(matches)
+	slashMatches := matchSlash(m.textinput.Value())
+	bangMatches := matchBang(m.textinput.Value(), m.skills)
+	newCount := len(slashMatches) + len(bangMatches)
 	if newCount != m.hintCount {
 		m.hintCount = newCount
 		m.hintVisible = newCount > 0
@@ -982,6 +1016,15 @@ type providerSetMsg struct {
 	models   []string
 	current  string
 	err      string
+}
+type skillsResultMsg struct {
+	skills []Skill
+	err    string
+}
+type skillLoadedMsg struct {
+	name    string
+	content string
+	err     string
 }
 
 type messageKind int

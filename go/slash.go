@@ -181,6 +181,71 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	return false, nil
 }
 
+// handleBang processes !<name> skill invocations and `! <cmd>` shell shortcuts.
+func (m *model) handleBang(text string) (bool, tea.Cmd) {
+	// `! <cmd>` (with leading space) = shell shortcut, preserved from before skills
+	if strings.HasPrefix(text, "! ") {
+		cmdText := strings.TrimPrefix(text, "! ")
+		m.appendText(UserStyle().Render("  you"))
+		m.appendText("  " + cmdText)
+		m.appendText("")
+		m.streaming = true
+		m.loading = true
+		m.spinner = 0
+		m.syncViewport()
+		return true, tea.Batch(m.execShell(cmdText), m.tick())
+	}
+
+	// `!<name>` (no space) = skill invocation
+	if strings.HasPrefix(text, "!") {
+		name := strings.TrimSpace(strings.TrimPrefix(text, "!"))
+		if name == "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("usage: !<skill-name>")))
+			m.syncViewport()
+			return true, nil
+		}
+		if !m.hasSkill(name) {
+			m.appendText(m.wardenLine(ErrorStyle().Render("unknown skill: " + name)))
+			m.syncViewport()
+			return true, nil
+		}
+		m.appendText(m.wardenLine(DimStyle().Render("! " + name + " (loading)")))
+		m.syncViewport()
+		return true, m.loadSkill(name)
+	}
+
+	return false, nil
+}
+
+func (m *model) hasSkill(name string) bool {
+	for _, s := range m.skills {
+		if s.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func matchBang(prefix string, skills []Skill) []Skill {
+	if len(prefix) == 0 || prefix[0] != '!' {
+		return nil
+	}
+	lower := strings.ToLower(strings.TrimPrefix(prefix, "!"))
+	if lower == "" {
+		// show all when just "!"
+		out := make([]Skill, len(skills))
+		copy(out, skills)
+		return out
+	}
+	var out []Skill
+	for _, s := range skills {
+		if strings.HasPrefix(s.Name, lower) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func wardenConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

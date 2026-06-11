@@ -231,3 +231,23 @@ func (m model) applyModel(name string) tea.Cmd {
 		return modelSetMsg{model: name}
 	}
 }
+
+func (m model) fetchSkills() tea.Cmd {
+	return func() tea.Msg {
+		skills, err := m.client.ListSkills()
+		if err != nil {
+			return skillsResultMsg{err: err.Error()}
+		}
+		return skillsResultMsg{skills: skills}
+	}
+}
+
+func (m model) loadSkill(name string) tea.Cmd {
+	return func() tea.Msg {
+		content, err := m.client.LoadSkill(name)
+		if err != nil {
+			return skillLoadedMsg{name: name, err: err.Error()}
+		}
+		return skillLoadedMsg{name: name, content: content}
+	}
+}

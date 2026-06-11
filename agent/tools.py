@@ -435,64 +435,17 @@ class FileListTool(Tool):
 class SkillTool(Tool):
 	name = "skill"
 	description = "Load a local skill file and a small sample of nearby files."
-	params = {"name": {"type": "string", "description": "Skill name or path"}}
-
-	def _skill_roots(self) -> list[Path]:
-		home = Path.home()
-		return [
-			Path.cwd() / "skills",
-			Path.cwd() / ".claude" / "skills",
-			home / ".codex" / "skills",
-			home / ".agents" / "skills",
-		]
-
-	def _resolve_skill_dir(self, name: str) -> Path | None:
-		candidate = Path(name)
-		if candidate.is_absolute():
-			if candidate.is_dir():
-				return candidate
-			if candidate.is_file():
-				return candidate.parent
-		for root in self._skill_roots():
-			direct = root / name
-			if (direct / "SKILL.md").is_file():
-				return direct
-			if root.is_dir():
-				for path in root.rglob("SKILL.md"):
-					if path.parent.name == name:
-						return path.parent
-		return None
+	params = {"name": {"type": "string", "description": "Skill name"}}
 
 	async def execute(self, args: Dict[str, Any]) -> str:
+		from agent.skills import find_skill, wrap_skill_content
 		name = str(args.get("name", "")).strip()
 		if not name:
 			return "error: name is required"
-		try:
-			skill_dir = self._resolve_skill_dir(name)
-			if skill_dir is None:
-				return f"error: skill not found: {name}"
-			skill_file = skill_dir / "SKILL.md"
-			content = skill_file.read_text(encoding="utf-8")
-			files = []
-			for entry in sorted(skill_dir.iterdir(), key=lambda p: p.name.lower()):
-				if entry.name == "SKILL.md":
-					continue
-				if entry.is_file():
-					files.append(str(entry.name))
-				elif entry.is_dir():
-					files.append(f"{entry.name}/")
-				if len(files) >= 10:
-					break
-			return (
-				f'<skill_content name="{skill_dir.name}">\n'
-				f"{content.strip()}\n\n"
-				f"<skill_files>\n"
-				f"{chr(10).join(files) if files else '(no extra files)'}\n"
-				f"</skill_files>\n"
-				f"</skill_content>"
-			)
-		except Exception as e:
-			return f"error: {e}"
+		skill = find_skill(name)
+		if skill is None:
+			return f"error: skill not found: {name}"
+		return wrap_skill_content(skill)
 
 
 class ClipboardTool(Tool):

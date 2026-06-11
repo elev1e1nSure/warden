@@ -8,7 +8,7 @@ from typing import AsyncIterator, List, Dict, Any
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.llm_client import LLMChunk, LLMClient
 from agent.logger import tool as log_tool
-from agent.prompt import SYSTEM
+from agent.prompt import build_system
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, parse_args
 
@@ -141,7 +141,7 @@ class ChatSession:
 			return {"summary": "nothing to compact", "tokens_before": self.token_count, "tokens_after": self.token_count}
 
 		tokens_before = self._estimate_tokens()
-		system = SYSTEM + f" Configured model name: {self.model}."
+		system = build_system(self.model)
 		messages = [{"role": "system", "content": system}] + self.history + [
 			{"role": "user", "content": _COMPACT_PROMPT}
 		]
@@ -372,7 +372,7 @@ class ChatSession:
 			iter_count += 1
 			yield ("warden_start", {})
 
-			system = SYSTEM + f" Configured model name: {self.model}."
+			system = build_system(self.model)
 			messages = [{"role": "system", "content": system}] + self.history
 
 			llm_result: dict = {}

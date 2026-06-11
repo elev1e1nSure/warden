@@ -19,6 +19,7 @@ go/warden.exe
 # Project runtime
 .warden/*
 !.warden/powershell-reference.md
+!.warden/skills/
 .tmp/
 
 # Claude worktrees

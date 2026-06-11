@@ -38,6 +38,12 @@ type ToolMsg struct {
 	Result string `json:"result"`
 }
 
+type Skill struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Location    string `json:"location"`
+}
+
 type Client struct {
 	BaseURL string
 }
@@ -215,6 +221,40 @@ func (c *Client) Shutdown() error {
 	}
 	resp.Body.Close()
 	return nil
+}
+
+func (c *Client) ListSkills() ([]Skill, error) {
+	resp, err := http.Get(c.BaseURL + "/skills")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Skills []Skill `json:"skills"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.Skills, nil
+}
+
+func (c *Client) LoadSkill(name string) (string, error) {
+	resp, err := http.Get(c.BaseURL + "/skill/" + name)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("skill not found: %s", name)
+	}
+	var result struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.Content, nil
 }
 
 func (c *Client) SendMessage(text string) <-chan tea.Msg {

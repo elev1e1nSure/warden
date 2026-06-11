@@ -41,9 +41,12 @@ def test_todowrite_tool_persists_state() -> None:
 
 def test_skill_tool_loads_skill_tree(monkeypatch) -> None:
 	base = Path(".tmp") / "test_tools_skill"
-	skill_dir = base / "skills" / "demo"
+	skill_dir = base / ".warden" / "skills" / "demo"
 	skill_dir.mkdir(parents=True, exist_ok=True)
-	(skill_dir / "SKILL.md").write_text("# Demo\n\nUse carefully.\n", encoding="utf-8")
+	(skill_dir / "SKILL.md").write_text(
+		"---\nname: demo\ndescription: A demo skill\n---\n\n# Demo\n\nUse carefully.\n",
+		encoding="utf-8",
+	)
 	(skill_dir / "notes.txt").write_text("extra", encoding="utf-8")
 
 	monkeypatch.setattr(tools_mod.Path, "cwd", classmethod(lambda cls: base))
@@ -54,3 +57,14 @@ def test_skill_tool_loads_skill_tree(monkeypatch) -> None:
 	assert '<skill_content name="demo">' in out
 	assert "Use carefully." in out
 	assert "notes.txt" in out
+
+
+def test_skill_tool_not_found(monkeypatch) -> None:
+	base = Path(".tmp") / "test_tools_skill_missing"
+	base.mkdir(parents=True, exist_ok=True)
+	monkeypatch.setattr(tools_mod.Path, "cwd", classmethod(lambda cls: base))
+	monkeypatch.setattr(tools_mod.Path, "home", classmethod(lambda cls: base))
+
+	out = asyncio.run(SkillTool().execute({"name": "ghost"}))
+	assert "error" in out
+	assert "ghost" in out

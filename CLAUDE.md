@@ -37,8 +37,9 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 
 ```
 go/        — bubbletea frontend
-agent/     — backend: server, chat, tools, safety, logs
+agent/     — backend: server, chat, tools, safety, logs, skills
 .warden/   — runtime reference docs (powershell-reference.md)
+.warden/skills/ — built-in skills (e.g. skill-creator)
 opencode/  — reference: opencode-ai/opencode repo for feature research
 ```
 
@@ -63,4 +64,18 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 - **slash hints:** 2 columns — command name (green, 14-char left-aligned) + description (dim)
 - controls: arrows, Enter, Esc, Ctrl+C
 - no buttons, no mouse clicks in the TUI itself
+- **input hints:** `/` prefix shows slash commands; `!` prefix shows available skills
 - if there's a need to add something truly new — discuss with the user first, then add to this section
+
+## skills
+
+Skills are Markdown instruction sets at `.warden/skills/<name>/SKILL.md` (project)
+or `~/.warden/skills/<name>/SKILL.md` (global). Fallback: `.claude/skills/` (compat).
+
+- **Catalog** — rendered as `<available_skills>` XML in the system prompt each turn
+- **Invocation** — `!<name>` in input (sends skill body as user message),
+or the LLM can call the `skill` tool when the catalog description matches
+- **Discovery** — `agent/skills.py`: project > global; `.warden` > `.claude`
+- **Format** — YAML frontmatter with `name` (kebab-case, 1-64 chars) and `description`;
+body ≤ 50 KB, imperative voice, no emojis
+- **Built-in** — `.warden/skills/skill-creator/SKILL.md` ships with the repo
