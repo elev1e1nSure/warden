@@ -352,16 +352,7 @@ func (m *model) renderMessages() []string {
 		case messageThink:
 			rendered = m.renderThinkEntry(entry)
 		case messageAssistant:
-			text := indentLines(m.renderMarkdown(entry.text), "  ")
-			lines := strings.Split(text, "\n")
-			for i, line := range lines {
-				visible := lipgloss.Width(line)
-				if visible < m.width {
-					line += strings.Repeat(" ", m.width-visible)
-				}
-				lines[i] = WardenBgStyle().Render(line)
-			}
-			rendered = strings.Join(lines, "\n")
+			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
 		case messageToolActivity:
 			rendered = entry.text
 		case messageToolFlow:
