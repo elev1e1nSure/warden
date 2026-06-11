@@ -265,6 +265,20 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
+func (m model) renderToolFlowEntry(entry messageEntry) string {
+	if entry.toolDone {
+		return ""
+	}
+	arrow := ToolStyle().Render("  → ")
+	name := ToolStyle().Render(entry.toolName)
+	if m.loading && !entry.toolDone {
+		brailleFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		frame := brailleFrames[m.spinner%len(brailleFrames)]
+		return ToolStyle().Render("  "+frame+" ") + name
+	}
+	return arrow + name
+}
+
 func (m model) renderThinkEntry(entry messageEntry) string {
 	duration := entry.duration
 	if duration <= 0 && !entry.startedAt.IsZero() {
@@ -339,6 +353,8 @@ func (m *model) renderMessages() []string {
 			rendered = WardenBgStyle().Render(indentLines(m.renderMarkdown(entry.text), "  "))
 		case messageToolActivity:
 			rendered = entry.text
+		case messageToolFlow:
+			rendered = m.renderToolFlowEntry(entry)
 		case messageToolDiff:
 			rendered = renderUnifiedDiff(entry.text)
 		default:

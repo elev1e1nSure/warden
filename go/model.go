@@ -619,14 +619,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendToolActivity(toolStartLine(inner.name, inner.args))
 				m.runningToolIdx = len(m.messages) - 1
 			} else {
-				verb := toolActivityVerbs[inner.name]
-				if verb == "" {
-					verb = "working"
-				}
-				verb = strings.ToUpper(verb[:1]) + verb[1:]
-				if m.activityIdx >= 0 && m.activityIdx < len(m.messages) {
-					m.messages[m.activityIdx].activity = verb
-				}
+				m.appendToolFlow(toolDisplayName(inner.name))
+				m.runningToolIdx = len(m.messages) - 1
 			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -641,8 +635,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.appendToolActivity(summary)
 				}
 			} else {
-				if m.activityIdx >= 0 && m.activityIdx < len(m.messages) {
-					m.messages[m.activityIdx].activity = ""
+				if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
+					if m.messages[m.runningToolIdx].kind == messageToolFlow {
+						m.messages[m.runningToolIdx].toolDone = true
+					}
 				}
 			}
 			if inner.tool.Diff != "" {
@@ -695,6 +691,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
+			m.compactToolFlow()
 			m.appendText("")
 			if inner.tokenLimit > 0 {
 				m.tokenCount = inner.tokenCount
@@ -717,6 +714,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.activityIdx = -1
+			m.compactToolFlow()
 			m.appendText("")
 			if msg.tokenLimit > 0 {
 				m.tokenCount = msg.tokenCount
@@ -1043,6 +1041,7 @@ const (
 	messageAssistant
 	messageToolActivity // tool line, filtered out at turn end in normal mode
 	messageToolDiff     // diff block, persists in history even in non-verbose mode
+	messageToolFlow     // live tool activity shown as flowing lines
 )
 
 type messageEntry struct {
@@ -1051,6 +1050,8 @@ type messageEntry struct {
 	startedAt time.Time
 	duration  time.Duration
 	activity  string // current verb shown in single-line activity mode
+	toolName  string // display name for messageToolFlow
+	toolDone  bool   // true when the tool has finished
 }
 
 func (m *model) appendText(text string) {
@@ -1059,6 +1060,10 @@ func (m *model) appendText(text string) {
 
 func (m *model) appendToolActivity(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
+}
+
+func (m *model) appendToolFlow(name string) {
+	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name})
 }
 
 func (m *model) appendThink() {
@@ -1097,6 +1102,34 @@ func (m *model) finishThink() {
 			}
 			return
 		}
+	}
+}
+
+// compactToolFlow removes live think/tool flow entries and leaves one summary line.
+func (m *model) compactToolFlow() {
+	if m.verboseMode {
+		return
+	}
+	var tools []string
+	seen := make(map[string]bool)
+	var filtered []messageEntry
+	for _, entry := range m.messages {
+		switch entry.kind {
+		case messageToolFlow:
+			if entry.toolName != "" && !seen[entry.toolName] {
+				seen[entry.toolName] = true
+				tools = append(tools, entry.toolName)
+			}
+		case messageThink:
+			// drop
+		default:
+			filtered = append(filtered, entry)
+		}
+	}
+	m.messages = filtered
+	if len(tools) > 0 {
+		summary := strings.Join(tools, " · ")
+		m.appendText(DimStyle().Render("  " + summary))
 	}
 }
 
