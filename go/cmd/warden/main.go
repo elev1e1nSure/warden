@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,15 +11,16 @@ import (
 	"strconv"
 	"time"
 
+	tui "warden"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"warden"
 )
 
 const (
 	port              = 8765
 	startupTimeout    = 60 * time.Second
-	healthCheckPeriod = 500 * time.Millisecond
+	healthCheckPeriod = 1500 * time.Millisecond
 )
 
 var (
@@ -41,13 +41,11 @@ const (
 )
 
 type launchModel struct {
-	state     state
-	spinner   int
-	backend   *exec.Cmd
-	deadline  time.Time
-	ready     bool
-	errMsg    string
-	modelName string
+	state    state
+	spinner  int
+	deadline time.Time
+	ready    bool
+	errMsg   string
 }
 
 type tickMsg struct{}
@@ -55,7 +53,7 @@ type readyMsg struct{}
 
 type backendExitMsg struct{ err error }
 
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+var spinnerFrames = []string{".", "..", "..."}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(healthCheckPeriod, func(time.Time) tea.Msg {
@@ -94,10 +92,6 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		m.spinner = (m.spinner + 1) % len(spinnerFrames)
-		if m.backend != nil && m.backend.Process != nil {
-			// Check if process already exited (ProcessState set after Wait)
-			// We avoid Wait here; health timeout is sufficient.
-		}
 		return m, checkHealthCmd()
 
 	case readyMsg:
@@ -120,17 +114,13 @@ func (m launchModel) View() string {
 	switch m.state {
 	case stateBoot, stateWaiting:
 		frame := spinnerFrames[m.spinner%len(spinnerFrames)]
-		body = lipgloss.NewStyle().Foreground(faint).Render("  " + frame + "  starting...")
+		body = lipgloss.NewStyle().Foreground(faint).Render(frame + " Starting")
 	case stateReady:
-		label := "  ready"
-		if m.modelName != "" {
-			label += "  " + m.modelName
-		}
-		body = lipgloss.NewStyle().Foreground(subtle).Render(label)
+		body = lipgloss.NewStyle().Foreground(subtle).Render("ready")
 	case stateFailed:
-		body = lipgloss.NewStyle().Foreground(danger).Render("  error: " + m.errMsg)
+		body = lipgloss.NewStyle().Foreground(danger).Render("error: " + m.errMsg)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", body, "")
+	return lipgloss.JoinVertical(lipgloss.Left, title, body)
 }
 
 func findProjectRoot() (string, error) {
@@ -157,27 +147,19 @@ func preCheck() (alreadyRunning bool, err error) {
 	return false, nil
 }
 
-var setupFlag = flag.Bool("setup", false, "Show setup screen to change provider/model/API key.")
-var clearFlag = flag.Bool("clear", false, "Clear all saved warden data and exit.")
-
-func clearWardenData() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "home dir:", err)
-		return
+func ensurePythonDeps(root string, logFile *os.File) error {
+	req := filepath.Join(root, "requirements.txt")
+	if _, err := os.Stat(req); err != nil {
+		return nil // no requirements.txt, skip
 	}
-	files := []string{
-		filepath.Join(home, ".warden-config.json"),
-		filepath.Join(home, ".warden-settings.json"),
+	cmd := exec.Command("pip", "install", "-r", req, "-q", "--disable-pip-version-check")
+	cmd.Dir = root
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("pip install failed — run manually: pip install -r requirements.txt\n  %w", err)
 	}
-	for _, f := range files {
-		if err := os.Remove(f); err == nil {
-			fmt.Println("removed", f)
-		} else if !os.IsNotExist(err) {
-			fmt.Fprintln(os.Stderr, "remove", f, ":", err)
-		}
-	}
-	fmt.Println("warden data cleared")
+	return nil
 }
 
 func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
@@ -196,12 +178,14 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	// prefer bundled backend.exe next to warden.exe; fall back to python
 	var cmd *exec.Cmd
 	backendExe := filepath.Join(root, "warden-backend.exe")
 	if _, statErr := os.Stat(backendExe); statErr == nil {
 		cmd = exec.Command(backendExe)
 	} else {
+		if err := ensurePythonDeps(root, outFile); err != nil {
+			return nil, err
+		}
 		cmd = exec.Command("python", "-m", "agent.server")
 	}
 	cmd.Dir = root
@@ -223,6 +207,7 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	cmd.Env = env
 	cmd.Stdout = outFile
 	cmd.Stderr = errFile
+	setupCmd(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -249,12 +234,11 @@ func killBackendByPort() {
 	}
 }
 
-func runLauncher(alreadyRunning bool, modelName string) (ready bool, backend *exec.Cmd) {
+func runLauncher(alreadyRunning bool) (ready bool) {
 	m := launchModel{
-		state:     stateBoot,
-		deadline:  time.Now().Add(startupTimeout),
-		ready:     alreadyRunning,
-		modelName: modelName,
+		state:    stateBoot,
+		deadline: time.Now().Add(startupTimeout),
+		ready:    alreadyRunning,
 	}
 	if alreadyRunning {
 		m.state = stateReady
@@ -265,33 +249,21 @@ func runLauncher(alreadyRunning bool, modelName string) (ready bool, backend *ex
 	model, err := p.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "launcher error:", err)
-		return false, nil
+		return false
 	}
 	lm := model.(launchModel)
-	return lm.ready, lm.backend
+	return lm.ready
 }
 
 func main() {
-	flag.Parse()
-
-	if *clearFlag {
-		clearWardenData()
-		return
-	}
-
 	root, err := findProjectRoot()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "find root failed:", err)
 		os.Exit(1)
 	}
 
-	cfg, exists := loadConfig()
-	if !exists || *setupFlag {
-		cfg = runSetup(cfg)
-		if err := saveConfig(cfg); err != nil {
-			fmt.Fprintln(os.Stderr, "save config failed:", err)
-		}
-	}
+	cfg, _ := loadConfig()
+	connected := cfg.Model != "" && cfg.APIKey != ""
 
 	alreadyRunning, err := preCheck()
 	if err != nil {
@@ -308,7 +280,7 @@ func main() {
 		}
 	}
 
-	ready, _ := runLauncher(alreadyRunning, cfg.Model)
+	ready := runLauncher(alreadyRunning)
 	if !ready {
 		if backend != nil {
 			stopBackend(backend)
@@ -316,7 +288,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tui.Run(cfg.Model)
+	err = tui.Run(cfg.Model, connected)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}
