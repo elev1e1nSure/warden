@@ -40,6 +40,8 @@ class TestStart:
 	def test_start_windows(self, monkeypatch):
 		from agent.ollama_process import OllamaProcessManager
 		monkeypatch.setattr(sys, "platform", "win32")
+		# CREATE_NEW_PROCESS_GROUP is Windows-only; add it so the test runs on Linux too
+		monkeypatch.setattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 512, raising=False)
 		with patch("agent.ollama_process.subprocess.Popen") as mock_popen:
 			m = OllamaProcessManager()
 			m.start()

@@ -1,5 +1,6 @@
 """Tests for the safety policy engine."""
 
+import os
 from pathlib import Path
 
 from agent.safety import (
@@ -200,7 +201,8 @@ class TestPowerShellClassification:
 
 class TestToolAssessment:
 	def test_file_read_safe(self) -> None:
-		d = _decision("file_read", {"path": r"D:\Projects\warden\README.md"})
+		cwd = os.getcwd()
+		d = assess_tool_call("file_read", {"path": os.path.join(cwd, "README.md")}, cwd=cwd)
 		assert d.risk == "safe"
 
 	def test_file_read_outside_workspace_confirm(self) -> None:
@@ -216,7 +218,8 @@ class TestToolAssessment:
 		assert d.risk == "confirm"
 
 	def test_file_delete_inside_confirm(self) -> None:
-		d = _decision("file_delete", {"path": "old.txt"})
+		cwd = os.getcwd()
+		d = assess_tool_call("file_delete", {"path": os.path.join(cwd, "old.txt")}, cwd=cwd)
 		assert d.risk == "confirm"
 
 	def test_file_delete_outside_blocked(self) -> None:
