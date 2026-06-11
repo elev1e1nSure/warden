@@ -535,7 +535,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendToolActivity(toolStartLine(inner.name, inner.args))
 				m.runningToolIdx = len(m.messages) - 1
 			} else {
-				m.appendToolFlow(toolDisplayName(inner.name))
+				m.appendToolFlow(toolDisplayName(inner.name), inner.args)
 				m.runningToolIdx = len(m.messages) - 1
 			}
 			m.syncViewport()
@@ -658,7 +658,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		if m.loading {
 			m.spinner += m.advance()
-			if !m.thinkDone && m.streaming && !m.confirming && !m.toolRunning && len(m.messages) > 0 {
+			if m.streaming && !m.confirming && len(m.messages) > 0 {
 				m.syncViewport()
 			}
 			return m, m.tick()
@@ -967,6 +967,7 @@ type messageEntry struct {
 	duration  time.Duration
 	activity  string // current verb shown in single-line activity mode
 	toolName  string // display name for messageToolFlow
+	toolArgs  string // tool arguments (e.g. search query) for display
 	toolDone  bool   // true when the tool has finished
 }
 
@@ -978,8 +979,8 @@ func (m *model) appendToolActivity(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
 }
 
-func (m *model) appendToolFlow(name string) {
-	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name})
+func (m *model) appendToolFlow(name, args string) {
+	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name, toolArgs: args})
 }
 
 func (m *model) appendThink() {
