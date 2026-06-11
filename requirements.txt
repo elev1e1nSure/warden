@@ -5,7 +5,7 @@ duckduckgo-search>=6.0.0
 pytest
 pytest-cov>=5.0
 pytest-asyncio>=0.23.0
-pytest-aiohttp>=3.9
+pytest-aiohttp>=1.0
 
 # optional runtime deps (tools import them lazily)
 pyautogui
