@@ -64,10 +64,9 @@ type model struct {
 	activityIdx int
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
-	// interrupt / rollback state
+	// interrupt state
 	interruptStream bool
 	streamStart     int
-	lastUserInput   string
 	// pending double-press confirmations (during streaming)
 	escPending  bool
 	quitPending bool
@@ -148,8 +147,17 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Block all mouse events — viewport scroll is arrow-key only
-	if _, ok := msg.(tea.MouseMsg); ok {
+	if mouse, ok := msg.(tea.MouseMsg); ok {
+		switch mouse.Button {
+		case tea.MouseButtonWheelUp:
+			m.userScrolled = true
+			m.viewport.LineUp(5)
+		case tea.MouseButtonWheelDown:
+			m.viewport.LineDown(5)
+			if m.viewport.AtBottom() {
+				m.userScrolled = false
+			}
+		}
 		return m, nil
 	}
 	var cmds []tea.Cmd
@@ -245,6 +253,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.updateViewportHeight()
 					m.syncViewport()
+				}
+				return m, nil
+			}
+			if m.streaming {
+				m.viewport.LineDown(3)
+				if m.viewport.AtBottom() {
+					m.userScrolled = false
 				}
 				return m, nil
 			}
@@ -380,11 +395,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.toolRunning = false
 				m.userScrolled = false
 				m.finishThink()
-				if m.streamStart <= len(m.messages) {
-					m.messages = m.messages[:m.streamStart]
-				}
-				m.textinput.SetValue(m.lastUserInput)
-				m.textinput.CursorEnd()
 				m.textinput.Placeholder = ""
 				m.syncViewport()
 				return m, m.focusInput()
@@ -531,7 +541,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			m.lastUserInput = text
 			m.streamStart = len(m.messages)
 			m.appendText(UserStyle().Render("  you"))
 			m.appendText("  " + text)
@@ -887,7 +896,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// send skill body as user message
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
-		m.lastUserInput = body
 		m.streamStart = len(m.messages)
 		m.appendText(UserStyle().Render("  > ") + body[:min(len(body), 200)])
 		m.textinput.Reset()
@@ -1057,17 +1065,6 @@ func (m *model) appendText(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
 }
 
-// filterTransientMessages removes think and tool activity entries added in the
-// current turn. Called at turn end when not in verbose mode.
-func (m *model) filterTransientMessages() {
-	filtered := make([]messageEntry, 0, len(m.messages))
-	for i, e := range m.messages {
-		if i < m.streamStart || (e.kind != messageThink && e.kind != messageToolActivity) {
-			filtered = append(filtered, e)
-		}
-	}
-	m.messages = filtered
-}
 
 func (m *model) appendToolActivity(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
