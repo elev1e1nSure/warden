@@ -14,7 +14,6 @@ type StatusResult struct {
 	Model      string `json:"model"`
 	Provider   string `json:"provider"`
 	Mode       string `json:"mode"`
-	Thinking   bool   `json:"thinking"`
 	CWD        string `json:"cwd"`
 	TokenCount int    `json:"token_count"`
 	TokenLimit int    `json:"token_limit"`

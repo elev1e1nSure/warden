@@ -122,7 +122,6 @@ func (m model) fetchStatus(brief bool) tea.Cmd {
 			model:      s.Model,
 			provider:   s.Provider,
 			mode:       s.Mode,
-			thinking:   s.Thinking,
 			cwd:        s.CWD,
 			brief:      brief,
 			tokenCount: s.TokenCount,

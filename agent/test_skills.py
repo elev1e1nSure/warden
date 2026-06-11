@@ -162,3 +162,9 @@ def test_max_size_truncates(monkeypatch, tmp_path) -> None:
 	huge = sk.find_skill("huge")
 	assert huge is not None
 	assert len(huge.content.encode("utf-8")) <= sk.MAX_SKILL_BYTES
+
+
+def test_find_skill_rejects_traversal() -> None:
+	assert sk.find_skill("../secret") is None
+	assert sk.find_skill("../../etc/passwd") is None
+	assert sk.find_skill("C:/Windows") is None

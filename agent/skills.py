@@ -146,6 +146,8 @@ def discover_skills() -> list[Skill]:
 
 def find_skill(name: str) -> Skill | None:
 	"""Find a single skill by name."""
+	if not _validate_name(name):
+		return None
 	for skill in discover_skills():
 		if skill.name == name:
 			return skill

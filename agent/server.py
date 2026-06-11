@@ -242,8 +242,11 @@ async def skills_list(request: web.Request) -> web.Response:
 
 
 async def skill_get(request: web.Request) -> web.Response:
-	from agent.skills import find_skill, wrap_skill_content
+	from agent.skills import find_skill, wrap_skill_content, _validate_name
 	name = request.match_info.get("name", "")
+	if not _validate_name(name):
+		log_request("GET", f"/skill/{name}", 400)
+		return web.json_response({"error": "invalid skill name"}, status=400)
 	skill = find_skill(name)
 	if skill is None:
 		log_request("GET", f"/skill/{name}", 404)
