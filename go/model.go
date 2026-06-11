@@ -454,7 +454,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							ch := m.questionCh
 							id := m.questionID
 							answers := m.questionAnswers
+							savedQuestions := m.questionsData
 							m = m.clearQuestionState()
+							m.appendQuizHistory(savedQuestions, answers)
+							m.updateViewportHeight()
+							m.syncViewport()
 							return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
 						}
 						m.syncViewport()
@@ -488,7 +492,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						ch := m.questionCh
 						id := m.questionID
 						answers := m.questionAnswers
+						savedQuestions := m.questionsData
 						m = m.clearQuestionState()
+						m.appendQuizHistory(savedQuestions, answers)
+						m.updateViewportHeight()
+						m.syncViewport()
 						return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
 					}
 					m.syncViewport()
@@ -1147,6 +1155,25 @@ func (m model) clearQuestionState() model {
 	m.textinput.Placeholder = ""
 	m.textinput.Reset()
 	return m
+}
+
+func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) {
+	var b strings.Builder
+	for i, q := range questions {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		ans := "—"
+		if i < len(answers) && len(answers[i]) > 0 {
+			ans = strings.Join(answers[i], ", ")
+		}
+		label := q.Header
+		if label == "" {
+			label = q.Question
+		}
+		b.WriteString(AccentStyle().Render("  ? ") + DimStyle().Render(label) + "   " + ans)
+	}
+	m.appendText(b.String())
 }
 
 func parseOptionNumber(input string) (int, error) {
