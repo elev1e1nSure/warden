@@ -297,6 +297,18 @@ func extractToolDetail(name, args string) string {
 	if args == "" {
 		return ""
 	}
+	// Fetch sends "text, timeout=15, url=https://..." — extract only URL
+	if name == "Fetch" {
+		for _, part := range strings.Split(args, ",") {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "url=") {
+				v := strings.TrimSpace(part[4:])
+				v = strings.Trim(v, `"'`)
+				return truncateRunes(v, 60)
+			}
+		}
+		return ""
+	}
 	// args come as "key=value, key2=value2" from backend
 	parts := strings.SplitN(args, "=", 2)
 	if len(parts) == 2 {

@@ -978,6 +978,15 @@ func (m *model) appendToolActivity(text string) {
 }
 
 func (m *model) appendToolFlow(name, args string) {
+	// collapse: if the last message is the same tool, reuse it
+	if len(m.messages) > 0 {
+		last := &m.messages[len(m.messages)-1]
+		if last.kind == messageToolFlow && last.toolName == name {
+			last.toolArgs = args
+			last.toolDone = false
+			return
+		}
+	}
 	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name, toolArgs: args})
 }
 
