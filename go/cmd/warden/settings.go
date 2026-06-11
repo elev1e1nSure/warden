@@ -236,19 +236,11 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m settingsModel) View() string {
 	dimStyle := lipgloss.NewStyle().Foreground(faint)
-	labelActive := lipgloss.NewStyle().Foreground(amber).Width(10)
-	labelInactive := lipgloss.NewStyle().Foreground(faint).Width(10)
+	activeVal := lipgloss.NewStyle().Foreground(green).Bold(true)
 
 	isActive := func(field int) bool { return m.focusIdx == field }
 
-	lbl := func(text string, field int) string {
-		if isActive(field) {
-			return labelActive.Render(text)
-		}
-		return labelInactive.Render(text)
-	}
-
-	textVal := func(inputIdx, field int) string {
+	valueStr := func(inputIdx, field int) string {
 		if isActive(field) {
 			return m.inputs[inputIdx].View()
 		}
@@ -264,29 +256,34 @@ func (m settingsModel) View() string {
 
 	var b strings.Builder
 	b.WriteString(dimStyle.Render("warden setup"))
-	b.WriteString("\n\n\n")
+	b.WriteString("\n\n")
 
 	// Provider
-	var provParts []string
+	b.WriteString(dimStyle.Render("provider: "))
 	for i, p := range setupProviders {
+		if i > 0 {
+			b.WriteString(dimStyle.Render(" "))
+		}
 		if i == m.providerIdx {
-			provParts = append(provParts, lipgloss.NewStyle().Foreground(amber).Bold(true).Render(p))
+			b.WriteString(activeVal.Render(p))
 		} else {
-			provParts = append(provParts, dimStyle.Render(p))
+			b.WriteString(dimStyle.Render(p))
 		}
 	}
-	b.WriteString("  " + lbl("Provider", sfProvider) + "  " + strings.Join(provParts, dimStyle.Render("  ·  ")))
 	b.WriteString("\n")
 
 	// Model
-	b.WriteString("  " + lbl("Model", sfModel) + "  " + textVal(0, sfModel))
+	b.WriteString(dimStyle.Render("model: "))
+	b.WriteString(valueStr(0, sfModel))
 	b.WriteString("\n")
 
 	// OpenRouter-only fields
 	if m.isOpenRouter() {
-		b.WriteString("  " + lbl("API URL", sfAPIURL) + "  " + textVal(1, sfAPIURL))
+		b.WriteString(dimStyle.Render("api url: "))
+		b.WriteString(valueStr(1, sfAPIURL))
 		b.WriteString("\n")
-		b.WriteString("  " + lbl("API Key", sfAPIKey) + "  " + textVal(2, sfAPIKey))
+		b.WriteString(dimStyle.Render("api key: "))
+		b.WriteString(valueStr(2, sfAPIKey))
 		b.WriteString("\n")
 	}
 
