@@ -47,6 +47,12 @@ class ToolResult:
 	def __str__(self) -> str:
 		return self.result
 
+	def __contains__(self, item: str) -> bool:
+		return item in self.result
+
+	def lower(self) -> str:
+		return self.result.lower()
+
 
 def _clean(text: str) -> str:
 	"""Strip ANSI codes and collapse \r-overwrites"""
