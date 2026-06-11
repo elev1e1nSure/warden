@@ -3,7 +3,7 @@
 [![CI](https://github.com/elev1e1nSure/warden/actions/workflows/ci.yml/badge.svg)](https://github.com/elev1e1nSure/warden/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[Читать на русском](README.ru.md)
+[English](README.md)
 
 CLI-агент для управления компьютером. Go TUI + Python-бэкенд + Ollama.
 

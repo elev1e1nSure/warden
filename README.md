@@ -1,6 +1,6 @@
 # warden
 
-[Читать на английском](README.md)
+[Русский](README.ru.md)
 
 CLI computer control agent for Windows. Go TUI + Python backend + Ollama.
 
