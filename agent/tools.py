@@ -27,7 +27,10 @@ def _clean(text: str) -> str:
 
 def _in_cwd(path: str) -> bool:
 	try:
-		return os.path.abspath(path).startswith(os.getcwd())
+		cwd = os.getcwd()
+		if not cwd.endswith(os.sep):
+			cwd += os.sep
+		return os.path.abspath(path).startswith(cwd)
 	except Exception:
 		return False
 

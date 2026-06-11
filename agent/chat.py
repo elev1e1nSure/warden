@@ -182,8 +182,7 @@ class ChatSession:
 
 				if thinking and self.thinking_enabled:
 					yield ("think", thinking)
-
-				if chunk.reasoning:
+				elif chunk.reasoning:
 					full_reasoning += chunk.reasoning
 					if self.thinking_enabled:
 						yield ("think", chunk.reasoning)
@@ -212,7 +211,7 @@ class ChatSession:
 								clean = _clean_visible_text(text_chunk[:idx])
 								yield ("token", clean)
 								full_content += clean
-							text_chunk = text_chunk[idx + 7:]
+							text_chunk = text_chunk[idx + 9:]
 							in_think = True
 					else:
 						idx = text_chunk.find("</think>")
@@ -222,7 +221,7 @@ class ChatSession:
 						else:
 							if idx > 0:
 								yield ("think", text_chunk[:idx])
-							text_chunk = text_chunk[idx + 8:]
+							text_chunk = text_chunk[idx + 9:]
 							in_think = False
 		except Exception as e:
 			yield ("token", f"\nconnection error: {e}")

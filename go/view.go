@@ -399,9 +399,9 @@ func (m model) renderWaveSpinner() string {
 
 // renderStatusBar renders the 2-line bottom status bar.
 func (m model) renderStatusBar() string {
-	mode := AccentStyle().Render("ask")
+	mode := AccentStyle().Render("Ask")
 	if m.autoMode {
-		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("auto")
+		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Auto")
 	}
 	dot := FaintStyle().Render(" · ")
 	provider := m.providerName
