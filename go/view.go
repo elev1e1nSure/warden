@@ -11,6 +11,35 @@ import (
 
 var diffStatsRe = regexp.MustCompile(`(\+\d+)\s+(-\d+)$`)
 
+var (
+	diffAddStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00D47A")).Background(lipgloss.Color("#0d1f0d"))
+	diffRemoveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444")).Background(lipgloss.Color("#1f0d0d"))
+	diffHunkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#569CD6"))
+	diffFileStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Bold(true)
+	diffCtxStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+)
+
+func renderUnifiedDiff(diff string) string {
+	lines := strings.Split(strings.TrimRight(diff, "\n"), "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
+		switch {
+		case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
+			out = append(out, diffFileStyle.Render("  "+line))
+		case strings.HasPrefix(line, "@@"):
+			out = append(out, diffHunkStyle.Render("  "+line))
+		case strings.HasPrefix(line, "+"):
+			out = append(out, diffAddStyle.Render("  "+line))
+		case strings.HasPrefix(line, "-"):
+			out = append(out, diffRemoveStyle.Render("  "+line))
+		default:
+			out = append(out, diffCtxStyle.Render("  "+line))
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
 // renderDiffStats finds "+N -N" at the end of s, returns (prefix, colored stats).
 func renderDiffStats(s string) (string, string) {
 	loc := diffStatsRe.FindStringIndex(s)
@@ -310,6 +339,8 @@ func (m *model) renderMessages() []string {
 			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
 		case messageToolActivity:
 			rendered = entry.text
+		case messageToolDiff:
+			rendered = renderUnifiedDiff(entry.text)
 		default:
 			rendered = entry.text
 		}

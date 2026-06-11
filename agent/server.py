@@ -306,6 +306,8 @@ async def chat(request: web.Request) -> web.StreamResponse:
 				msg = {"type": "tool_start", "name": payload["name"], "args": payload["args"]}
 			elif type_ == "tool":
 				msg = {"type": "tool", "name": payload["name"], "args": payload["args"], "result": payload["result"]}
+				if payload.get("diff"):
+					msg["diff"] = payload["diff"]
 			elif type_ == "confirm":
 				msg = {
 					"type": "confirm",

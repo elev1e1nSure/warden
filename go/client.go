@@ -35,6 +35,7 @@ type ToolMsg struct {
 	Name   string `json:"name"`
 	Args   string `json:"args"`
 	Result string `json:"result"`
+	Diff   string `json:"diff"`
 }
 
 type Skill struct {

@@ -614,6 +614,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messages[m.activityIdx].activity = ""
 				}
 			}
+			if inner.tool.Diff != "" {
+				m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
+			}
 			m.runningToolIdx = -1
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -1031,6 +1034,7 @@ const (
 	messageThink
 	messageAssistant
 	messageToolActivity // tool line, filtered out at turn end in normal mode
+	messageToolDiff     // diff block, persists in history even in non-verbose mode
 )
 
 type messageEntry struct {
