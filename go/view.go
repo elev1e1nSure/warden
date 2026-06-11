@@ -206,7 +206,7 @@ func toolStartLine(name, args string) string {
 
 // wardenLine builds a labeled response line (used for slash command output).
 func (m model) wardenLine(suffix string) string {
-	return "  " + WardenStyle().Render("warden") + "\n  " + suffix
+	return "  " + WardenStyle().Render("warden") + "\n    " + suffix
 }
 
 func compactThinkText(text string) string {
