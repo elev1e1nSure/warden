@@ -268,29 +268,29 @@ func wrapWords(text string, width int) []string {
 func toolPastTense(name string) string {
 	switch name {
 	case "Search":
-		return "searched"
+		return "Searched"
 	case "Read":
-		return "read"
+		return "Read"
 	case "Write":
-		return "wrote"
+		return "Wrote"
 	case "Grep":
-		return "searched"
+		return "Searched"
 	case "Glob":
-		return "found"
+		return "Found"
 	case "Patch":
-		return "patched"
+		return "Patched"
 	case "Browser":
-		return "browsed"
+		return "Browsed"
 	case "Fetch":
-		return "fetched"
+		return "Fetched"
 	case "Screenshot":
-		return "screenshot"
+		return "Screenshot"
 	case "Keyboard":
-		return "typed"
+		return "Typed"
 	case "Todo":
-		return "listed"
+		return "Listed"
 	}
-	return "ran " + strings.ToLower(name)
+	return "Ran " + strings.ToLower(name)
 }
 
 func extractToolDetail(name, args string) string {
@@ -351,7 +351,7 @@ func (m model) renderThinkEntry(entry messageEntry) string {
 
 	if !m.verboseMode {
 		if entry.duration > 0 {
-			return DimStyle().Render("  thought")
+			return DimStyle().Render("  Thought")
 		}
 		if m.loading {
 			dots := []string{".", "..", "..."}
