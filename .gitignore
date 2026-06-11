@@ -22,6 +22,9 @@ go/warden.exe
 !.warden/skills/
 .tmp/
 
+# Scratch files
+poll.html
+
 # Claude worktrees
 .claude/
 

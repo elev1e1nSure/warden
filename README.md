@@ -39,21 +39,41 @@ $env:OPENROUTER_API_KEY="sk-or-v1-..."
 | key | action |
 |---|---|
 | `Enter` | send |
-| `Esc` | interrupt |
-| `Esc` ×2 | force-interrupt |
+| `Esc` | interrupt stream |
+| `Esc` ×2 | force-stop |
 | `Shift+Tab` | toggle Ask / Auto mode |
-| `↑` / `↓` | scroll |
+| `↑` / `↓` | scroll during stream |
+| `scroll wheel` | scroll (5 lines per tick) |
+| `↑` / `↓` (idle) | navigate input history |
 | `Ctrl+C` | exit |
 
 ## slash commands
 
 | command | action |
 |---|---|
-| `/auto` | Auto mode — dangerous commands run without confirmation |
-| `/ask` | Ask mode — confirmation for dangerous commands |
-| `/reset` | reset session |
-| `/provider <name>` | switch provider (`ollama` or `openrouter`) |
-| `/api <url>` | set API base URL (e.g. for OpenRouter) |
+| `/auto` | Auto mode — confirm-level actions run without prompt |
+| `/ask` | Ask mode — confirm-level actions require `y` / `n` |
+| `/reset` | reset session and clear screen |
+| `/clear` | clear screen, keep session |
+| `/status` | show model, provider, mode |
+| `/models` | switch model (interactive picker) |
+| `/provider <name>` | switch provider (`ollama` \| `openrouter`) |
+| `/api <url>` | override API base URL |
+| `/compact` | summarize context to free up token budget |
+| `/copy-last` | copy last assistant response to clipboard |
+| `/verbose` | toggle verbose mode (show tool lines and diffs) |
+| `/pwd` | show current working directory |
+
+## skills
+
+Skills are Markdown instruction sets the agent can invoke.
+
+```
+! <skill-name>          # invoke a skill
+!                       # list available skills
+```
+
+Skills live in `.warden/skills/<name>/SKILL.md` (project) or `~/.warden/skills/<name>/SKILL.md` (global).
 
 ## safety
 

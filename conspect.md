@@ -38,9 +38,14 @@ Go TUI <-> Python backend (HTTP NDJSON) <-> Ollama <-> Tools (PowerShell, filesy
 - Times out after 5 minutes
 
 ## Commands
-- `/auto` - Disable confirmations
-- `/ask` - Enable confirmations
-- `/reset` - Clear pending actions
+- `/auto` `/ask` — toggle mode
+- `/reset` `/clear` — session / screen
+- `/status` `/pwd` — info
+- `/models` `/provider` `/api` — switch model/provider
+- `/compact` — summarize context
+- `/copy-last` — copy last response
+- `/verbose` — toggle tool lines/diffs
+- `!<name>` — invoke skill, `! cmd` — run shell shortcut
 
 ## Security
 - **Safe**: Read-only operations
