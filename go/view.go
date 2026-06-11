@@ -206,7 +206,7 @@ func toolStartLine(name, args string) string {
 
 // wardenLine builds a labeled response line (used for slash command output).
 func (m model) wardenLine(suffix string) string {
-	return WardenStyle().Render("warden") + "  " + suffix
+	return "  " + WardenStyle().Render("warden") + "\n  " + suffix
 }
 
 func compactThinkText(text string) string {
@@ -452,8 +452,8 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 func (m model) renderWaveSpinner() string {
 	const n = 7
 	const lo = -2
-	const hi = n + 1     // =8
-	const span = hi - lo // 10
+	const hi = n + 1       // =8
+	const span = hi - lo   // 10
 	const cycle = span * 2 // 20
 	if !m.loading {
 		return FaintStyle().Render(strings.Repeat("░", n))
@@ -502,13 +502,8 @@ func (m model) renderStatusBar() string {
 		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Auto")
 	}
 	dot := FaintStyle().Render(" · ")
-	provider := m.providerName
-	if provider == "" {
-		provider = "ollama"
-	}
 	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
-	providerPart := DimStyle().Render(provider)
-	left := mode + dot + modelPart + dot + providerPart
+	left := mode + dot + modelPart
 
 	line1 := left
 	if m.tokenLimit > 0 && m.tokenCount > 0 {
@@ -570,7 +565,6 @@ func (m model) renderInput() string {
 	return style.Render(m.textinput.View())
 }
 
-
 func (m *model) layoutViewportHeight() int {
 	if m.height < 1 {
 		return 1
@@ -599,12 +593,17 @@ func (m *model) layoutViewportHeight() int {
 
 	modelPickerHeight := 0
 	if m.modelPicking {
-		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.modelProviders, m.modelProviderIdx))
+		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop))
+	}
+
+	cwHeight := 0
+	if m.cwOpen {
+		cwHeight = lipgloss.Height(m.renderConnectWizard())
 	}
 
 	// input: 3 (border top + content + border bottom)
 	// status bar: 2 lines
-	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + 3 + 2
+	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + 3 + 2
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -641,7 +640,11 @@ func (m model) View() string {
 	}
 
 	if m.modelPicking {
-		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.modelProviders, m.modelProviderIdx))
+		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop))
+	}
+
+	if m.cwOpen {
+		layers = append(layers, m.renderConnectWizard())
 	}
 
 	if m.hintVisible {
@@ -655,27 +658,96 @@ func (m model) View() string {
 var pickerKeyStyle = lipgloss.NewStyle().Foreground(Amber).Bold(true)
 var pickerTabActive = lipgloss.NewStyle().Foreground(Amber).Bold(true)
 
-func renderModelPicker(filtered []string, idx, scrollTop int, providers []string, providerIdx int) string {
+func (m model) renderConnectWizard() string {
+	acc := AccentStyle()
+	dim := DimStyle()
+	err := ErrorStyle()
+	bold := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	key := func(s string) string { return pickerKeyStyle.Render(s) }
+
+	var lines []string
+
+	if m.cwErr != "" {
+		lines = append(lines, "  "+err.Render("✕  "+m.cwErr))
+		lines = append(lines, "  "+dim.Render(key("esc")+" dismiss"))
+		return strings.Join(lines, "\n")
+	}
+
+	if m.cwLoading {
+		lines = append(lines, "  "+dim.Render("connecting..."))
+		return strings.Join(lines, "\n")
+	}
+
+	switch m.cwStep {
+	case 0:
+		lines = append(lines, "  "+bold.Render("connect"), "")
+		providers := []string{"openrouter", "ollama"}
+		for i, p := range providers {
+			if i == m.cwPickIdx {
+				lines = append(lines, "  "+acc.Render("› "+p))
+			} else {
+				lines = append(lines, "  "+dim.Render("  "+p))
+			}
+		}
+		lines = append(lines, "")
+		hint := key("↑↓") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" cancel")
+		lines = append(lines, "  "+hint)
+
+	case 1:
+		lines = append(lines, "  "+bold.Render("api key"), "")
+		lines = append(lines, "  "+m.cwInput.View())
+		lines = append(lines, "  "+dim.Render("get one at openrouter.ai/keys"))
+		lines = append(lines, "")
+		hint := key("Enter") + dim.Render(" confirm   ") + key("Esc") + dim.Render(" back")
+		lines = append(lines, "  "+hint)
+
+	case 2:
+		lines = append(lines, "  "+bold.Render("model"), "")
+		if m.cwCustom {
+			lines = append(lines, "  "+m.cwInput.View())
+			lines = append(lines, "")
+			hint := key("Enter") + dim.Render(" confirm   ") + key("Esc") + dim.Render(" back")
+			lines = append(lines, "  "+hint)
+		} else {
+			const maxVis = 7
+			start := m.cwScroll
+			end := start + maxVis
+			if end > len(m.cwModels) {
+				end = len(m.cwModels)
+			}
+			for i := start; i < end; i++ {
+				name := m.cwModels[i]
+				if i == m.cwPickIdx {
+					lines = append(lines, "  "+acc.Render("› "+name))
+				} else {
+					lines = append(lines, "  "+dim.Render("  "+name))
+				}
+			}
+			lines = append(lines, "")
+			hint := key("↑↓") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" back")
+			lines = append(lines, "  "+hint)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func renderModelPicker(filtered []string, idx, scrollTop int) string {
 	const maxVisible = 8
 	start := scrollTop
 	end := start + maxVisible
 	if end > len(filtered) {
 		end = len(filtered)
 	}
-	lines := make([]string, 0, maxVisible+5)
+	lines := make([]string, 0, maxVisible+4)
 
-	// key hints — amber keys, dim descriptions
 	key := func(s string) string { return pickerKeyStyle.Render(s) }
 	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
 		key("Enter") + DimStyle().Render(" select   ") +
 		key("Esc") + DimStyle().Render(" cancel")
-	if len(providers) > 1 {
-		hint += "   " + key("←→") + DimStyle().Render(" provider")
-	}
 	lines = append(lines, "  "+hint)
 	lines = append(lines, "")
 
-	// model list
 	for i := start; i < end; i++ {
 		name := filtered[i]
 		if i == idx {
@@ -683,20 +755,6 @@ func renderModelPicker(filtered []string, idx, scrollTop int, providers []string
 		} else {
 			lines = append(lines, DimStyle().Render("    "+name))
 		}
-	}
-
-	// provider tabs at bottom
-	if len(providers) > 1 {
-		lines = append(lines, "")
-		var tabs []string
-		for i, p := range providers {
-			if i == providerIdx {
-				tabs = append(tabs, pickerTabActive.Render(p))
-			} else {
-				tabs = append(tabs, DimStyle().Render(p))
-			}
-		}
-		lines = append(lines, "  "+strings.Join(tabs, FaintStyle().Render("  ·  ")))
 	}
 
 	return strings.Join(lines, "\n")
