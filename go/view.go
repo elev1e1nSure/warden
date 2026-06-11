@@ -355,11 +355,11 @@ func (m *model) renderMessages() []string {
 			text := indentLines(m.renderMarkdown(entry.text), "  ")
 			lines := strings.Split(text, "\n")
 			for i, line := range lines {
-				if strings.TrimSpace(line) == "" {
-					lines[i] = WardenBgStyle().Render(" ")
-				} else {
-					lines[i] = WardenBgStyle().Render(line)
+				visible := lipgloss.Width(line)
+				if visible < m.width {
+					line += strings.Repeat(" ", m.width-visible)
 				}
+				lines[i] = WardenBgStyle().Render(line)
 			}
 			rendered = strings.Join(lines, "\n")
 		case messageToolActivity:
