@@ -47,14 +47,23 @@ type model struct {
 	hintCount   int
 	// status
 	thinkingEnabled  bool
-	thinkingExpanded bool
 	// path
 	cwd          string
 	providerName string
-	// live tool activity line — single updating line, never appended to messages
-	liveActivity     string
-	liveToolResult   string // full result for F2 expansion
-	toolExpanded     bool   // F2 toggled
+	// index of the in-progress tool line in messages (-1 = none)
+	runningToolIdx int
+	// verbose mode — shows tool lines, errors, think duration
+	verboseMode bool
+	// model picker
+	modelPicking      bool
+	modelList         []string
+	modelFiltered     []string
+	modelPickIdx      int
+	modelScrollTop    int
+	modelProviders    []string
+	modelProviderIdx  int
+	// activity tracking (index of current think/activity entry)
+	activityIdx int
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
 	// interrupt / rollback state
@@ -80,9 +89,26 @@ type model struct {
 	history    []string
 	historyIdx int
 	historySav string
+	// slash command cycling
+	slashIdx     int
+	slashTyped   string
 	// markdown
 	mdRenderer *glamour.TermRenderer
 	mdWidth    int
+}
+
+func filterModels(models []string, filter string) []string {
+	if filter == "" {
+		return models
+	}
+	lower := strings.ToLower(filter)
+	var result []string
+	for _, m := range models {
+		if strings.Contains(strings.ToLower(m), lower) {
+			result = append(result, m)
+		}
+	}
+	return result
 }
 
 func initialModel(modelName string) model {
@@ -106,10 +132,14 @@ func initialModel(modelName string) model {
 		client:          NewClient("http://localhost:8765"),
 		messages:        []messageEntry{},
 		thinkingEnabled: true,
+		autoMode:        loadAutoMode(),
 		cwd:             cwd,
 		modelName:       modelName,
 		history:         []string{},
 		loading:         true,
+		runningToolIdx:  -1,
+		slashIdx:        -1,
+		activityIdx:     -1,
 	}
 }
 
@@ -134,10 +164,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 
 	case tea.KeyMsg:
-		if msg.Type != tea.KeyF2 && msg.String() == "f2" {
-			m = m.toggleF2()
-			return m, m.focusInput()
-		}
 		// Clear pending confirmations if user presses a different key
 		if msg.Type != tea.KeyEsc {
 			m.escPending = false
@@ -156,19 +182,49 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 
-		case tea.KeyF2:
-			m = m.toggleF2()
-			return m, m.focusInput()
-
 		case tea.KeyUp:
+			if m.modelPicking {
+				if m.modelPickIdx > 0 {
+					m.modelPickIdx--
+					if m.modelPickIdx < m.modelScrollTop {
+						m.modelScrollTop = m.modelPickIdx
+					}
+					m.updateViewportHeight()
+					m.syncViewport()
+				}
+				return m, nil
+			}
+
 			if m.streaming {
 				m.userScrolled = true
 				m.viewport.LineUp(3)
 				return m, nil
 			}
-			if !m.questioning && !m.confirming && len(m.history) > 0 {
+			if m.questioning || m.confirming {
+				break
+			}
+			val := m.textinput.Value()
+			matches := matchSlash(val)
+			if len(matches) > 0 {
+				if m.slashIdx == -1 {
+					m.slashTyped = val
+					m.slashIdx = len(matches) - 1
+				} else if m.slashIdx > 0 {
+					m.slashIdx--
+				} else {
+					m.slashIdx = -1
+					m.textinput.SetValue(m.slashTyped)
+					m.textinput.CursorEnd()
+					break
+				}
+				m.textinput.SetValue(matches[m.slashIdx].name)
+				m.textinput.CursorEnd()
+				break
+			}
+			m.slashIdx = -1
+			if len(m.history) > 0 {
 				if m.historyIdx == len(m.history) {
-					m.historySav = m.textinput.Value()
+					m.historySav = val
 				}
 				if m.historyIdx > 0 {
 					m.historyIdx--
@@ -180,6 +236,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyDown:
+			if m.modelPicking {
+				if m.modelPickIdx < len(m.modelFiltered)-1 {
+					m.modelPickIdx++
+					const maxVisible = 8
+					if m.modelPickIdx >= m.modelScrollTop+maxVisible {
+						m.modelScrollTop = m.modelPickIdx - maxVisible + 1
+					}
+					m.updateViewportHeight()
+					m.syncViewport()
+				}
+				return m, nil
+			}
+
+		case tea.KeyLeft:
+			if m.modelPicking && len(m.modelProviders) > 1 {
+				m.modelProviderIdx = (m.modelProviderIdx - 1 + len(m.modelProviders)) % len(m.modelProviders)
+				m.modelList = nil
+				m.modelFiltered = nil
+				m.modelPickIdx = 0
+				m.modelScrollTop = 0
+				m.textinput.Reset()
+				m.syncViewport()
+				return m, m.switchProvider(m.modelProviders[m.modelProviderIdx])
+			}
+
+		case tea.KeyRight:
+			if m.modelPicking && len(m.modelProviders) > 1 {
+				m.modelProviderIdx = (m.modelProviderIdx + 1) % len(m.modelProviders)
+				m.modelList = nil
+				m.modelFiltered = nil
+				m.modelPickIdx = 0
+				m.modelScrollTop = 0
+				m.textinput.Reset()
+				m.syncViewport()
+				return m, m.switchProvider(m.modelProviders[m.modelProviderIdx])
+			}
 			if m.streaming {
 				m.viewport.LineDown(3)
 				if m.viewport.AtBottom() {
@@ -187,7 +279,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			if !m.questioning && !m.confirming && len(m.history) > 0 {
+			if m.questioning || m.confirming {
+				break
+			}
+			val := m.textinput.Value()
+			matches := matchSlash(val)
+			if m.slashIdx >= 0 && len(matches) > 0 {
+				if m.slashIdx < len(matches)-1 {
+					m.slashIdx++
+					m.textinput.SetValue(matches[m.slashIdx].name)
+					m.textinput.CursorEnd()
+				} else {
+					m.slashIdx = -1
+					m.textinput.SetValue(m.slashTyped)
+					m.textinput.CursorEnd()
+				}
+				break
+			}
+			m.slashIdx = -1
+			if len(m.history) > 0 {
 				if m.historyIdx < len(m.history) {
 					m.historyIdx++
 					m.textinput.Placeholder = ""
@@ -245,6 +355,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEsc:
+			if m.modelPicking {
+				m.modelPicking = false
+				m.modelList = nil
+				m.modelFiltered = nil
+				m.textinput.Reset()
+				m.updateViewportHeight()
+				m.syncViewport()
+				return m, m.focusInput()
+			}
 			if m.streaming && !m.questioning && !m.confirming {
 				if !m.escPending {
 					m.escPending = true
@@ -255,9 +374,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.interruptStream = true
 				m.streaming = false
 				m.loading = false
-				m.liveActivity = ""
-				m.liveToolResult = ""
-				m.toolExpanded = false
+				m.runningToolIdx = -1
 				m.thinkBuf = ""
 				m.thinkDone = false
 				m.toolRunning = false
@@ -345,6 +462,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textinput.Placeholder = ""
 
 		case tea.KeyEnter:
+			if m.modelPicking {
+				if m.modelPickIdx < len(m.modelFiltered) {
+					chosen := m.modelFiltered[m.modelPickIdx]
+					m.modelPicking = false
+					m.modelList = nil
+					m.modelFiltered = nil
+					m.textinput.Reset()
+					m.updateViewportHeight()
+					return m, tea.Batch(m.focusInput(), m.applyModel(chosen))
+				}
+				return m, nil
+			}
 			if m.questioning {
 				q := m.questionsData[m.questionIdx]
 				if len(q.Options) == 0 {
@@ -385,7 +514,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if strings.HasPrefix(text, "! ") {
 				cmdText := strings.TrimPrefix(text, "! ")
-				m.appendText(DimStyle().Render("  > ") + cmdText)
+				m.appendText(UserStyle().Render("  you"))
+				m.appendText("  " + cmdText)
 				m.appendText("")
 				m.textinput.Reset()
 				m.streaming = true
@@ -397,7 +527,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.lastUserInput = text
 			m.streamStart = len(m.messages)
-			m.appendText(DimStyle().Render("  > ") + text)
+			m.appendText(UserStyle().Render("  you"))
+			m.appendText("  " + text)
 			m.appendText("")
 			m.textinput.Reset()
 			m.streaming = true
@@ -425,21 +556,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkBuf = ""
 			m.thinkDone = false
 			m.toolRunning = false
-			m.liveActivity = ""
-			m.liveToolResult = ""
-			m.toolExpanded = false
 			m.lastAssistantRaw = ""
-			m.appendThink()
+			if m.activityIdx == -1 {
+				m.appendText(WardenStyle().Render("  warden"))
+			}
+			m.activityIdx = m.resetOrAppendThink()
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case thinkMsg:
-			if !m.toolRunning && m.liveActivity != "" {
-				m.liveActivity = ""
-				m.liveToolResult = ""
-				m.toolExpanded = false
-				m.updateViewportHeight()
-			}
 			m.thinkBuf += inner.text
 			m.updateThink(inner.text)
 			m.syncViewport()
@@ -448,15 +573,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tokenMsg:
 			if !m.thinkDone {
 				m.finishThink()
-				m.appendText("")
 				m.appendAssistant("")
 				m.thinkDone = true
-			}
-			if m.liveActivity != "" {
-				m.liveActivity = ""
-				m.liveToolResult = ""
-				m.toolExpanded = false
-				m.updateViewportHeight()
 			}
 			m.appendToLastAssistant(inner.text)
 			m.lastAssistantRaw += inner.text
@@ -465,17 +583,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case toolStartMsg:
 			m.toolRunning = true
-			if !m.thinkDone && len(m.messages) > 0 {
-				m.finishThink()
+			if m.verboseMode {
+				if !m.thinkDone && len(m.messages) > 0 {
+					m.finishThink()
+				}
+				m.appendToolActivity(toolStartLine(inner.name, inner.args))
+				m.runningToolIdx = len(m.messages) - 1
+			} else {
+				verb := toolActivityVerbs[inner.name]
+				if verb == "" {
+					verb = "working"
+				}
+				verb = strings.ToUpper(verb[:1]) + verb[1:]
+				if m.activityIdx >= 0 && m.activityIdx < len(m.messages) {
+					m.messages[m.activityIdx].activity = verb
+				}
 			}
-			m.liveActivity = toolStartLine(inner.name, inner.args)
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
 		case toolMsg:
 			m.toolRunning = false
-			m.liveActivity = toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
-			m.liveToolResult = inner.tool.Result
+			if m.verboseMode {
+				summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
+				if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
+					m.messages[m.runningToolIdx].text = summary
+				} else {
+					m.appendToolActivity(summary)
+				}
+			} else {
+				if m.activityIdx >= 0 && m.activityIdx < len(m.messages) {
+					m.messages[m.activityIdx].activity = ""
+				}
+			}
+			m.runningToolIdx = -1
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
 
@@ -513,15 +654,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
-			m.liveActivity = ""
-			m.liveToolResult = ""
-			m.toolExpanded = false
 			m.escPending = false
 			m.quitPending = false
 			m.userScrolled = false
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
+			m.activityIdx = -1
 			m.appendText("")
 			if inner.tokenLimit > 0 {
 				m.tokenCount = inner.tokenCount
@@ -540,12 +679,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.loading = false
 			m.toolRunning = false
-			m.liveActivity = ""
-			m.liveToolResult = ""
-			m.toolExpanded = false
 			m.finishThink()
 			m.thinkBuf = ""
 			m.thinkDone = false
+			m.activityIdx = -1
 			m.appendText("")
 			if msg.tokenLimit > 0 {
 				m.tokenCount = msg.tokenCount
@@ -624,6 +761,87 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.syncViewport()
 
+	case modelsResultMsg:
+		if msg.err != "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("models: " + msg.err)))
+			m.syncViewport()
+		} else if len(msg.models) == 0 {
+			m.appendText(m.wardenLine(DimStyle().Render("no models found")))
+			m.syncViewport()
+		} else {
+			m.modelList = msg.models
+			m.modelFiltered = msg.models
+			m.modelPickIdx = 0
+			for i, name := range msg.models {
+				if name == msg.current {
+					m.modelPickIdx = i
+					break
+				}
+			}
+			const maxVisible = 8
+			m.modelScrollTop = m.modelPickIdx - maxVisible/2
+			if m.modelScrollTop < 0 {
+				m.modelScrollTop = 0
+			}
+			if m.modelScrollTop+maxVisible > len(msg.models) {
+				m.modelScrollTop = len(msg.models) - maxVisible
+				if m.modelScrollTop < 0 {
+					m.modelScrollTop = 0
+				}
+			}
+			m.textinput.Reset()
+			m.modelPicking = true
+			m.updateViewportHeight()
+			m.syncViewport()
+		}
+
+	case modelSetMsg:
+		if msg.err != "" {
+			m.appendText(m.wardenLine(ErrorStyle().Render("model: " + msg.err)))
+			m.syncViewport()
+		} else {
+			m.modelName = msg.model
+			m.messages = []messageEntry{}
+			_ = saveWardenConfigField("model", msg.model)
+		}
+
+	case providersResultMsg:
+		if msg.err == "" && len(msg.providers) > 0 {
+			m.modelProviders = msg.providers
+			for i, p := range msg.providers {
+				if p == msg.current {
+					m.modelProviderIdx = i
+					break
+				}
+			}
+		}
+
+	case providerSetMsg:
+		if msg.err != "" {
+			m.modelPicking = false
+			m.modelList = nil
+			m.modelFiltered = nil
+			m.appendText(m.wardenLine(ErrorStyle().Render("provider: " + msg.err)))
+			m.syncViewport()
+		} else {
+			m.providerName = msg.provider
+			if len(msg.models) > 0 {
+				m.modelList = msg.models
+				filter := m.textinput.Value()
+				m.modelFiltered = filterModels(msg.models, filter)
+				m.modelPickIdx = 0
+				for i, name := range m.modelFiltered {
+					if name == msg.current {
+						m.modelPickIdx = i
+						break
+					}
+				}
+				m.modelScrollTop = 0
+				m.updateViewportHeight()
+				m.syncViewport()
+			}
+		}
+
 	case providerInitMsg:
 		m.providerName = msg.provider
 
@@ -633,6 +851,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.client.ResetSession()
 		m.syncViewport()
 		cmds = append(cmds, m.initProvider())
+		if m.autoMode {
+			cmds = append(cmds, m.setMode(true))
+		}
 
 	case backendErrorMsg:
 		m.loading = false
@@ -643,8 +864,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, m.focusInput())
 
 	var cmd tea.Cmd
+	oldVal := m.textinput.Value()
 	m.textinput, cmd = m.textinput.Update(msg)
 	cmds = append(cmds, cmd)
+	if m.slashIdx >= 0 && m.textinput.Value() != oldVal {
+		m.slashIdx = -1
+	}
+	if m.modelPicking && m.textinput.Value() != oldVal {
+		m.modelFiltered = filterModels(m.modelList, m.textinput.Value())
+		m.modelPickIdx = 0
+		m.modelScrollTop = 0
+		m.updateViewportHeight()
+		m.syncViewport()
+	}
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -731,6 +963,26 @@ type statusResultMsg struct {
 }
 type clipboardDoneMsg struct{ err error }
 type providerInitMsg struct{ provider string }
+type modelsResultMsg struct {
+	models  []string
+	current string
+	err     string
+}
+type modelSetMsg struct {
+	model string
+	err   string
+}
+type providersResultMsg struct {
+	providers []string
+	current   string
+	err       string
+}
+type providerSetMsg struct {
+	provider string
+	models   []string
+	current  string
+	err      string
+}
 
 type messageKind int
 
@@ -738,6 +990,7 @@ const (
 	messageText messageKind = iota
 	messageThink
 	messageAssistant
+	messageToolActivity // tool line, filtered out at turn end in normal mode
 )
 
 type messageEntry struct {
@@ -745,34 +998,46 @@ type messageEntry struct {
 	text      string
 	startedAt time.Time
 	duration  time.Duration
+	activity  string // current verb shown in single-line activity mode
 }
 
 func (m *model) appendText(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageText, text: text})
 }
 
-func (m model) toggleF2() model {
-	if m.liveActivity != "" {
-		m.toolExpanded = !m.toolExpanded
-		m.updateViewportHeight()
-		m.syncViewport()
-		return m
+// filterTransientMessages removes think and tool activity entries added in the
+// current turn. Called at turn end when not in verbose mode.
+func (m *model) filterTransientMessages() {
+	filtered := make([]messageEntry, 0, len(m.messages))
+	for i, e := range m.messages {
+		if i < m.streamStart || (e.kind != messageThink && e.kind != messageToolActivity) {
+			filtered = append(filtered, e)
+		}
 	}
-	return m.toggleThinkingExpanded()
+	m.messages = filtered
 }
 
-func (m model) toggleThinkingExpanded() model {
-	m.thinkingExpanded = !m.thinkingExpanded
-	if m.thinkingExpanded {
-		m.syncViewportToLatestThink()
-	} else {
-		m.syncViewport()
-	}
-	return m
+func (m *model) appendToolActivity(text string) {
+	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
 }
 
 func (m *model) appendThink() {
 	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
+}
+
+// resetOrAppendThink reuses the existing think entry for the current turn (keeps
+// accumulated text and original startedAt so total duration is correct), or
+// creates a new one if none exists yet.
+func (m *model) resetOrAppendThink() int {
+	for i := len(m.messages) - 1; i >= m.streamStart; i-- {
+		if m.messages[i].kind == messageThink {
+			m.messages[i].duration = 0
+			m.messages[i].activity = ""
+			return i
+		}
+	}
+	m.appendThink()
+	return len(m.messages) - 1
 }
 
 func (m *model) updateThink(text string) {

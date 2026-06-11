@@ -162,6 +162,27 @@ func preCheck() (alreadyRunning bool, err error) {
 }
 
 var setupFlag = flag.Bool("setup", false, "Show setup screen to change provider/model/API key.")
+var clearFlag = flag.Bool("clear", false, "Clear all saved warden data and exit.")
+
+func clearWardenData() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "home dir:", err)
+		return
+	}
+	files := []string{
+		filepath.Join(home, ".warden-config.json"),
+		filepath.Join(home, ".warden-settings.json"),
+	}
+	for _, f := range files {
+		if err := os.Remove(f); err == nil {
+			fmt.Println("removed", f)
+		} else if !os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, "remove", f, ":", err)
+		}
+	}
+	fmt.Println("warden data cleared")
+}
 
 func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	runtimeDir := filepath.Join(root, ".warden")
@@ -249,6 +270,11 @@ func runLauncher(alreadyRunning bool, modelName string) (ready bool, backend *ex
 
 func main() {
 	flag.Parse()
+
+	if *clearFlag {
+		clearWardenData()
+		return
+	}
 
 	root, err := findProjectRoot()
 	if err != nil {

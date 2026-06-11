@@ -142,6 +142,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.SetProvider(name)
+			_ = saveWardenConfigField("provider", name)
 			return nil
 		}
 	}
@@ -158,7 +159,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.syncViewport()
 		return true, func() tea.Msg {
 			m.client.SetAPIURL(url)
-			_ = saveWardenAPIURL(url)
+			_ = saveWardenConfigField("api_url", url)
 			return nil
 		}
 	}
@@ -188,7 +189,7 @@ func wardenConfigPath() (string, error) {
 	return filepath.Join(home, ".warden-config.json"), nil
 }
 
-func saveWardenAPIURL(url string) error {
+func saveWardenConfigField(key string, value any) error {
 	path, err := wardenConfigPath()
 	if err != nil {
 		return err
@@ -201,7 +202,7 @@ func saveWardenAPIURL(url string) error {
 	if cfg == nil {
 		cfg = map[string]any{}
 	}
-	cfg["api_url"] = url
+	cfg[key] = value
 	out, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
