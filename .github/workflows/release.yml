@@ -9,7 +9,40 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Go vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Go test
+        working-directory: go
+        run: go test ./...
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Run Python tests
+        run: pytest --no-header -q
+
   release:
+    needs: [test]
     runs-on: windows-latest
 
     steps:
@@ -39,6 +72,7 @@ jobs:
         run: |
           pyinstaller --onefile --name warden-backend `
             --collect-all agent `
+            --collect-all playwright `
             --collect-submodules openai `
             --collect-submodules ollama `
             --hidden-import=aiohttp `
@@ -77,7 +111,7 @@ jobs:
           current = os.environ.get("CURRENT_TAG", "")
           tags = [t for t in run("git tag --sort=-version:refname").splitlines() if t and t != current]
           prev = tags[0] if tags else ""
-          range_ = f"{prev}..HEAD" if prev else "HEAD"
+          range_ = f"{prev}..{current}" if prev else current
           commits = [l for l in run(f"git log {range_} --pretty=format:%s --no-merges").splitlines() if l.strip()]
 
           groups, breaking, other = {}, [], []
