@@ -16,12 +16,12 @@ from agent.tools.input import CU_MAX_SIDE
 _SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
 _CU_TOOLS = {"screenshot", "mouse", "keyboard"}
 
-_CU_WARNING_TITLE = "Computer use is experimental"
+_CU_WARNING_TITLE = "Computer use is a work in progress"
 _CU_WARNING_DETAILS = [
-    "The agent will control your mouse, keyboard, and screen directly.",
-    "It can click, type, and interact with any open window.",
-    "Use only in a trusted environment — stop with Esc or move cursor to the top-left corner.",
-    "This confirmation appears once per session.",
+    "This feature is early and rough — expect mistakes, misclicks, and wrong coordinates.",
+    "The agent sees a downscaled screenshot and may misjudge positions.",
+    "Move the cursor to the top-left corner to abort at any time.",
+    "This notice appears once per session.",
 ]
 
 
@@ -99,7 +99,7 @@ async def execute_tool_call(
 			"tool": name,
 			"risk": "confirm",
 			"title": _CU_WARNING_TITLE,
-			"summary": "computer use requires physical control of your machine",
+			"summary": "feature is early — results may be inaccurate",
 			"details": _CU_WARNING_DETAILS,
 			"args": args_str,
 			"preview": args_str,
