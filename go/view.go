@@ -829,7 +829,11 @@ func (m model) renderStatusBar() string {
 	case m.quitPending:
 		hint = ErrorStyle().Render("ctrl+c") + DimStyle().Render(" quit · any key abort")
 	case m.selectMode:
-		hint = DimStyle().Render("select mode · ") + lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Esc") + DimStyle().Render(" exit")
+		keyColor := Amber
+		if !m.autoMode {
+			keyColor = Green
+		}
+		hint = DimStyle().Render("select mode · ") + lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" exit")
 	case m.confirming:
 		hint = DimStyle().Render("Y run  N cancel")
 	case m.streaming:
