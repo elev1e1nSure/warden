@@ -1,4 +1,4 @@
-package tui
+﻿package tui
 
 import (
 	"fmt"
@@ -350,7 +350,7 @@ func toolPresentTense(display string) string {
 // actionDetail extracts the tool detail for the live action line, stripping any
 // trailing ellipsis/dots so URLs render clean (no "…" or running dots).
 func actionDetail(display, args string) string {
-	return strings.TrimRight(extractToolDetail(display, args), "…. ")
+	return strings.TrimRight(extractToolDetail(display, args), "… ")
 }
 
 func extractToolDetail(name, args string) string {
@@ -427,7 +427,7 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
-// renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
+// renderChainCounter renders the grouped tool tally: "Searched —2 · Fetched —6 · 18s".
 // While live the time ticks; once duration is set the line is frozen.
 func (m model) renderChainCounter(entry messageEntry) string {
 	if len(m.chainOrder) == 0 {
@@ -437,7 +437,7 @@ func (m model) renderChainCounter(entry messageEntry) string {
 	for _, name := range m.chainOrder {
 		label := toolPastTense(name)
 		if c := m.chainCounts[name]; c > 1 {
-			label += fmt.Sprintf(" ×%d", c)
+			label += fmt.Sprintf(" —%d", c)
 		}
 		parts = append(parts, label)
 	}
@@ -550,22 +550,14 @@ func (m *model) applyBgLines(style lipgloss.Style, content string) string {
 
 func (m *model) renderUserMsg(text string) string {
 	bgColor := lipgloss.Color("#242424")
-	dimOnBg := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555")).Background(bgColor)
 	plainOnBg := lipgloss.NewStyle().Background(bgColor)
 	lines := strings.Split(text, "\n")
-	out := make([]string, 0, len(lines))
-	for i, l := range lines {
-		var line string
-		if i == 0 {
-			// "> " with dim fg + bg; remaining text with just bg — no inner reset breaks outer bg
-			prefix := dimOnBg.Render("> ")
-			rest := plainOnBg.Width(m.width - 2).Render(l)
-			line = prefix + rest
-		} else {
-			line = plainOnBg.Width(m.width).Render("  " + l)
-		}
-		out = append(out, line)
+	out := make([]string, 0, len(lines)+2)
+	out = append(out, plainOnBg.Width(m.width).Render(""))
+	for _, l := range lines {
+		out = append(out, plainOnBg.Width(m.width).Render("  "+l))
 	}
+	out = append(out, plainOnBg.Width(m.width).Render(""))
 	return strings.Join(out, "\n")
 }
 
@@ -624,7 +616,7 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
 
 	// Tool name line — same style as chat tool lines
-	b.WriteString("  " + AccentStyle().Render("▶") + "  " + ToolStyle().Bold(true).Render(inner.tool))
+	b.WriteString("  " + AccentStyle().Render("¶") + "  " + ToolStyle().Bold(true).Render(inner.tool))
 	b.WriteString("\n")
 
 	// Command / path preview — split into lines, show up to 4, dim + indented
@@ -716,7 +708,7 @@ func (m model) renderWaveSpinner() string {
 	const span = hi - lo   // 10
 	const cycle = span * 2 // 20
 	if !m.loading {
-		return FaintStyle().Render(strings.Repeat("░", n))
+		return FaintStyle().Render(strings.Repeat("·", n))
 	}
 	s := m.spinner % cycle
 	var pos int
@@ -741,15 +733,15 @@ func (m model) renderWaveSpinner() string {
 		}
 		switch {
 		case dist == 0:
-			b.WriteString(lipgloss.NewStyle().Foreground(peak).Render("█"))
+			b.WriteString(lipgloss.NewStyle().Foreground(peak).Render("â–ˆ"))
 		case dist == 1:
-			b.WriteString(lipgloss.NewStyle().Foreground(mid).Render("▓"))
+			b.WriteString(lipgloss.NewStyle().Foreground(mid).Render("—"))
 		case dist == 2:
-			b.WriteString(lipgloss.NewStyle().Foreground(faint).Render("▒"))
+			b.WriteString(lipgloss.NewStyle().Foreground(faint).Render("–"))
 		case dist == 3:
-			b.WriteString(FaintStyle().Render("░"))
+			b.WriteString(FaintStyle().Render("·"))
 		default:
-			b.WriteString(FaintStyle().Render("░"))
+			b.WriteString(FaintStyle().Render("·"))
 		}
 	}
 	return b.String()
@@ -873,7 +865,7 @@ func (m model) renderStatusBar() string {
 
 // renderInput renders the bordered text input.
 func (m model) renderInput() string {
-	borderColor := GreenMid
+	borderColor := Green
 	if m.autoMode {
 		borderColor = BlueMid
 	}
@@ -996,7 +988,7 @@ func (m model) renderConnectWizard() string {
 	var lines []string
 
 	if m.cwErr != "" {
-		lines = append(lines, "  "+err.Render("✕  "+m.cwErr))
+		lines = append(lines, "  "+err.Render("•  "+m.cwErr))
 		lines = append(lines, "  "+dim.Render(key("esc")+" dismiss"))
 		return strings.Join(lines, "\n")
 	}
@@ -1012,13 +1004,13 @@ func (m model) renderConnectWizard() string {
 		providers := []string{"openrouter", "ollama"}
 		for i, p := range providers {
 			if i == m.cwPickIdx {
-				lines = append(lines, "  "+acc.Render("› "+p))
+				lines = append(lines, "  "+acc.Render("→ "+p))
 			} else {
 				lines = append(lines, "  "+dim.Render("  "+p))
 			}
 		}
 		lines = append(lines, "")
-		hint := key("↑↓") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" cancel")
+		hint := key("←→") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" cancel")
 		lines = append(lines, "  "+hint)
 
 	case 1:
@@ -1046,13 +1038,13 @@ func (m model) renderConnectWizard() string {
 			for i := start; i < end; i++ {
 				name := m.cwModels[i]
 				if i == m.cwPickIdx {
-					lines = append(lines, "  "+acc.Render("› "+name))
+					lines = append(lines, "  "+acc.Render("→ "+name))
 				} else {
 					lines = append(lines, "  "+dim.Render("  "+name))
 				}
 			}
 			lines = append(lines, "")
-			hint := key("↑↓") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" back")
+			hint := key("←→") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" back")
 			lines = append(lines, "  "+hint)
 		}
 	}
@@ -1075,7 +1067,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
 	}
 	key := func(s string) string { return keyStyle.Render(s) }
-	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
+	hint := key("←→") + DimStyle().Render(" navigate   ") +
 		key("Enter") + DimStyle().Render(" select   ") +
 		key("Esc") + DimStyle().Render(" cancel")
 	lines = append(lines, "  "+hint)
@@ -1084,7 +1076,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	for i := start; i < end; i++ {
 		name := filtered[i]
 		if i == idx {
-			lines = append(lines, accent.Render("  › "+name))
+			lines = append(lines, accent.Render("  → "+name))
 		} else {
 			lines = append(lines, DimStyle().Render("    "+name))
 		}
@@ -1125,7 +1117,7 @@ func (m model) renderHint() string {
 			cmd := matches[i]
 			active := i == selected
 			name := fmt.Sprintf("/%-13s", cmd.name[1:])
-			nameStyle := SlashNameStyle(active)
+			nameStyle := SlashNameStyle(active, m.autoMode)
 			descStyle := SlashDescStyle(active)
 			descLimit := m.width - lipgloss.Width(name) - 6
 			if active {
@@ -1136,7 +1128,7 @@ func (m model) renderHint() string {
 			}
 			if active {
 				lines = append(lines,
-					"  "+AccentStyle().Render("›")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
+`	`	`	`	`	"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
 				)
 				continue
 			}
