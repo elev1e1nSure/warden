@@ -40,7 +40,11 @@ def test_file_list_tool_skips_symlink_escape(monkeypatch) -> None:
 	link = base / "escape"
 	if link.exists() or link.is_symlink():
 		link.unlink()
-	os.symlink(str(outside), str(link))
+	try:
+		os.symlink(str(outside), str(link))
+	except OSError:
+		import pytest
+		pytest.skip("symlink requires elevated privileges on Windows")
 	monkeypatch.chdir(base)
 
 	out = asyncio.run(FileListTool().execute({"path": str(base)}))

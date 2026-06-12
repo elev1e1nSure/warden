@@ -115,7 +115,7 @@ class TestExecuteToolCall:
 	async def test_unknown_tool_records_error(self):
 		session = _session([])
 		tc = _make_tc("nonexistent_tool_xyz")
-		with patch("agent.chat.REGISTRY", {}):
+		with patch("agent.tool_runner.REGISTRY", {}):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 		# unknown tool — no events yielded, but history updated
 		assert any("not found" in str(session.history[-1].get("content", "")) for _ in [1])
@@ -125,7 +125,7 @@ class TestExecuteToolCall:
 		tc = _make_tc("question", '{"questions": [{"question": "Q?", "header": "h"}]}')
 		fake_qtool = MagicMock()
 		fake_qtool.name = "question"
-		with patch("agent.chat.REGISTRY", {"question": fake_qtool}):
+		with patch("agent.tool_runner.REGISTRY", {"question": fake_qtool}):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 		assert any("no question manager" in str(e) for e in [session.history[-1]["content"]])
 
@@ -134,7 +134,7 @@ class TestExecuteToolCall:
 		tc = _make_tc("file_delete", '{"path": "/evil"}')
 
 		blocked = SafetyDecision(risk="blocked", reason="dangerous path", summary="blocked", details=[], normalized_args={})
-		with patch("agent.chat.assess_tool_call", return_value=blocked):
+		with patch("agent.tool_runner.assess_tool_call", return_value=blocked):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]
@@ -152,7 +152,7 @@ class TestExecuteToolCall:
 		async def fake_wait(call_id):
 			return False  # user cancelled
 
-		with patch("agent.chat.assess_tool_call", return_value=confirm_decision), \
+		with patch("agent.tool_runner.assess_tool_call", return_value=confirm_decision), \
 		     patch.object(session.confirmation_manager, "wait", side_effect=fake_wait):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
@@ -176,9 +176,9 @@ class TestExecuteToolCall:
 		fake_tool.execute = AsyncMock(return_value="dir contents")
 		fake_tool.name = "file_list"
 
-		with patch("agent.chat.assess_tool_call", return_value=confirm_decision), \
+		with patch("agent.tool_runner.assess_tool_call", return_value=confirm_decision), \
 		     patch.object(session.confirmation_manager, "wait", side_effect=fake_wait), \
-		     patch("agent.chat.REGISTRY", {"file_list": fake_tool}):
+		     patch("agent.tool_runner.REGISTRY", {"file_list": fake_tool}):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]
@@ -194,7 +194,7 @@ class TestExecuteToolCall:
 			risk="confirm", reason="file write", summary="Write file", details=[], normalized_args={}
 		)
 
-		with patch("agent.chat.assess_tool_call", return_value=confirm_decision):
+		with patch("agent.tool_runner.assess_tool_call", return_value=confirm_decision):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]
@@ -212,8 +212,8 @@ class TestExecuteToolCall:
 		slow_tool.name = "powershell"
 		slow_tool.execute = AsyncMock(side_effect=asyncio.TimeoutError())
 
-		with patch("agent.chat.assess_tool_call", return_value=safe_decision), \
-		     patch("agent.chat.REGISTRY", {"powershell": slow_tool}), \
+		with patch("agent.tool_runner.assess_tool_call", return_value=safe_decision), \
+		     patch("agent.tool_runner.REGISTRY", {"powershell": slow_tool}), \
 		     patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
@@ -235,8 +235,8 @@ class TestExecuteToolCall:
 			side_effect=RuntimeError("question tool must be handled by chat loop, not executed directly")
 		)
 
-		with patch("agent.chat.assess_tool_call", return_value=safe_decision), \
-		     patch("agent.chat.REGISTRY", {"powershell": error_tool}):
+		with patch("agent.tool_runner.assess_tool_call", return_value=safe_decision), \
+		     patch("agent.tool_runner.REGISTRY", {"powershell": error_tool}):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=False)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]
@@ -255,8 +255,8 @@ class TestExecuteToolCall:
 		fake_tool.name = "file_list"
 		fake_tool.execute = AsyncMock(return_value="files here")
 
-		with patch("agent.chat.assess_tool_call", return_value=safe_decision), \
-		     patch("agent.chat.REGISTRY", {"file_list": fake_tool}):
+		with patch("agent.tool_runner.assess_tool_call", return_value=safe_decision), \
+		     patch("agent.tool_runner.REGISTRY", {"file_list": fake_tool}):
 			events = [e async for e in session._execute_tool_call(tc, auto_mode=True)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]
@@ -277,8 +277,8 @@ class TestExecuteToolCall:
 		fake_tool.name = "file_list"
 		fake_tool.execute = AsyncMock(return_value="result")
 
-		with patch("agent.chat.assess_tool_call", return_value=safe_decision), \
-		     patch("agent.chat.REGISTRY", {"file_list": fake_tool}):
+		with patch("agent.tool_runner.assess_tool_call", return_value=safe_decision), \
+		     patch("agent.tool_runner.REGISTRY", {"file_list": fake_tool}):
 			events = [e async for e in session._execute_tool_call(tc_dict, auto_mode=False)]
 
 		tool_events = [(t, p) for t, p in events if t == "tool"]

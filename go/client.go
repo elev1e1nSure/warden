@@ -126,7 +126,7 @@ func (c *Client) ListModels() ([]string, string, error) {
 		return nil, "", err
 	}
 	if result.Error != "" {
-		return nil, "", fmt.Errorf(result.Error)
+		return nil, "", fmt.Errorf("%s", result.Error)
 	}
 	return result.Models, result.Current, nil
 }
