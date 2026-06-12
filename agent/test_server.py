@@ -38,6 +38,8 @@ def _make_backend(auto_mode: bool = False, api_url: str = "") -> MagicMock:
 def _make_app(backend: MagicMock, shutdown_event: asyncio.Event | None = None) -> web.Application:
     app = web.Application()
     app["backend"] = backend
+    if shutdown_event is not None:
+        app["shutdown_event"] = shutdown_event
     app.router.add_get("/health", server_module.health)
     app.router.add_post("/reset", server_module.reset)
     app.router.add_post("/mode", server_module.set_mode)
@@ -141,19 +143,13 @@ async def test_compact(aiohttp_client):
 
 async def test_shutdown_sets_event(aiohttp_client):
     backend = _make_backend()
-    app = _make_app(backend)
     evt = asyncio.Event()
-    # Patch the module-level _shutdown_event
-    original = server_module._shutdown_event
-    server_module._shutdown_event = evt
-    try:
-        client = await aiohttp_client(app)
-        resp = await client.post("/shutdown")
-        assert resp.status == 200
-        await asyncio.sleep(0.01)  # let call_soon fire
-        assert evt.is_set()
-    finally:
-        server_module._shutdown_event = original
+    app = _make_app(backend, shutdown_event=evt)
+    client = await aiohttp_client(app)
+    resp = await client.post("/shutdown")
+    assert resp.status == 200
+    await asyncio.sleep(0.01)  # let call_soon fire
+    assert evt.is_set()
 
 
 # ── confirm ───────────────────────────────────────────────────────────────────

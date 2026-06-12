@@ -26,3 +26,11 @@ jobs:
 
       - name: Run tests
         run: xvfb-run --auto-servernum pytest --no-header -q
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            htmlcov/
+            coverage.json

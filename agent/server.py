@@ -14,10 +14,6 @@ from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import info, warn, error, success, request as log_request
 from agent.tools import _get_screenshot_dir, _cleanup_old_screenshots
 
-_backend: Backend | None = None
-_shutdown_event: asyncio.Event | None = None
-
-
 class Backend:
 	def __init__(self) -> None:
 		try:
@@ -130,8 +126,9 @@ async def shutdown_handler(request: web.Request) -> web.Response:
 	backend.question_manager.cancel_all()
 	log_request("POST", "/shutdown", 200)
 	info("graceful shutdown requested")
-	if _shutdown_event is not None:
-		asyncio.get_event_loop().call_soon(_shutdown_event.set)
+	shutdown_event = request.app.get("shutdown_event")
+	if shutdown_event is not None:
+		asyncio.get_event_loop().call_soon(shutdown_event.set)
 	return web.Response(text="ok")
 
 
@@ -398,20 +395,19 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	return response
 
 
-async def main() -> None:
-	global _backend, _shutdown_event
-	_shutdown_event = asyncio.Event()
+async def main() -> Backend:
 	info("starting backend...")
 	backend = Backend()
-	_backend = backend
 	await backend.setup()
 	if backend.ollama is not None:
 		success("ollama ready")
 	else:
 		success("remote API ready")
 
+	shutdown_event = asyncio.Event()
 	app = web.Application()
 	app["backend"] = backend
+	app["shutdown_event"] = shutdown_event
 	app.router.add_get("/health", health)
 	app.router.add_post("/reset", reset)
 	app.router.add_post("/chat", chat)
@@ -433,13 +429,15 @@ async def main() -> None:
 	site = web.TCPSite(runner, "localhost", 8765)
 	await site.start()
 	success("backend on http://localhost:8765")
-	await _shutdown_event.wait()
+	await shutdown_event.wait()
 	await runner.cleanup()
+	return backend
 
 
 if __name__ == "__main__":
+	backend = None
 	try:
-		asyncio.run(main())
+		backend = asyncio.run(main())
 	except KeyboardInterrupt:
-		if _backend is not None and _backend.ollama is not None:
-			_backend.ollama.shutdown()
+		if backend is not None and backend.ollama is not None:
+			backend.ollama.shutdown()

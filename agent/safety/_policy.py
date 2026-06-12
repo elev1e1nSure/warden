@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 from agent.safety._filesystem import is_dangerous_path, is_path_within_workspace
 from agent.safety._powershell import classify as classify_powershell
@@ -16,8 +16,8 @@ class SafetyDecision:
     risk: str  # "safe" | "confirm" | "blocked"
     reason: str
     summary: str
-    details: List[str] = field(default_factory=list)
-    normalized_args: Dict[str, Any] = field(default_factory=dict)
+    details: list[str] = field(default_factory=list)
+    normalized_args: dict[str, Any] = field(default_factory=dict)
 
 
 def _decide(risk, reason, summary, details=None, args=None, tool=None, mode="ask") -> SafetyDecision:

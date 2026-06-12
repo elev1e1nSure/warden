@@ -9,6 +9,7 @@ __pycache__/
 venv/
 .coverage
 htmlcov/
+coverage.json
 
 # Go
 *.exe
@@ -19,7 +20,6 @@ go/warden.exe
 
 # Project runtime
 .warden/*
-!.warden/powershell-reference.md
 !.warden/skills/
 .tmp/
 

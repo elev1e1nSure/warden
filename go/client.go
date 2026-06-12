@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -44,15 +45,27 @@ type Skill struct {
 }
 
 type Client struct {
-	BaseURL string
+	BaseURL      string
+	HTTPClient   *http.Client
+	StreamClient *http.Client
 }
 
 func NewClient(url string) *Client {
-	return &Client{BaseURL: url}
+	return &Client{
+		BaseURL: url,
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		StreamClient: &http.Client{
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 30 * time.Second,
+			},
+		},
+	}
 }
 
 func (c *Client) ResetSession() error {
-	resp, err := http.Post(c.BaseURL+"/reset", "application/json", nil)
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/reset", "application/json", nil)
 	if err != nil {
 		return err
 	}
@@ -68,7 +81,7 @@ func (c *Client) SetMode(auto bool) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -84,7 +97,7 @@ func (c *Client) SendQuestion(id string, answers [][]string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -100,7 +113,7 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -112,7 +125,7 @@ func (c *Client) SendConfirm(id string, ok bool) error {
 }
 
 func (c *Client) ListModels() ([]string, string, error) {
-	resp, err := http.Get(c.BaseURL + "/models")
+	resp, err := c.HTTPClient.Get(c.BaseURL + "/models")
 	if err != nil {
 		return nil, "", err
 	}
@@ -141,7 +154,7 @@ func (c *Client) Connect(provider, apiURL, apiKey, model string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/connect", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/connect", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -164,7 +177,7 @@ func (c *Client) SetAPIURL(url string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/api_url/set", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/api_url/set", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -180,7 +193,7 @@ func (c *Client) SetModel(model string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.BaseURL+"/model/set", "application/json", bytes.NewReader(body))
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/model/set", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -192,7 +205,7 @@ func (c *Client) SetModel(model string) error {
 }
 
 func (c *Client) GetStatus() (*StatusResult, error) {
-	resp, err := http.Get(c.BaseURL + "/status")
+	resp, err := c.HTTPClient.Get(c.BaseURL + "/status")
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +218,7 @@ func (c *Client) GetStatus() (*StatusResult, error) {
 }
 
 func (c *Client) Compact() (*CompactResult, error) {
-	resp, err := http.Post(c.BaseURL+"/compact", "application/json", nil)
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/compact", "application/json", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +231,7 @@ func (c *Client) Compact() (*CompactResult, error) {
 }
 
 func (c *Client) Shutdown() error {
-	resp, err := http.Post(c.BaseURL+"/shutdown", "application/json", nil)
+	resp, err := c.HTTPClient.Post(c.BaseURL+"/shutdown", "application/json", nil)
 	if err != nil {
 		return err
 	}
@@ -230,7 +243,7 @@ func (c *Client) Shutdown() error {
 }
 
 func (c *Client) ListSkills() ([]Skill, error) {
-	resp, err := http.Get(c.BaseURL + "/skills")
+	resp, err := c.HTTPClient.Get(c.BaseURL + "/skills")
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +258,7 @@ func (c *Client) ListSkills() ([]Skill, error) {
 }
 
 func (c *Client) LoadSkill(name string) (string, error) {
-	resp, err := http.Get(c.BaseURL + "/skill/" + name)
+	resp, err := c.HTTPClient.Get(c.BaseURL + "/skill/" + name)
 	if err != nil {
 		return "", err
 	}
@@ -275,7 +288,7 @@ func (c *Client) SendMessage(text string) <-chan tea.Msg {
 			return
 		}
 
-		resp, err := http.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
+		resp, err := c.StreamClient.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
 		if err != nil {
 			ch <- tokenMsg{text: "\nnetwork error: " + err.Error()}
 			ch <- doneMsg{}
