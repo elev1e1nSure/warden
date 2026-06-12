@@ -74,8 +74,9 @@ type model struct {
 	interruptStream bool
 	streamStart     int
 	// pending double-press confirmations (during streaming)
-	escPending  bool
-	quitPending bool
+	escPending       bool
+	quitPending      bool
+	quitPendingSince time.Time
 	// viewport scroll: user manually scrolled up during streaming
 	userScrolled bool
 	// token tracking
@@ -227,6 +228,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				}
 				m.quitPending = true
+				m.quitPendingSince = time.Now()
 				return m, nil
 			}
 			return m, tea.Quit
@@ -723,6 +725,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinner += m.advance()
 			if m.streaming && !m.confirming && len(m.messages) > 0 {
 				m.syncViewport()
+			}
+			// Clear quitPending after 3 seconds
+			if m.quitPending && time.Since(m.quitPendingSince) > 3*time.Second {
+				m.quitPending = false
 			}
 			return m, m.tick()
 		}
