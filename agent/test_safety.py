@@ -302,14 +302,58 @@ class TestToolAssessment:
 		assert d.risk == "confirm"
 
 	def test_new_tools_safe(self) -> None:
-		for tool, args in [
-			("file_list", {"path": "."}),
-			("todowrite", {"todos": [{"content": "x", "status": "pending", "priority": "low"}]}),
-			("skill", {"name": "demo"}),
+		# file_list safety is path-dependent: give it a workspace and a path
+		# that genuinely match so it resolves inside the workspace cross-platform.
+		cwd = os.getcwd()
+		for tool, args, c in [
+			("file_list", {"path": cwd}, cwd),
+			("todowrite", {"todos": [{"content": "x", "status": "pending", "priority": "low"}]}, r"D:\Projects\warden"),
+			("skill", {"name": "demo"}, r"D:\Projects\warden"),
 		]:
-			d = _decision(tool, args)
+			d = _decision(tool, args, cwd=c)
 			assert d.risk == "safe", f"{tool}: expected safe, got {d.risk}"
 
 	def test_file_list_outside_workspace_confirm(self) -> None:
 		d = _decision("file_list", {"path": "D:/outside"})
 		assert d.risk == "confirm"
+
+	# ── new tools ──────────────────────────────────────────────────────────
+
+	def test_window_list_safe(self) -> None:
+		assert _decision("window_list", {}).risk == "safe"
+
+	def test_window_focus_confirm(self) -> None:
+		assert _decision("window_focus", {"title": "Notepad"}).risk == "confirm"
+
+	def test_window_manage_confirm(self) -> None:
+		assert _decision("window_manage", {"action": "close", "hwnd": 123}).risk == "confirm"
+
+	def test_image_locate_safe(self) -> None:
+		assert _decision("image_locate", {"image": "x.png"}).risk == "safe"
+
+	def test_ocr_safe(self) -> None:
+		assert _decision("ocr", {}).risk == "safe"
+
+	def test_wait_for_safe(self) -> None:
+		assert _decision("wait_for", {"type": "window", "target": "x"}).risk == "safe"
+
+	def test_system_info_safe(self) -> None:
+		assert _decision("system_info", {}).risk == "safe"
+
+	def test_notify_safe(self) -> None:
+		assert _decision("notify", {"message": "done"}).risk == "safe"
+
+	def test_memory_safe(self) -> None:
+		assert _decision("memory", {"action": "get"}).risk == "safe"
+
+	def test_http_request_get_safe(self) -> None:
+		assert _decision("http_request", {"url": "https://api.example.com", "method": "GET"}).risk == "safe"
+
+	def test_http_request_post_confirm(self) -> None:
+		assert _decision("http_request", {"url": "https://api.example.com", "method": "POST"}).risk == "confirm"
+
+	def test_browser_click_confirm(self) -> None:
+		assert _decision("browser_click", {"selector": "#go"}).risk == "confirm"
+
+	def test_browser_fill_confirm(self) -> None:
+		assert _decision("browser_fill", {"selector": "#q", "value": "hi"}).risk == "confirm"

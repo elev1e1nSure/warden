@@ -9,6 +9,55 @@ from agent.tools.base import Tool
 from agent.tools.input import _get_screenshot_dir, _cleanup_old_screenshots
 
 
+# ── persistent interactive session (shared by browser_click / browser_fill) ──
+# Keeps one headless page alive across calls so clicks and fills compound,
+# unlike the stateless read/screenshot tools that open a fresh browser each time.
+_SESSION: Dict[str, Any] = {"pw": None, "browser": None, "page": None}
+
+
+async def _get_page():
+	"""Return the live interactive page, creating the browser lazily."""
+	from playwright.async_api import async_playwright
+
+	page = _SESSION.get("page")
+	if page is not None and not page.is_closed():
+		return page
+	pw = await async_playwright().start()
+	browser = await pw.chromium.launch(headless=True)
+	ctx = await browser.new_context(locale="en-US")
+	page = await ctx.new_page()
+	_SESSION.update(pw=pw, browser=browser, page=page)
+	return page
+
+
+def _selector(raw: str) -> str:
+	"""Accept a CSS/XPath selector or plain text.
+
+	If the string contains no selector metacharacters it's treated as visible
+	text and matched via Playwright's text engine. Pass an explicit
+	`text=...` or a CSS selector to be unambiguous.
+	"""
+	raw = raw.strip()
+	if raw.startswith(("#", ".", "[", "//")) or raw.startswith("text="):
+		return raw
+	if any(c in raw for c in "#.[]>=:") or "//" in raw:
+		return raw
+	# looks like human text → match by visible text
+	return f"text={raw}"
+
+
+async def _page_snapshot(page) -> str:
+	try:
+		text = await page.evaluate("() => document.body ? document.body.innerText.slice(0, 800) : ''")
+	except Exception:
+		text = ""
+	url = page.url
+	out = f"url: {url}"
+	if text and text.strip():
+		out += "\n" + text.strip()
+	return out[:1500]
+
+
 class BrowserOpenTool(Tool):
 	name = "browser_open"
 	description = (
@@ -163,6 +212,96 @@ class BrowserScreenshotTool(Tool):
 				await page.screenshot(path=str(name), full_page=True)
 				await browser.close()
 			return f"saved: {name}"
+		except ImportError:
+			return "error: pip install playwright && playwright install chromium"
+		except Exception as e:
+			return f"error: {e}"
+
+
+class BrowserClickTool(Tool):
+	name = "browser_click"
+	description = (
+		"Click an element on the interactive browser page (Playwright). "
+		"Optionally navigate to a URL first. "
+		"selector: a CSS/XPath selector or plain visible text. "
+		"The session persists, so clicks and fills build on each other."
+	)
+	params = {
+		"selector": {"type": "string", "description": "CSS/XPath selector or visible text to click"},
+		"url": {"type": "string", "description": "URL to navigate to first (optional)"},
+		"timeout": {"type": "integer", "description": "Timeout in seconds for the action (default 15)"},
+	}
+
+	def tool_definition(self) -> dict:
+		d = super().tool_definition()
+		d["function"]["parameters"]["required"] = ["selector"]
+		return d
+
+	async def execute(self, args: Dict[str, Any]) -> str:
+		selector = str(args.get("selector", "")).strip()
+		if not selector:
+			return "error: selector is required"
+		url = str(args.get("url", "")).strip()
+		timeout_ms = min(int(args.get("timeout", 15)), 60) * 1000
+		try:
+			page = await _get_page()
+			if url:
+				await page.goto(url, timeout=timeout_ms)
+			await page.click(_selector(selector), timeout=timeout_ms)
+			try:
+				await page.wait_for_load_state("networkidle", timeout=5000)
+			except Exception:
+				pass
+			snap = await _page_snapshot(page)
+			return f"clicked: {selector}\n{snap}"
+		except ImportError:
+			return "error: pip install playwright && playwright install chromium"
+		except Exception as e:
+			return f"error: {e}"
+
+
+class BrowserFillTool(Tool):
+	name = "browser_fill"
+	description = (
+		"Fill an input field on the interactive browser page (Playwright). "
+		"Optionally navigate to a URL first and/or press Enter after filling. "
+		"selector: a CSS/XPath selector or plain visible text/label. "
+		"The session persists across calls."
+	)
+	params = {
+		"selector": {"type": "string", "description": "CSS/XPath selector or label/placeholder text of the field"},
+		"value": {"type": "string", "description": "Text to type into the field"},
+		"url": {"type": "string", "description": "URL to navigate to first (optional)"},
+		"submit": {"type": "boolean", "description": "Press Enter after filling (optional)"},
+		"timeout": {"type": "integer", "description": "Timeout in seconds for the action (default 15)"},
+	}
+
+	def tool_definition(self) -> dict:
+		d = super().tool_definition()
+		d["function"]["parameters"]["required"] = ["selector", "value"]
+		return d
+
+	async def execute(self, args: Dict[str, Any]) -> str:
+		selector = str(args.get("selector", "")).strip()
+		if not selector:
+			return "error: selector is required"
+		value = str(args.get("value", ""))
+		url = str(args.get("url", "")).strip()
+		submit = bool(args.get("submit", False))
+		timeout_ms = min(int(args.get("timeout", 15)), 60) * 1000
+		try:
+			page = await _get_page()
+			if url:
+				await page.goto(url, timeout=timeout_ms)
+			await page.fill(_selector(selector), value, timeout=timeout_ms)
+			if submit:
+				await page.press(_selector(selector), "Enter")
+				try:
+					await page.wait_for_load_state("networkidle", timeout=5000)
+				except Exception:
+					pass
+			snap = await _page_snapshot(page)
+			return f"filled: {selector}\n{snap}"
 		except ImportError:
 			return "error: pip install playwright && playwright install chromium"
 		except Exception as e:

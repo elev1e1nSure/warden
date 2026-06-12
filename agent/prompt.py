@@ -22,6 +22,9 @@ _BASE_SYSTEM = (
 "you were shown — coordinates are mapped to the real screen for you, so never "
 "rescale them yourself. After clicking a field, use keyboard to type. "
 "Take a fresh screenshot to confirm the result before moving on. "
+"For reliable automation prefer image_locate to find a target's coordinates, "
+"wait_for instead of fixed sleeps, and ocr to read on-screen text. "
+"Use window_list/window_focus/window_manage to find and arrange windows. "
 
 "Shell is PowerShell on Windows. Use safe, readable commands. "
 "If something fails, inspect the error and try a different reasonable way. "

@@ -16,7 +16,19 @@ var toolDisplayNames = map[string]string{
 	"webfetch":           "Fetch",
 	"browser_open":       "Open",
 	"browser_screenshot": "Screenshot",
+	"browser_click":      "Click",
+	"browser_fill":       "Fill",
+	"http_request":       "HTTP",
 	"screenshot":         "Screenshot",
+	"window_list":        "Windows",
+	"window_focus":       "Focus",
+	"window_manage":      "Window",
+	"image_locate":       "Locate",
+	"ocr":                "OCR",
+	"wait_for":           "Wait",
+	"system_info":        "System",
+	"notify":             "Notify",
+	"memory":             "Memory",
 	"file_write":         "Write",
 	"file_delete":        "Delete",
 	"file_list":          "List",
@@ -136,6 +148,18 @@ var toolActivityVerbs = map[string]string{
 	"clipboard":          "clipboard",
 	"file_delete":        "deleting",
 	"file_list":          "listing",
+	"browser_click":      "clicking",
+	"browser_fill":       "filling",
+	"http_request":       "requesting",
+	"window_list":        "listing windows",
+	"window_focus":       "focusing",
+	"window_manage":      "managing window",
+	"image_locate":       "locating",
+	"ocr":                "reading text",
+	"wait_for":           "waiting",
+	"system_info":        "reading system",
+	"notify":             "notifying",
+	"memory":             "remembering",
 }
 
 func toolActivityLine(name string) string {
@@ -191,6 +215,24 @@ func toolPastTense(name string) string {
 		return "Copied"
 	case "Ask":
 		return "Asked"
+	case "Click", "Fill":
+		return "Clicked"
+	case "HTTP":
+		return "Requested"
+	case "Windows", "Focus", "Window":
+		return "Managed window"
+	case "Locate":
+		return "Located"
+	case "OCR":
+		return "Read text"
+	case "Wait":
+		return "Waited"
+	case "System":
+		return "Read system"
+	case "Notify":
+		return "Notified"
+	case "Memory":
+		return "Remembered"
 	}
 	return "Ran " + strings.ToLower(name)
 }

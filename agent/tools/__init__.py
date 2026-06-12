@@ -37,10 +37,17 @@ from agent.tools.browser import (
     BrowserReadTool,
     YouTubeSearchTool,
     BrowserScreenshotTool,
+    BrowserClickTool,
+    BrowserFillTool,
 )
 from agent.tools.search import GoogleSearchTool, WebFetchTool
 from agent.tools.misc import SkillTool, TodoWriteTool, QuestionTool, _TODO_STORE
 from agent.tools.archive import ArchiveTool
 from agent.tools.process import ProcessListTool, ProcessKillTool
 from agent.tools.move import FileMoveTool, FileCopyTool
+from agent.tools.window import WindowListTool, WindowFocusTool, WindowManageTool
+from agent.tools.screen import ImageLocateTool, OcrTool, WaitForTool
+from agent.tools.system import SystemInfoTool, NotifyTool
+from agent.tools.http import HttpRequestTool
+from agent.tools.memory import MemoryTool
 from agent.tools.registry import REGISTRY

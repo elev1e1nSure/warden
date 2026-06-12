@@ -4,6 +4,8 @@ from typing import Dict
 
 from agent.tools.base import Tool
 from agent.tools.browser import (
+    BrowserClickTool,
+    BrowserFillTool,
     BrowserOpenTool,
     BrowserReadTool,
     BrowserScreenshotTool,
@@ -26,6 +28,11 @@ from agent.tools.shell import BashTool, PowerShellTool
 from agent.tools.archive import ArchiveTool
 from agent.tools.process import ProcessListTool, ProcessKillTool
 from agent.tools.move import FileMoveTool, FileCopyTool
+from agent.tools.window import WindowListTool, WindowFocusTool, WindowManageTool
+from agent.tools.screen import ImageLocateTool, OcrTool, WaitForTool
+from agent.tools.system import SystemInfoTool, NotifyTool
+from agent.tools.http import HttpRequestTool
+from agent.tools.memory import MemoryTool
 
 REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	PowerShellTool(),
@@ -50,10 +57,22 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	YouTubeSearchTool(),
 	GoogleSearchTool(),
 	BrowserScreenshotTool(),
+	BrowserClickTool(),
+	BrowserFillTool(),
 	ApplyPatchTool(),
 	WebFetchTool(),
+	HttpRequestTool(),
 	QuestionTool(),
 	ArchiveTool(),
 	ProcessListTool(),
 	ProcessKillTool(),
+	WindowListTool(),
+	WindowFocusTool(),
+	WindowManageTool(),
+	ImageLocateTool(),
+	OcrTool(),
+	WaitForTool(),
+	SystemInfoTool(),
+	NotifyTool(),
+	MemoryTool(),
 ]}
