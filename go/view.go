@@ -164,37 +164,6 @@ func toolSummaryLine(name, args, result string) string {
 	return arrow + nameRender + "  " + DimStyle().Render(head)
 }
 
-var toolActivityVerbs = map[string]string{
-	"google_search":      "searching",
-	"youtube_search":     "searching",
-	"grep":               "searching",
-	"glob":               "searching files",
-	"file_read":          "reading",
-	"browser_read":       "reading",
-	"webfetch":           "fetching",
-	"browser_open":       "opening",
-	"browser_screenshot": "screenshotting",
-	"screenshot":         "screenshotting",
-	"file_write":         "writing",
-	"edit":               "editing",
-	"apply_patch":        "patching",
-	"powershell":         "running",
-	"bash":               "running",
-	"mouse":              "clicking",
-	"keyboard":           "typing",
-	"clipboard":          "clipboard",
-	"file_delete":        "deleting",
-	"file_list":          "listing",
-}
-
-func toolActivityLine(name string) string {
-	verb, ok := toolActivityVerbs[name]
-	if !ok {
-		verb = "working"
-	}
-	return DimStyle().Render("  " + verb + "...")
-}
-
 func toolStartLine(name, args string) string {
 	arrow := ToolStyle().Render("  → ")
 	display := ToolStyle().Render(toolDisplayName(name))
@@ -202,11 +171,6 @@ func toolStartLine(name, args string) string {
 		return arrow + display
 	}
 	return arrow + display + "  " + DimStyle().Render(truncateRunes(args, 140))
-}
-
-// wardenLine builds a labeled response line (used for slash command output).
-func (m model) wardenLine(suffix string) string {
-	return "  " + WardenStyleAuto(m.autoMode).Render("warden") + "\n    " + suffix
 }
 
 func compactThinkText(text string) string {
@@ -405,26 +369,9 @@ func pathBase(p string) string {
 	return p
 }
 
-func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
-	prefix := "  "
-	detail := extractToolDetail(entry.toolName, entry.toolArgs)
-	if entry.toolDone {
-		past := toolPastTense(entry.toolName)
-		if detail != "" {
-			past += " " + detail
-		}
-		return DimStyle().Render(prefix + past)
-	}
-	if detail != "" {
-		detail = " -> " + detail
-	}
-	// Only the currently running tool gets the animated ellipsis
-	if idx == m.runningToolIdx {
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + idx) % 3
-		return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
-	}
-	return DimStyle().Render(prefix + entry.toolName + detail)
+// animDots returns the animated ellipsis frame for the given spinner step.
+func animDots(step int) string {
+	return [...]string{".", "..", "..."}[step%3]
 }
 
 // renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
@@ -455,8 +402,7 @@ func (m model) renderChainAction(entry messageEntry) string {
 		return ""
 	}
 	if entry.thinking {
-		dots := []string{".", "..", "..."}
-		return DimStyle().Render("  " + entry.activity + dots[(m.spinner/3)%3])
+		return DimStyle().Render("  " + entry.activity + animDots(m.spinner/3))
 	}
 	line := entry.activity
 	if entry.toolArgs != "" {
@@ -478,20 +424,16 @@ func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 		if !animating {
 			return DimStyle().Render("  Thought: " + formatThinkDuration(duration))
 		}
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + 1) % 3
 		verb := "Thinking"
 		if entry.activity != "" {
 			verb = entry.activity
 		}
-		return DimStyle().Render("  " + verb + dots[dotIdx])
+		return DimStyle().Render("  " + verb + animDots(m.spinner/3+1))
 	}
 
 	var summary string
 	if animating {
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + 1) % 3
-		summary = DimStyle().Render("  Thinking" + dots[dotIdx])
+		summary = DimStyle().Render("  Thinking" + animDots(m.spinner/3+1))
 	} else {
 		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
 	}
@@ -528,26 +470,6 @@ func indentLines(text string, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-var (
-	userMsgBg   = lipgloss.NewStyle().Background(lipgloss.Color("#242424"))
-	assistantBg = lipgloss.NewStyle().Background(lipgloss.Color("#1a1a1a"))
-)
-
-// bgLine pads a single pre-rendered string to full terminal width with a background.
-func (m *model) bgLine(style lipgloss.Style, content string) string {
-	return style.Width(m.width).Render(content)
-}
-
-// applyBgLines applies background to each line of a multi-line string.
-func (m *model) applyBgLines(style lipgloss.Style, content string) string {
-	lines := strings.Split(content, "\n")
-	out := make([]string, len(lines))
-	for i, l := range lines {
-		out[i] = style.Width(m.width).Render(l)
-	}
-	return strings.Join(out, "\n")
-}
-
 func (m *model) renderUserMsg(text string) string {
 	bgColor := lipgloss.Color("#242424")
 	plainOnBg := lipgloss.NewStyle().Background(bgColor)
@@ -577,16 +499,12 @@ func (m *model) renderMessages() []string {
 		switch entry.kind {
 		case messageUser:
 			rendered = m.renderUserMsg(entry.text)
-		case messageWarden:
-			// label removed, skip
 		case messageThink:
 			rendered = m.renderThinkEntry(entry, i == lastThinkIdx)
 		case messageAssistant:
 			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
 		case messageToolActivity:
 			rendered = entry.text
-		case messageToolFlow:
-			rendered = m.renderToolFlowEntry(i, entry)
 		case messageChainCounter:
 			rendered = m.renderChainCounter(entry)
 		case messageChainAction:
@@ -698,55 +616,6 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int) string {
 	return b.String()
 }
 
-// renderWaveSpinner renders a smooth bouncing wave with pulsing background dots.
-// Triangle-wave pos: -2..8 (overflows both edges for soft bounce).
-// Background dots (outside wave tail) slowly pulse for a "breathing" effect.
-func (m model) renderWaveSpinner() string {
-	const n = 7
-	const lo = -2
-	const hi = n + 1       // =8
-	const span = hi - lo   // 10
-	const cycle = span * 2 // 20
-	if !m.loading {
-		return FaintStyle().Render(strings.Repeat("·", n))
-	}
-	s := m.spinner % cycle
-	var pos int
-	if s < span {
-		pos = lo + s
-	} else {
-		pos = hi - (s - span)
-	}
-	var b strings.Builder
-	peak := Green
-	mid := GreenMid
-	faint := GreenFaint
-	if m.autoMode {
-		peak = Blue
-		mid = BlueMid
-		faint = BlueFaint
-	}
-	for i := 0; i < n; i++ {
-		dist := i - pos
-		if dist < 0 {
-			dist = -dist
-		}
-		switch {
-		case dist == 0:
-			b.WriteString(lipgloss.NewStyle().Foreground(peak).Render("â–ˆ"))
-		case dist == 1:
-			b.WriteString(lipgloss.NewStyle().Foreground(mid).Render("—"))
-		case dist == 2:
-			b.WriteString(lipgloss.NewStyle().Foreground(faint).Render("–"))
-		case dist == 3:
-			b.WriteString(FaintStyle().Render("·"))
-		default:
-			b.WriteString(FaintStyle().Render("·"))
-		}
-	}
-	return b.String()
-}
-
 // renderFullWave renders a full-terminal-width bouncing wave under the prompt bar.
 // Uses a fixed 60-tick cycle (~4.2s at 70ms/tick) regardless of terminal width.
 func (m model) renderFullWave() string {
@@ -813,6 +682,7 @@ func (m model) renderStatusBar() string {
 	}
 	dot := FaintStyle().Render(" · ")
 	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
+	keyStyle := WardenStyleAuto(m.autoMode)
 
 	var hint string
 	switch {
@@ -821,25 +691,13 @@ func (m model) renderStatusBar() string {
 	case m.quitPending:
 		hint = ErrorStyle().Render("ctrl+c") + DimStyle().Render(" quit · any key abort")
 	case m.selectMode:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		hint = DimStyle().Render("select mode · ") + lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" exit")
+		hint = DimStyle().Render("select mode · ") + keyStyle.Render("Esc") + DimStyle().Render(" exit")
 	case m.confirming:
 		hint = DimStyle().Render("Y run  N cancel")
 	case m.streaming:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		hint = lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
+		hint = keyStyle.Render("Esc") + DimStyle().Render(" interrupt")
 	default:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		key := lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Shift Tab")
+		key := keyStyle.Render("Shift Tab")
 		if m.autoMode {
 			hint = key + DimStyle().Render("  to Ask mode")
 		} else {
@@ -979,11 +837,7 @@ func (m model) renderConnectWizard() string {
 	acc := WardenStyleAuto(m.autoMode)
 	dim := DimStyle()
 	err := ErrorStyle()
-	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
-	if m.autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
-	}
-	key := func(s string) string { return keyStyle.Render(s) }
+	key := func(s string) string { return acc.Render(s) }
 
 	var lines []string
 
@@ -1062,11 +916,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	lines := make([]string, 0, maxVisible+4)
 
 	accent := WardenStyleAuto(autoMode)
-	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
-	if autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
-	}
-	key := func(s string) string { return keyStyle.Render(s) }
+	key := func(s string) string { return accent.Render(s) }
 	hint := key("←→") + DimStyle().Render(" navigate   ") +
 		key("Enter") + DimStyle().Render(" select   ") +
 		key("Esc") + DimStyle().Render(" cancel")

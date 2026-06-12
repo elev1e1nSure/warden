@@ -167,10 +167,6 @@ func (m model) tick() tea.Cmd {
 	})
 }
 
-func (m model) advance() int {
-	return 1
-}
-
 func (m model) fetchModels() tea.Cmd {
 	return func() tea.Msg {
 		models, current, err := m.client.ListModels()
@@ -210,11 +206,6 @@ func (m model) loadSkill(name string) tea.Cmd {
 	}
 }
 
-func cwProviderModels(provider string) []string {
-	_ = provider // no hardcoded lists — models are free-form
-	return []string{"enter custom..."}
-}
-
 func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if msg.Type == tea.KeyCtrlC {
 		return false, nil
@@ -244,7 +235,8 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		case tea.KeyEnter:
 			providers := []string{"openrouter", "ollama"}
 			m.cwProvider = providers[m.cwPickIdx]
-			m.cwModels = cwProviderModels(m.cwProvider)
+			// no hardcoded model lists — models are free-form
+			m.cwModels = []string{"enter custom..."}
 			if m.cwProvider == "openrouter" {
 				ti := textinput.New()
 				ti.Prompt = ""

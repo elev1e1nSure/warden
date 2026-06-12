@@ -9,7 +9,6 @@ var (
 	Blue       = lipgloss.Color("#38BDF8")
 	BlueMid    = lipgloss.Color("#0EA5E9")
 	BlueFaint  = lipgloss.Color("#0C4A6E")
-	Yellow     = Blue // alias kept for compat
 	Red        = lipgloss.Color("#ff4444")
 	Dim        = lipgloss.Color("#666666")
 	Faint      = lipgloss.Color("#2a2a2a")
@@ -17,10 +16,6 @@ var (
 )
 
 func AccentStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Green).Bold(true)
-}
-
-func WardenStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Green).Bold(true)
 }
 
@@ -34,10 +29,6 @@ func WardenStyleAuto(autoMode bool) lipgloss.Style {
 
 func HeaderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(White).Bold(true)
-}
-
-func UserStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Dim).Bold(true)
 }
 
 func DimStyle() lipgloss.Style {
@@ -68,10 +59,6 @@ func SlashDescStyle(active bool) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#585858"))
 	}
 	return DimStyle()
-}
-
-func KeyStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Green).Bold(true)
 }
 
 func ConfirmYStyle() lipgloss.Style {
