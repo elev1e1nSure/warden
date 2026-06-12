@@ -156,5 +156,57 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name == "question":
         return _d("safe", "interactive", "Asking user")
 
+    # process_list / process_kill
+    if tool_name == "process_list":
+        return _d("safe", "read-only", "Listing processes")
+    if tool_name == "process_kill":
+        return _d("confirm", "terminates a process", "Killing process",
+                  ["can disrupt the system or other applications"])
+
+    # file_move / file_copy
+    if tool_name in ("file_move", "file_copy"):
+        src = str(norm.get("src", ""))
+        dest = str(norm.get("dest", ""))
+        if is_dangerous_path(src) or is_dangerous_path(dest):
+            return _d("blocked", "dangerous path", "Path is outside allowed scope",
+                      ["UNC path, device path, or traversal detected"])
+        if not is_path_within_workspace(src, workspace) or not is_path_within_workspace(dest, workspace):
+            return _d("blocked", "path outside workspace",
+                      "file_move/file_copy outside workspace is blocked",
+                      [f"src: {src}", f"dest: {dest}"])
+        return _d("confirm", "mutates filesystem", f"{tool_name} inside workspace",
+                  [f"src: {src}", f"dest: {dest}"])
+
+    # archive
+    if tool_name == "archive":
+        action = str(norm.get("action", "list")).lower()
+        path = str(norm.get("path", ""))
+        if is_dangerous_path(path):
+            return _d("blocked", "dangerous path", "Archive path is outside allowed scope",
+                      ["UNC path, device path, or traversal detected"])
+        if action == "list":
+            return _d("safe", "read-only", "Listing archive", [f"path: {path}"])
+        if action == "create":
+            sources = norm.get("sources", []) or []
+            if not is_path_within_workspace(path, workspace):
+                return _d("blocked", "path outside workspace", "Archive path is outside workspace",
+                          [f"path: {path}"])
+            for s in sources:
+                if is_dangerous_path(str(s)) or not is_path_within_workspace(str(s), workspace):
+                    return _d("blocked", "source outside workspace",
+                              "Archive source is outside workspace",
+                              [f"src: {s}"])
+            return _d("confirm", "creates archive", "Creating archive",
+                      [f"path: {path}", f"{len(sources)} source(s)"])
+        if action == "extract":
+            dest = str(norm.get("dest", "")) or path
+            if is_dangerous_path(dest) or not is_path_within_workspace(dest, workspace):
+                return _d("blocked", "path outside workspace", "Extract dest is outside workspace",
+                          [f"dest: {dest}"])
+            return _d("confirm", "extracts archive", "Extracting archive",
+                      [f"path: {path}", f"dest: {dest}"])
+        return _d("confirm", "unknown archive action", f"archive {action}",
+                  ["action must be list, extract, or create"])
+
     return _d("confirm", "unknown tool", f"Unknown tool: {tool_name}",
               ["no safety policy defined — requires confirmation"])

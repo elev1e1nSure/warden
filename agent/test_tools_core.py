@@ -573,6 +573,72 @@ class TestMouseTool:
             if saved is not None:
                 sys.modules["pyautogui"] = saved
 
+    async def test_click_maps_downscaled_coords(self):
+        from agent.tools import MouseTool
+        mock_pg = self._make_pyautogui_mock()
+        mock_pg.size.return_value = (1920, 1080)
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            result = await MouseTool().execute({"action": "click", "x": 640, "y": 360})
+        mock_pg.click.assert_called_once_with(960, 540)
+        assert "960" in result and "540" in result
+
+    async def test_drag_maps_both_points(self):
+        from agent.tools import MouseTool
+        mock_pg = self._make_pyautogui_mock()
+        mock_pg.size.return_value = (1920, 1080)
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            result = await MouseTool().execute(
+                {"action": "drag", "x": 100, "y": 100, "x2": 200, "y2": 200}
+            )
+        assert "drag" in result
+        mock_pg.moveTo.assert_called_once_with(150, 150, duration=0.2)
+        mock_pg.dragTo.assert_called_once_with(300, 300, duration=0.3, button="left")
+
+    async def test_no_downscale_passthrough(self):
+        from agent.tools import MouseTool
+        mock_pg = self._make_pyautogui_mock()
+        mock_pg.size.return_value = (1280, 720)
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            await MouseTool().execute({"action": "click", "x": 640, "y": 360})
+        mock_pg.click.assert_called_once_with(640, 360)
+
+
+# ── coordinate mapping helpers ────────────────────────────────────────────────
+
+class TestCoordinateMapping:
+    def test_scale_factor_no_downscale_when_small(self):
+        from agent.tools.input import _scale_factor
+        assert _scale_factor(1280, 720) == 1.0
+        assert _scale_factor(800, 600) == 1.0
+
+    def test_scale_factor_downscales_large(self):
+        from agent.tools.input import _scale_factor
+        assert _scale_factor(1920, 1080) == 1280 / 1920
+
+    def test_map_to_screen_inverts_scale(self):
+        from agent.tools.input import _map_to_screen
+        import agent.tools.input as inp
+        with patch.object(inp, "_screen_size", return_value=(1920, 1080)):
+            assert _map_to_screen(640, 360) == (960, 540)
+
+    def test_map_to_screen_passthrough_small_screen(self):
+        from agent.tools.input import _map_to_screen
+        import agent.tools.input as inp
+        with patch.object(inp, "_screen_size", return_value=(1280, 720)):
+            assert _map_to_screen(100, 200) == (100, 200)
+
+    def test_map_to_screen_clamps_out_of_bounds(self):
+        from agent.tools.input import _map_to_screen
+        import agent.tools.input as inp
+        with patch.object(inp, "_screen_size", return_value=(1920, 1080)):
+            assert _map_to_screen(99999, 99999) == (1919, 1079)
+
+    def test_map_to_screen_passthrough_when_size_unknown(self):
+        from agent.tools.input import _map_to_screen
+        import agent.tools.input as inp
+        with patch.object(inp, "_screen_size", return_value=(0, 0)):
+            assert _map_to_screen(123, 456) == (123, 456)
+
 
 # ── KeyboardTool ──────────────────────────────────────────────────────────────
 
@@ -614,6 +680,41 @@ class TestKeyboardTool:
             result = await KeyboardTool().execute({"action": "type", "text": "x"})
         assert "pip install" in result
 
+    async def test_type_ascii_uses_write(self):
+        from agent.tools import KeyboardTool
+        mock_pg = self._make_pyautogui_mock()
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            result = await KeyboardTool().execute({"action": "type", "text": "hello"})
+        assert "typed" in result
+        mock_pg.write.assert_called_once()
+        mock_pg.hotkey.assert_not_called()
+
+    async def test_type_unicode_uses_clipboard_paste(self):
+        from agent.tools import KeyboardTool
+        mock_pg = self._make_pyautogui_mock()
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}), \
+             patch("agent.tools.input.subprocess.run") as mock_run:
+            result = await KeyboardTool().execute({"action": "type", "text": "привет"})
+        assert "typed" in result
+        mock_pg.write.assert_not_called()
+        mock_run.assert_called_once()
+        mock_pg.hotkey.assert_called_once_with("ctrl", "v")
+
+    async def test_press_combo_is_lowercased(self):
+        from agent.tools import KeyboardTool
+        mock_pg = self._make_pyautogui_mock()
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            result = await KeyboardTool().execute({"action": "press", "text": "Ctrl+C"})
+        mock_pg.hotkey.assert_called_once_with("ctrl", "c")
+        assert "ctrl+c" in result
+
+    async def test_press_synonyms_normalized(self):
+        from agent.tools import KeyboardTool
+        mock_pg = self._make_pyautogui_mock()
+        with patch.dict(sys.modules, {"pyautogui": mock_pg}):
+            await KeyboardTool().execute({"action": "press", "text": "Windows+D"})
+        mock_pg.hotkey.assert_called_once_with("win", "d")
+
 
 # ── ScreenshotTool ────────────────────────────────────────────────────────────
 
@@ -637,6 +738,22 @@ class TestScreenshotTool:
         with patch.dict(sys.modules, {"PIL": None, "PIL.ImageGrab": None}):
             result = await ScreenshotTool().execute({})
         assert "pip install" in result or "error" in result
+
+    async def test_reports_screen_and_shown_sizes(self, tmp_workspace):
+        from agent.tools import ScreenshotTool
+        import agent.tools.input as inp
+
+        mock_img = MagicMock()
+        mock_img.width = 1920
+        mock_img.height = 1080
+        mock_pil = MagicMock()
+        mock_pil.ImageGrab.grab.return_value = mock_img
+
+        with patch.dict(sys.modules, {"PIL": mock_pil, "PIL.ImageGrab": mock_pil.ImageGrab}), \
+             patch.object(inp, "_screen_size", return_value=(1920, 1080)):
+            result = await ScreenshotTool().execute({})
+        assert "screen 1920x1080" in result
+        assert "shown 1280x720" in result
 
 
 # ── BrowserOpenTool ───────────────────────────────────────────────────────────

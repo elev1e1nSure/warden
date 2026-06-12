@@ -39,9 +39,16 @@ jobs:
         run: |
           pyinstaller --onefile --name warden-backend `
             --collect-all agent `
+            --collect-submodules openai `
+            --collect-submodules ollama `
             --hidden-import=aiohttp `
             --hidden-import=PIL `
             --hidden-import=pyautogui `
+            --hidden-import=openai `
+            --hidden-import=ollama `
+            --hidden-import=duckduckgo_search `
+            --hidden-import=html2text `
+            --hidden-import=certifi `
             run_backend.py
 
       - name: Generate release notes
@@ -156,6 +163,15 @@ jobs:
 
           Compress-Archive -Path $folder -DestinationPath "$folder.zip"
 
+      - name: Generate checksums
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $zip = "warden-$env:TAG-windows-x64.zip"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -FilePath "SHA256SUMS.txt" -Encoding ascii
+
       - name: Create GitHub release
         shell: pwsh
         env:
@@ -166,4 +182,4 @@ jobs:
           gh release create $env:TAG `
             --title $env:TAG `
             --notes-file release_notes.md `
-            $zip
+            $zip SHA256SUMS.txt

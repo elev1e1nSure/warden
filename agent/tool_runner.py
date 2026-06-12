@@ -10,6 +10,7 @@ from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import tool as log_tool
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, ToolResult, parse_args
+from agent.tools.input import CU_MAX_SIDE
 
 
 _SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
@@ -23,7 +24,7 @@ def _extract_saved_path(result: str) -> str | None:
 	return str(p) if p.exists() else None
 
 
-def _encode_image(path: str, max_side: int = 1280) -> str | None:
+def _encode_image(path: str, max_side: int = CU_MAX_SIDE) -> str | None:
 	try:
 		from PIL import Image
 		img = Image.open(path)

@@ -1,5 +1,8 @@
 # warden
 
+[![CI](https://github.com/elev1e1nSure/warden/actions/workflows/ci.yml/badge.svg)](https://github.com/elev1e1nSure/warden/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 [Русский](README.ru.md)
 
 CLI computer control agent for Windows. Go TUI + Python backend + Ollama.
@@ -42,6 +45,27 @@ On first run a connection wizard opens. Pick a provider and model, or pre-config
 ```
 
 With no config file it defaults to Ollama (`qwen3:8b`).
+
+## computer use
+
+The agent can see and drive the screen. The loop is: `screenshot` → look at
+the image → `mouse` / `keyboard` → `screenshot` again to confirm.
+
+- **Vision** — every `screenshot` is attached to the conversation as an image,
+  so a vision-capable model literally sees the screen. Pick a model with image
+  support (e.g. a `qwen2.5vl` / `llava` Ollama model, or any vision model on
+  OpenRouter); text-only models are blind to screenshots.
+- **Coordinates** — screenshots are downscaled before being sent to the model.
+  The agent points at pixels **in the image it was shown**, and warden maps
+  those back to real screen pixels automatically. No manual scaling.
+- **`mouse`** — `move`, `click`, `right_click`, `double_click`, `scroll`, and
+  `drag` (give `x`/`y` as the start and `x2`/`y2` as the drop point).
+- **`keyboard`** — `type` writes text (non-ASCII like Cyrillic/emoji is pasted
+  via the clipboard so it lands correctly), `press` sends keys and combos
+  (`ctrl+c`, `alt+f4`, `win+d`).
+
+A real screen corner is the pyautogui fail-safe: slam the cursor into the
+top-left corner to abort an automated action.
 
 ## controls
 
@@ -94,4 +118,4 @@ In **Ask** mode, confirm-level actions require `y` / `n` before executing. In **
 
 ## tools
 
-`powershell` `file_read` `file_write` `file_delete` `file_list` `glob` `grep` `edit` `apply_patch` `clipboard` `screenshot` `mouse` `keyboard` `browser_open` `browser_read` `browser_screenshot` `google_search` `youtube_search` `webfetch` `skill` `todowrite` `question`
+`powershell` `bash` `file_read` `file_write` `file_delete` `file_list` `file_move` `file_copy` `glob` `grep` `edit` `apply_patch` `clipboard` `screenshot` `mouse` `keyboard` `browser_open` `browser_read` `browser_screenshot` `google_search` `youtube_search` `webfetch` `archive` `process_list` `process_kill` `skill` `todowrite` `question`

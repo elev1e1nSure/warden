@@ -23,6 +23,9 @@ from agent.tools.misc import QuestionTool, SkillTool, TodoWriteTool
 from agent.tools.patch import ApplyPatchTool
 from agent.tools.search import GoogleSearchTool, WebFetchTool
 from agent.tools.shell import BashTool, PowerShellTool
+from agent.tools.archive import ArchiveTool
+from agent.tools.process import ProcessListTool, ProcessKillTool
+from agent.tools.move import FileMoveTool, FileCopyTool
 
 REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	PowerShellTool(),
@@ -34,6 +37,8 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	FileWriteTool(),
 	FileDeleteTool(),
 	FileListTool(),
+	FileMoveTool(),
+	FileCopyTool(),
 	TodoWriteTool(),
 	SkillTool(),
 	ClipboardTool(),
@@ -48,4 +53,7 @@ REGISTRY: Dict[str, Tool] = {t.name: t for t in [
 	ApplyPatchTool(),
 	WebFetchTool(),
 	QuestionTool(),
+	ArchiveTool(),
+	ProcessListTool(),
+	ProcessKillTool(),
 ]}

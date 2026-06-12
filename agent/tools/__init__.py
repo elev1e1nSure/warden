@@ -40,4 +40,7 @@ from agent.tools.browser import (
 )
 from agent.tools.search import GoogleSearchTool, WebFetchTool
 from agent.tools.misc import SkillTool, TodoWriteTool, QuestionTool, _TODO_STORE
+from agent.tools.archive import ArchiveTool
+from agent.tools.process import ProcessListTool, ProcessKillTool
+from agent.tools.move import FileMoveTool, FileCopyTool
 from agent.tools.registry import REGISTRY

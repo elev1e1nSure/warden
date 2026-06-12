@@ -80,7 +80,7 @@ func (m model) handleStreamEvent(msg nextMsg) (model, []tea.Cmd) {
 		} else {
 			m.bumpChain(toolDisplayName(inner.tool.Name))
 		}
-		if m.diffMode && inner.tool.Diff != "" {
+		if m.verboseMode && inner.tool.Diff != "" {
 			entry := messageEntry{kind: messageToolDiff, text: inner.tool.Diff}
 			// Keep the live chain action line (if any) at the tail so in-place
 			// clearAction/setAction keep working — slot the diff above it.

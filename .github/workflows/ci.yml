@@ -5,9 +5,20 @@ on:
     branches: ['**']
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  python:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
 
     steps:
       - uses: actions/checkout@v5
@@ -15,11 +26,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install system deps
-        run: sudo apt-get install -y xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
 
       - name: Install Python deps
         run: pip install -r requirements.txt
@@ -28,9 +39,44 @@ jobs:
         run: xvfb-run --auto-servernum pytest --no-header -q
 
       - name: Upload coverage reports
+        if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
           path: |
             htmlcov/
             coverage.json
+
+  go:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Check formatting
+        working-directory: go
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-compliant:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Build
+        working-directory: go
+        run: go build ./...
+
+      - name: Test
+        working-directory: go
+        run: go test ./...

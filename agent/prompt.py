@@ -1,5 +1,7 @@
 """System prompt for Warden."""
 
+import datetime
+
 from agent.skills import format_catalog
 
 _BASE_SYSTEM = (
@@ -12,11 +14,14 @@ _BASE_SYSTEM = (
 
 "Do not guess or invent facts, paths, app states, command results, or tool outputs. "
 "Your training data has a cutoff date; for any question about current versions, releases, dates, or recent events, ALWAYS use search tools and trust the results. "
-"The current date is June 11, 2026 — use this to judge freshness of search results and filter out outdated information. "
 "If you lack current data, say so plainly instead of hallucinating. "
 "If unsure, say so plainly and ask one short question. "
 
-"Use tools when needed. For screen tasks, screenshot first, then act, then verify. "
+"Computer use: to act on screen, call screenshot, look at the returned image, "
+"then use mouse/keyboard. Give mouse x/y exactly as they appear on the screenshot "
+"you were shown — coordinates are mapped to the real screen for you, so never "
+"rescale them yourself. After clicking a field, use keyboard to type. "
+"Take a fresh screenshot to confirm the result before moving on. "
 
 "Shell is PowerShell on Windows. Use safe, readable commands. "
 "If something fails, inspect the error and try a different reasonable way. "
@@ -32,7 +37,12 @@ _BASE_SYSTEM = (
 
 def build_system(model: str | None = None) -> str:
 	"""Build the full system prompt, including the skills catalog if any."""
-	out = _BASE_SYSTEM
+	today = datetime.date.today().strftime("%B %d, %Y")
+	out = (
+		_BASE_SYSTEM
+		+ f" The current date is {today} — use it to judge the freshness of "
+		"search results and filter out outdated information."
+	)
 	if model:
 		out += f" Configured model name: {model}."
 	catalog = format_catalog()
