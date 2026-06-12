@@ -427,7 +427,7 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
-// renderChainCounter renders the grouped tool tally: "Searched —2 · Fetched —6 · 18s".
+// renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
 // While live the time ticks; once duration is set the line is frozen.
 func (m model) renderChainCounter(entry messageEntry) string {
 	if len(m.chainOrder) == 0 {
@@ -437,7 +437,7 @@ func (m model) renderChainCounter(entry messageEntry) string {
 	for _, name := range m.chainOrder {
 		label := toolPastTense(name)
 		if c := m.chainCounts[name]; c > 1 {
-			label += fmt.Sprintf(" —%d", c)
+			label += fmt.Sprintf(" ×%d", c)
 		}
 		parts = append(parts, label)
 	}
@@ -867,7 +867,7 @@ func (m model) renderStatusBar() string {
 func (m model) renderInput() string {
 	borderColor := Green
 	if m.autoMode {
-		borderColor = BlueMid
+		borderColor = Blue
 	}
 	if m.streaming || m.confirming {
 		borderColor = Faint
