@@ -50,4 +50,48 @@ from agent.tools.screen import ImageLocateTool, OcrTool, WaitForTool
 from agent.tools.system import SystemInfoTool, NotifyTool
 from agent.tools.http import HttpRequestTool
 from agent.tools.memory import MemoryTool
-from agent.tools.registry import REGISTRY
+
+REGISTRY = {
+	t.name: t for t in [
+		PowerShellTool(),
+		BashTool(),
+		FileReadTool(),
+		GlobTool(),
+		GrepTool(),
+		EditTool(),
+		FileWriteTool(),
+		FileDeleteTool(),
+		FileListTool(),
+		FileMoveTool(),
+		FileCopyTool(),
+		TodoWriteTool(),
+		SkillTool(),
+		ClipboardTool(),
+		ScreenshotTool(),
+		MouseTool(),
+		KeyboardTool(),
+		BrowserOpenTool(),
+		BrowserReadTool(),
+		YouTubeSearchTool(),
+		GoogleSearchTool(),
+		BrowserScreenshotTool(),
+		BrowserClickTool(),
+		BrowserFillTool(),
+		ApplyPatchTool(),
+		WebFetchTool(),
+		HttpRequestTool(),
+		QuestionTool(),
+		ArchiveTool(),
+		ProcessListTool(),
+		ProcessKillTool(),
+		WindowListTool(),
+		WindowFocusTool(),
+		WindowManageTool(),
+		ImageLocateTool(),
+		OcrTool(),
+		WaitForTool(),
+		SystemInfoTool(),
+		NotifyTool(),
+		MemoryTool(),
+	]
+}
