@@ -12,7 +12,7 @@ from agent.llm_client import LLMChunk, OpenAIClient
 
 # ── _normalize_messages (existing + extended) ─────────────────────────────────
 
-def test_normalize_messages_preserves_reasoning_fields() -> None:
+def test_normalize_messages_strips_reasoning_fields() -> None:
 	client = OpenAIClient.__new__(OpenAIClient)
 	messages = [
 		{
@@ -31,8 +31,8 @@ def test_normalize_messages_preserves_reasoning_fields() -> None:
 
 	result = OpenAIClient._normalize_messages(client, messages)
 
-	assert result[0]["reasoning"] == "step by step"
-	assert result[0]["reasoning_details"] == [{"type": "reasoning.text", "text": "step by step"}]
+	assert "reasoning" not in result[0]
+	assert "reasoning_details" not in result[0]
 	assert result[0]["tool_calls"][0]["function"]["name"] == "read"
 
 

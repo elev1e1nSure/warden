@@ -107,11 +107,10 @@ class OpenAIClient(LLMClient):
 					"content": str(msg.get("content", "")),
 					"tool_calls": openai_tool_calls,
 				}
-				if msg.get("reasoning"):
-					assistant_msg["reasoning"] = str(msg["reasoning"])
-				if msg.get("reasoning_details"):
-					assistant_msg["reasoning_details"] = msg["reasoning_details"]
 				result.append(assistant_msg)
+			elif msg.get("role") == "assistant":
+				clean = {k: v for k, v in msg.items() if k not in ("reasoning", "reasoning_details")}
+				result.append(clean)
 			elif msg.get("role") == "user" and "images" in msg:
 				images = msg["images"]
 				text = msg.get("content", "")

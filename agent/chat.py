@@ -124,10 +124,9 @@ class ChatSession:
 		msg: Dict[str, Any] = {"role": "assistant", "content": text}
 		if tool_calls:
 			msg["tool_calls"] = tool_calls
-		if reasoning:
-			msg["reasoning"] = reasoning
-		if reasoning_details:
-			msg["reasoning_details"] = reasoning_details
+		# Do NOT persist reasoning/reasoning_details in history.
+		# Anthropic rejects thinking blocks with invalid signatures
+		# when they are round-tripped through JSON serialization.
 		self.history.append(msg)
 
 	def add_tool_result(self, tool_name: str, result: str, tool_call_id: str = "") -> None:
@@ -203,9 +202,7 @@ class ChatSession:
 			result["error"] = True
 
 		result["content"] = full_content
-		result["reasoning"] = full_reasoning
 		result["tool_calls"] = collected_tool_calls
-		result["reasoning_details"] = collected_reasoning_details
 
 	async def _execute_tool_call(self, tc, auto_mode: bool) -> AsyncIterator[tuple]:
 		async for event in execute_tool_call(
@@ -237,15 +234,11 @@ class ChatSession:
 				break
 
 			full_content = llm_result.get("content", "")
-			full_reasoning = llm_result.get("reasoning", "")
 			collected_tool_calls = llm_result.get("tool_calls", [])
-			collected_reasoning_details = llm_result.get("reasoning_details", [])
 
 			self.add_assistant(
 				full_content,
 				collected_tool_calls or None,
-				reasoning=full_reasoning,
-				reasoning_details=collected_reasoning_details or None,
 			)
 			self.token_count = self._estimate_tokens()
 

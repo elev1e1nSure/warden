@@ -58,7 +58,6 @@ class TestCallLlm:
 		events = [e async for e in session._call_llm([], result)]
 		think_texts = [p for t, p in events if t == "think"]
 		assert "deep thought" in think_texts
-		assert result["reasoning"] == "deep thought"
 
 	async def test_reasoning_details_text_extracted(self):
 		session = _session([LLMChunk(reasoning_details=[{"text": "detail here"}])])
