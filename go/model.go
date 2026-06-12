@@ -219,7 +219,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type != tea.KeyEsc {
 			m.escPending = false
 		}
-		if msg.Type != tea.KeyCtrlC {
+		// Only clear quitPending on non-control keys (Ctrl alone shouldn't reset)
+		if !strings.HasPrefix(string(msg.Type), "ctrl") && msg.Type != tea.KeyCtrlC {
 			m.quitPending = false
 		}
 		switch msg.Type {
