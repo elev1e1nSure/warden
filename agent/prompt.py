@@ -28,7 +28,10 @@ _BASE_SYSTEM = (
 "Small icons are easy to miss, so after every click take a screenshot and check "
 "what actually happened: if the wrong thing opened, close it (press escape or "
 "alt+f4) and try again, preferring the keyboard. After clicking a text field, use "
-"keyboard to type. Confirm the final result with a screenshot before you finish. "
+"keyboard to type. Take a fresh screenshot to confirm the result before moving on. "
+"For reliable automation prefer image_locate to find a target's coordinates, "
+"wait_for instead of fixed sleeps, and ocr to read on-screen text. "
+"Use window_list/window_focus/window_manage to find and arrange windows. "
 
 "Shell is PowerShell on Windows. Use safe, readable commands. "
 "If something fails, inspect the error and try a different reasonable way. "

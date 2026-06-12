@@ -208,5 +208,52 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
         return _d("confirm", "unknown archive action", f"archive {action}",
                   ["action must be list, extract, or create"])
 
+    # window tools
+    if tool_name == "window_list":
+        return _d("safe", "read-only", "Listing windows")
+    if tool_name == "window_focus":
+        return _d("confirm", "changes foreground window", "Focusing window",
+                  [f"title: {norm.get('title', '')}", f"hwnd: {norm.get('hwnd', '')}"])
+    if tool_name == "window_manage":
+        action = str(norm.get("action", "")).lower()
+        return _d("confirm", "manipulates a window", f"Window {action}",
+                  ["can move, resize, minimize, maximize, or close windows"])
+
+    # screen perception
+    if tool_name == "image_locate":
+        return _d("safe", "read-only", "Locating image on screen")
+    if tool_name == "ocr":
+        return _d("safe", "read-only", "Recognizing text on screen")
+    if tool_name == "wait_for":
+        return _d("safe", "read-only polling", f"Waiting for {norm.get('type', '')}",
+                  [f"target: {norm.get('target', '')}"])
+
+    # system_info / notify
+    if tool_name == "system_info":
+        return _d("safe", "read-only", "Reading system info")
+    if tool_name == "notify":
+        return _d("safe", "shows a notification", "Sending desktop notification")
+
+    # memory
+    if tool_name == "memory":
+        return _d("safe", "local notes store", f"memory {norm.get('action', '')}")
+
+    # http_request
+    if tool_name == "http_request":
+        method = str(norm.get("method", "GET")).upper()
+        url = str(norm.get("url", ""))
+        if method in ("GET", "HEAD", "OPTIONS"):
+            return _d("safe", "read-only request", f"{method} {url}")
+        return _d("confirm", "sends a write request", f"{method} {url}",
+                  ["can create or modify remote state"])
+
+    # interactive browser
+    if tool_name == "browser_click":
+        return _d("confirm", "interacts with a web page", "Clicking page element",
+                  [f"selector: {norm.get('selector', '')}"])
+    if tool_name == "browser_fill":
+        return _d("confirm", "interacts with a web page", "Filling page field",
+                  [f"selector: {norm.get('selector', '')}"])
+
     return _d("confirm", "unknown tool", f"Unknown tool: {tool_name}",
               ["no safety policy defined — requires confirmation"])

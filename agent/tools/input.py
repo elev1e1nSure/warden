@@ -76,6 +76,20 @@ def _map_to_screen(x: int, y: int) -> tuple[int, int]:
 	return mx, my
 
 
+def _map_to_model(x: int, y: int) -> tuple[int, int]:
+	"""Map real screen pixels back to model coords (downscaled-screenshot space).
+
+	Inverse of _map_to_screen: tools that locate things on the real screen
+	(image_locate, window bounds) report coordinates in the same space the
+	model sees in screenshots, so it can feed them straight to the mouse tool.
+	"""
+	sw, sh = _screen_size()
+	scale = _scale_factor(sw, sh)
+	if scale >= 1.0:
+		return x, y
+	return round(x * scale), round(y * scale)
+
+
 # pyautogui key names are lowercase; normalise common synonyms the model may use.
 _KEY_ALIASES = {
 	"control": "ctrl",
