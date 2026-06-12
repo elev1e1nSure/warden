@@ -1128,7 +1128,7 @@ func (m model) renderHint() string {
 			}
 			if active {
 				lines = append(lines,
-`	`	`	`	`	"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
+					"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
 				)
 				continue
 			}
