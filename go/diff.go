@@ -94,7 +94,7 @@ func renderUnifiedDiff(diff string, width int) string {
 			strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"):
 			continue // metadata folded into the header
 		case strings.HasPrefix(l, "@@"):
-			out = append(out, rail(diffFrameStyle)+diffHunkStyle.Render(pad(l)))
+			continue // skip hunk headers
 		case strings.HasPrefix(l, "+"):
 			out = append(out, rail(diffAddGutter)+diffAddStyle.Render(pad(l)))
 		case strings.HasPrefix(l, "-"):
