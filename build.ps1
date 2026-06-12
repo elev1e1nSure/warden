@@ -29,17 +29,9 @@ function Spinner($durationSec, $label) {
 
 Clear-Host
 Write-Host ""
-Write-Host "    __      __                _           " -ForegroundColor Cyan
-Write-Host "    \ \    / /               | |          " -ForegroundColor Cyan
-Write-Host "     \ \  / /__ _ _ __ _ __  | | ___ _ __ " -ForegroundColor Cyan
-Write-Host "      \ \/ / _ \ '__| '_ \ | |/ _ \ '__|" -ForegroundColor Cyan
-Write-Host "       \  /  __/ |  | | | || |  __/ |   " -ForegroundColor Cyan
-Write-Host "        \/ \___|_|  |_| |_|_/ |\___|_|   " -ForegroundColor Cyan
-Write-Host "                           |__/           " -ForegroundColor Cyan
+Write-Host "  warden build script" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "        Build script  |  Windows edition" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "  =========================================" -ForegroundColor DarkGray
 Write-Host ""
 
 # ── deps ─────────────────────────────────────────────────────────────────
@@ -81,5 +73,5 @@ Write-Host ""
 Ok "warden.exe built in ${elapsed}s"
 Write-Host "    path: $root\warden.exe" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "  =========================================" -ForegroundColor DarkGray
 Write-Host ""
