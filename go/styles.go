@@ -3,7 +3,7 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Green      = lipgloss.Color("#52B788")
+	Green      = lipgloss.Color("#8AB89A")
 	GreenMid   = lipgloss.Color("#2D8A5A")
 	GreenFaint = lipgloss.Color("#1A4D34")
 	Blue       = lipgloss.Color("#38BDF8")
@@ -56,9 +56,9 @@ func ToolStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Blue)
 }
 
-func SlashNameStyle(active bool) lipgloss.Style {
+func SlashNameStyle(active bool, autoMode bool) lipgloss.Style {
 	if active {
-		return AccentStyle()
+		return WardenStyleAuto(autoMode)
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#d0d0d0"))
 }

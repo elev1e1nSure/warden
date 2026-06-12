@@ -234,6 +234,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyUp:
+			if m.handleSlashNavigation(msg) {
+				return m, nil
+			}
 			if m.modelPicking {
 				if m.modelPickIdx > 0 {
 					m.modelPickIdx--
@@ -258,6 +261,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyDown:
+			if m.handleSlashNavigation(msg) {
+				return m, nil
+			}
 			if m.modelPicking {
 				if m.modelPickIdx < len(m.modelFiltered)-1 {
 					m.modelPickIdx++
@@ -503,6 +509,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.CursorEnd()
 				m.syncInputHeight()
 				return m, nil
+			}
+			if strings.HasPrefix(val, "/") {
+				matches := matchSlash(val)
+				if len(matches) > 0 {
+					idx := m.slashIdx
+					if idx < 0 || idx >= len(matches) {
+						idx = 0
+					}
+					val = matches[idx].name
+					m.textinput.SetValue(val)
+					m.textinput.CursorEnd()
+				}
 			}
 			text := strings.TrimSpace(m.expandPastes(val))
 			if text == "" {
@@ -758,6 +776,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.syncViewport()
 
+	case updateResultMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.appendText(ErrorStyle().Render("  update failed: " + msg.err.Error()))
+			m.appendText("")
+			m.syncViewport()
+			return m, nil
+		}
+		m.appendText(DimStyle().Render("  update downloaded, restarting..."))
+		m.syncViewport()
+		return m, tea.Quit
+
 	case modelsResultMsg:
 		if msg.err != "" || len(msg.models) == 0 {
 			break
@@ -883,8 +913,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // refreshHints recomputes slash/bang hint visibility and resizes the viewport.
 func (m *model) refreshHints() {
-	slashMatches := matchSlash(m.textinput.Value())
-	bangMatches := matchBang(m.textinput.Value(), m.skills)
+	val := m.textinput.Value()
+	slashMatches := matchSlash(val)
+	bangMatches := matchBang(val, m.skills)
 	newCount := len(slashMatches) + len(bangMatches)
 	if newCount != m.hintCount {
 		m.hintCount = newCount
@@ -893,6 +924,17 @@ func (m *model) refreshHints() {
 			m.updateViewportHeight()
 			m.syncViewport()
 		}
+	}
+	if len(slashMatches) == 0 {
+		m.slashIdx = -1
+		m.slashTyped = ""
+		return
+	}
+	if strings.HasPrefix(val, "/") {
+		if m.slashIdx < 0 || m.slashIdx >= len(slashMatches) || m.slashTyped != val {
+			m.slashIdx = 0
+		}
+		m.slashTyped = val
 	}
 }
 
@@ -969,6 +1011,9 @@ type compactResultMsg struct {
 	tokensBefore int
 	tokensAfter  int
 	err          string
+}
+type updateResultMsg struct {
+	err error
 }
 type backendReadyMsg struct{}
 type backendErrorMsg struct{}

@@ -21,7 +21,7 @@ const (
 	port              = 8765
 	startupTimeout    = 60 * time.Second
 	healthCheckPeriod = 1500 * time.Millisecond
-	spinnerPeriod     = 500 * time.Millisecond
+	spinnerPeriod     = 120 * time.Millisecond
 )
 
 var (
@@ -42,11 +42,13 @@ const (
 )
 
 type launchModel struct {
-	state    state
-	spinner  int
-	deadline time.Time
-	ready    bool
-	errMsg   string
+	state     state
+	spinner   int
+	deadline  time.Time
+	startedAt time.Time
+	ready     bool
+	errMsg    string
+	attaching bool
 }
 
 type tickMsg struct{}
@@ -54,7 +56,7 @@ type readyMsg struct{}
 
 type backendExitMsg struct{ err error }
 
-var spinnerFrames = []string{".", "..", "..."}
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(spinnerPeriod, func(time.Time) tea.Msg {
@@ -112,17 +114,41 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m launchModel) View() string {
 	title := lipgloss.NewStyle().Foreground(blue).Bold(true).Render("warden")
-	var body string
+	elapsed := time.Since(m.startedAt).Round(100 * time.Millisecond)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+
+	keyStyle := lipgloss.NewStyle().Foreground(blue).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(faint)
+
+	var status string
 	switch m.state {
 	case stateBoot, stateWaiting:
 		frame := spinnerFrames[m.spinner%len(spinnerFrames)]
-		body = lipgloss.NewStyle().Foreground(faint).Render("Starting" + frame)
+		if m.attaching {
+			status = "attaching to running warden"
+		} else {
+			status = "starting warden"
+		}
+		status = frame + "  " + status
 	case stateReady:
-		body = lipgloss.NewStyle().Foreground(subtle).Render("ready")
+		status = lipgloss.NewStyle().Foreground(green).Render("ready")
 	case stateFailed:
-		body = lipgloss.NewStyle().Foreground(danger).Render("error: " + m.errMsg)
+		status = lipgloss.NewStyle().Foreground(danger).Render("startup failed")
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, title, body)
+
+	lines := []string{
+		title,
+		"",
+		keyStyle.Render(status),
+		dimStyle.Render("  " + elapsed.String()),
+	}
+	if m.state == stateFailed && m.errMsg != "" {
+		lines = append(lines, "", lipgloss.NewStyle().Foreground(danger).Render(m.errMsg))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func findProjectRoot() (string, error) {
@@ -236,11 +262,13 @@ func killBackendByPort() {
 	}
 }
 
-func runLauncher(alreadyRunning bool) (ready bool) {
+func runLauncher(root string, cfg WardenConfig, alreadyRunning bool) (ready bool) {
 	m := launchModel{
-		state:    stateBoot,
-		deadline: time.Now().Add(startupTimeout),
-		ready:    alreadyRunning,
+		state:     stateBoot,
+		deadline:  time.Now().Add(startupTimeout),
+		startedAt: time.Now(),
+		ready:     alreadyRunning,
+		attaching: alreadyRunning,
 	}
 	if alreadyRunning {
 		m.state = stateReady
@@ -282,7 +310,7 @@ func main() {
 		}
 	}
 
-	ready := runLauncher(alreadyRunning)
+	ready := runLauncher(root, cfg, alreadyRunning)
 	if !ready {
 		if backend != nil {
 			stopBackend(backend)

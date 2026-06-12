@@ -23,7 +23,6 @@ go/warden.exe
 .tmp/
 
 # Scratch files
-poll.html
 TODO.md
 
 # Claude worktrees
@@ -32,4 +31,3 @@ TODO.md
 # External
 opencode/
 .opencode/
-.mavis/

@@ -19,6 +19,7 @@ var slashCommands = []slashCmd{
 	{"/clear", "Clear chat and reset session"},
 	{"/compact", "Summarize conversation to free up context"},
 	{"/models", "Switch model"},
+	{"/update", "Download and install the latest release"},
 	{"/select", "Enable text selection (disables mouse capture)"},
 	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
@@ -35,6 +36,35 @@ func matchSlash(prefix string) []slashCmd {
 		}
 	}
 	return out
+}
+
+func (m *model) handleSlashNavigation(msg tea.KeyMsg) bool {
+	val := m.textinput.Value()
+	if !strings.HasPrefix(val, "/") {
+		return false
+	}
+	matches := matchSlash(val)
+	if len(matches) == 0 {
+		return false
+	}
+	if m.slashIdx < 0 || m.slashIdx >= len(matches) {
+		m.slashIdx = 0
+	}
+	switch msg.Type {
+	case tea.KeyUp:
+		if m.slashIdx == 0 {
+			m.slashIdx = len(matches) - 1
+		} else {
+			m.slashIdx--
+		}
+	case tea.KeyDown:
+		m.slashIdx = (m.slashIdx + 1) % len(matches)
+	default:
+		return false
+	}
+	m.updateViewportHeight()
+	m.syncViewport()
+	return true
 }
 
 func slashCommonPrefix(matches []slashCmd) string {
@@ -97,6 +127,13 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	case "/models":
 		m.clearHintState()
 		return true, m.fetchModels()
+	case "/update":
+		m.clearHintState()
+		m.loading = true
+		m.spinner = 0
+		m.appendText(DimStyle().Render("  downloading update..."))
+		m.syncViewport()
+		return true, tea.Batch(m.runUpdate(), m.tick())
 	}
 
 	switch trimmed {
