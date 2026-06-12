@@ -11,3 +11,4 @@ pytest-aiohttp>=1.0
 pyautogui
 Pillow
 playwright
+html2text

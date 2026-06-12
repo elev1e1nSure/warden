@@ -13,11 +13,10 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 - don't add dependencies without reason
 - code comments in English, short
 - risk classification is deterministic code in `agent/safety/_policy.py` — never the model or the prompt
-- risk markers in `.warden/powershell-reference.md` must match what `agent/safety/` actually enforces; change them together
 
 ## stack
 
-- **Go 1.23+** — frontend (bubbletea, lipgloss)
+- **Go 1.24+** — frontend (bubbletea, lipgloss)
 - **Python 3.11+** — backend (aiohttp, ollama SDK)
 - pyautogui — mouse / keyboard
 - Pillow — screenshots
@@ -38,7 +37,6 @@ CLI computer control agent. Go TUI + Python backend + Ollama. Strict minimalism.
 ```
 go/        — bubbletea frontend
 agent/     — backend: server, chat, tools, safety, logs, skills
-.warden/   — runtime reference docs (powershell-reference.md)
 .warden/skills/ — built-in skills (e.g. skill-creator)
 opencode/  — reference: opencode-ai/opencode repo for feature research
 ```
@@ -65,6 +63,8 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 - controls: arrows, Enter, Esc, Ctrl+C
 - no buttons, no mouse clicks in the TUI itself
 - **input hints:** `/` prefix shows slash commands; `!` prefix shows available skills
+- **connect wizard:** `/connect` opens an interactive provider/model picker (openrouter or ollama)
+- **select mode:** `/select` disables mouse capture so the terminal can select text; `Esc` exits
 - if there's a need to add something truly new — discuss with the user first, then add to this section
 
 ## skills
