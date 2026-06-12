@@ -149,15 +149,6 @@ class ChatSession:
 		# Anthropic rejects thinking blocks with invalid signatures
 		# when they are round-tripped through JSON serialization.
 		self.history.append(msg)
-		if text and self.memory_store is not None and self.memory_store.get_enabled():
-			for fact in self._extractor.extract(text):
-				self.memory_store.upsert_entry(
-					self.session_id,
-					fact.category,
-					fact.key,
-					fact.value,
-					fact.confidence,
-				)
 
 	def add_tool_result(self, tool_name: str, result: str, tool_call_id: str = "") -> None:
 		entry: Dict[str, Any] = {"role": "tool", "content": result, "name": tool_name}

@@ -185,29 +185,31 @@ class MemoryStore:
 			return json.loads(row[0])
 
 	def get_context_text(self) -> str:
-		"""Format latest snapshot as a short context block for the LLM."""
-		snap = self.get_latest_snapshot()
-		if not snap:
+		"""Format all memory entries as a context block for the LLM.
+
+		Reads live entries (not snapshots) so facts learned in the current
+		session are immediately visible to the model.
+		"""
+		entries = self.get_entries()
+		if not entries:
 			return ""
-		lines: list[str] = ["[Memory context]"]
-		user = snap.get("user", {})
-		for k, v in user.items():
-			if v:
-				lines.append(f"- User {k}: {v}")
-		projects = snap.get("projects", [])
-		if projects:
-			names = [p["name"] for p in projects if p.get("name")]
-			if names:
-				lines.append(f"- Projects: {', '.join(names)}")
-			for p in projects:
-				stack = p.get("tech_stack", [])
-				if stack:
-					lines.append(f"- Tech stack: {', '.join(stack)}")
-		prefs = snap.get("preferences", {})
-		for k, v in prefs.items():
-			if v:
-				lines.append(f"- Preference {k}: {v}")
-		return "\n".join(lines)
+
+		by_cat: dict[str, dict[str, str]] = {}
+		for e in entries:
+			by_cat.setdefault(e["category"], {})[e["key"]] = e["value"]
+
+		lines: list[str] = ["[Memory]"]
+		for k, v in by_cat.get("user", {}).items():
+			lines.append(f"- user {k}: {v}")
+		tech = sorted(by_cat.get("tech_stack", {}).values())
+		if tech:
+			lines.append(f"- tech stack: {', '.join(tech)}")
+		for k, v in by_cat.get("preference", {}).items():
+			lines.append(f"- prefers {k}: {v}")
+		for k, v in by_cat.get("project", {}).items():
+			lines.append(f"- project: {v}")
+
+		return "\n".join(lines) if len(lines) > 1 else ""
 
 	def get_stats(self) -> dict[str, Any]:
 		with self._conn() as conn:
