@@ -381,70 +381,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch))
 			}
 			if m.confirming {
-				m.confirming = false
-				ch := m.confirmCh
-				id := m.confirmID
-				m.confirmID = ""
-				m.confirmCh = nil
-				m.confirmTool = ""
-				m.textinput.Placeholder = ""
-				m.resetInput()
-				m.updateViewportHeight()
-				m.syncViewport()
-				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch))
+				return m.resolveConfirm(false)
 			}
 			m.resetInput()
 
 		case tea.KeyRunes:
 			if m.confirming {
-				r := strings.ToLower(string(msg.Runes))
-				if r == "y" || r == "н" {
-					ok := true
-					ch := m.confirmCh
-					id := m.confirmID
-					m.confirming = false
-					m.confirmID = ""
-					m.confirmCh = nil
-					m.confirmTool = ""
-					m.textinput.Placeholder = ""
-					m.resetInput()
-					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
-				}
-				if r == "n" || r == "т" {
-					ok := false
-					ch := m.confirmCh
-					id := m.confirmID
-					m.confirming = false
-					m.confirmID = ""
-					m.confirmCh = nil
-					m.confirmTool = ""
-					m.textinput.Placeholder = ""
-					m.resetInput()
-					return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+				switch strings.ToLower(string(msg.Runes)) {
+				case "y", "н":
+					return m.resolveConfirm(true)
+				case "n", "т":
+					return m.resolveConfirm(false)
 				}
 				return m, nil
 			}
 			if m.questioning {
 				q := m.questionsData[m.questionIdx]
 				if len(q.Options) > 0 {
-					input := string(msg.Runes)
-					if num, err := parseOptionNumber(input); err == nil && num >= 1 && num <= len(q.Options) {
-						idx := num - 1
-						m.questionAnswers = append(m.questionAnswers, []string{q.Options[idx].Label})
-						m.questionIdx++
-						if m.questionIdx >= len(m.questionsData) {
-							ch := m.questionCh
-							id := m.questionID
-							answers := m.questionAnswers
-							savedQuestions := m.questionsData
-							m = m.clearQuestionState()
-							m.appendQuizHistory(savedQuestions, answers)
-							m.updateViewportHeight()
-							m.syncViewport()
-							return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
-						}
-						m.syncViewport()
-						return m, m.focusInput()
+					if num, err := parseOptionNumber(string(msg.Runes)); err == nil && num >= 1 && num <= len(q.Options) {
+						return m.answerQuestion(q.Options[num-1].Label)
 					}
 				}
 			}
@@ -470,21 +425,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(q.Options) == 0 {
 					text := strings.TrimSpace(m.textinput.Value())
 					m.resetInput()
-					m.questionAnswers = append(m.questionAnswers, []string{text})
-					m.questionIdx++
-					if m.questionIdx >= len(m.questionsData) {
-						ch := m.questionCh
-						id := m.questionID
-						answers := m.questionAnswers
-						savedQuestions := m.questionsData
-						m = m.clearQuestionState()
-						m.appendQuizHistory(savedQuestions, answers)
-						m.updateViewportHeight()
-						m.syncViewport()
-						return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
-					}
-					m.syncViewport()
-					return m, m.focusInput()
+					return m.answerQuestion(text)
 				}
 				return m, nil
 			}
@@ -545,16 +486,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.recordHistory(text)
-			m.streamStart = len(m.messages)
 			m.messages = append(m.messages, messageEntry{kind: messageUser, text: text})
 			m.appendText("")
-			m.resetInput()
-			m.startChain()
-			m.streaming = true
-			m.loading = true
-			m.spinner = 0
-			m.syncViewport()
-			return m, tea.Batch(m.sendMessage(text), m.tick())
+			return m, m.beginStream(text)
 		}
 
 	case startStreamMsg:
@@ -676,54 +610,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncViewport()
 
 		case doneMsg:
-			m.streaming = false
-			m.loading = false
-			m.toolRunning = false
-			m.escPending = false
-			m.quitPending = false
-			m.userScrolled = false
-			if m.verboseMode {
-				m.finishThink()
-			} else {
-				m.freezeChain()
-			}
-			m.thinkBuf = ""
-			m.thinkDone = false
-			m.activityIdx = -1
-			m.appendText("")
-			if inner.tokenLimit > 0 {
-				m.tokenCount = inner.tokenCount
-				m.tokenLimit = inner.tokenLimit
-			}
-			m.syncViewport()
-			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
-				m.loading = true
-				cmds = append(cmds, m.runCompact(), m.tick())
+			if cmd := m.finishStream(inner.tokenCount, inner.tokenLimit); cmd != nil {
+				cmds = append(cmds, cmd)
 			}
 		}
 
 	case doneMsg:
 		if m.streaming {
-			m.streaming = false
-			m.loading = false
-			m.toolRunning = false
-			if m.verboseMode {
-				m.finishThink()
-			} else {
-				m.freezeChain()
-			}
-			m.thinkBuf = ""
-			m.thinkDone = false
-			m.activityIdx = -1
-			m.appendText("")
-			if msg.tokenLimit > 0 {
-				m.tokenCount = msg.tokenCount
-				m.tokenLimit = msg.tokenLimit
-			}
-			m.syncViewport()
-			if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
-				m.loading = true
-				cmds = append(cmds, m.runCompact(), m.tick())
+			if cmd := m.finishStream(msg.tokenCount, msg.tokenLimit); cmd != nil {
+				cmds = append(cmds, cmd)
 			}
 		}
 
@@ -740,7 +635,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		if m.loading {
-			m.spinner += m.advance()
+			m.spinner++
 			if m.streaming && !m.confirming && len(m.messages) > 0 {
 				m.syncViewport()
 			}
@@ -872,14 +767,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
-		m.streamStart = len(m.messages)
-		m.resetInput()
-		m.startChain()
-		m.streaming = true
-		m.loading = true
-		m.spinner = 0
-		m.syncViewport()
-		cmds = append(cmds, tea.Batch(m.sendMessage(body), m.tick()))
+		cmds = append(cmds, m.beginStream(body))
 
 	case backendErrorMsg:
 		m.loading = false
@@ -909,6 +797,83 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.refreshHints()
 
 	return m, tea.Batch(cmds...)
+}
+
+// resolveConfirm closes the confirm dialog and sends the verdict to the backend.
+func (m model) resolveConfirm(ok bool) (model, tea.Cmd) {
+	ch := m.confirmCh
+	id := m.confirmID
+	m.confirming = false
+	m.confirmID = ""
+	m.confirmCh = nil
+	m.confirmTool = ""
+	m.textinput.Placeholder = ""
+	m.resetInput()
+	m.updateViewportHeight()
+	m.syncViewport()
+	return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+}
+
+// answerQuestion records the answer for the current question and advances;
+// after the last question it sends all answers to the backend.
+func (m model) answerQuestion(answer string) (model, tea.Cmd) {
+	m.questionAnswers = append(m.questionAnswers, []string{answer})
+	m.questionIdx++
+	if m.questionIdx < len(m.questionsData) {
+		m.syncViewport()
+		return m, m.focusInput()
+	}
+	ch := m.questionCh
+	id := m.questionID
+	answers := m.questionAnswers
+	saved := m.questionsData
+	m = m.clearQuestionState()
+	m.appendQuizHistory(saved, answers)
+	m.updateViewportHeight()
+	m.syncViewport()
+	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
+}
+
+// beginStream marks the start of a streaming turn and sends text to the backend.
+func (m *model) beginStream(text string) tea.Cmd {
+	m.streamStart = len(m.messages)
+	m.resetInput()
+	m.startChain()
+	m.streaming = true
+	m.loading = true
+	m.spinner = 0
+	m.syncViewport()
+	return tea.Batch(m.sendMessage(text), m.tick())
+}
+
+// finishStream resets streaming state at turn end; returns a compact command
+// when the context is close to the token limit.
+func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
+	m.streaming = false
+	m.loading = false
+	m.toolRunning = false
+	m.escPending = false
+	m.quitPending = false
+	m.userScrolled = false
+	if m.verboseMode {
+		m.finishThink()
+	} else {
+		m.freezeChain()
+	}
+	m.thinkBuf = ""
+	m.thinkDone = false
+	m.activityIdx = -1
+	m.appendText("")
+	if tokenLimit > 0 {
+		m.tokenCount = tokenCount
+		m.tokenLimit = tokenLimit
+	}
+	m.syncViewport()
+	if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
+		m.loading = true
+		return tea.Batch(m.runCompact(), m.tick())
+	}
+	return nil
 }
 
 // refreshHints recomputes slash/bang hint visibility and resizes the viewport.
@@ -1082,12 +1047,10 @@ type messageKind int
 const (
 	messageText   messageKind = iota
 	messageUser               // user input, rendered with background
-	messageWarden             // warden label, first line of response block
 	messageThink
 	messageAssistant
 	messageToolActivity // tool line, filtered out at turn end in normal mode
 	messageToolDiff     // diff block, persists in history even in non-verbose mode
-	messageToolFlow     // live tool activity shown as flowing lines (verbose)
 	messageChainCounter // non-verbose: running grouped tool tally, frozen at turn end
 	messageChainAction  // non-verbose: single live "what's happening now" line
 )
@@ -1098,9 +1061,7 @@ type messageEntry struct {
 	startedAt time.Time
 	duration  time.Duration
 	activity  string // present-tense verb for the live action line
-	toolName  string // display name for messageToolFlow
 	toolArgs  string // tool arguments / detail (query, url, file) for display
-	toolDone  bool   // true when the tool has finished
 	thinking  bool   // chain action line: model is reasoning (animated dots)
 }
 
@@ -1110,19 +1071,6 @@ func (m *model) appendText(text string) {
 
 func (m *model) appendToolActivity(text string) {
 	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
-}
-
-func (m *model) appendToolFlow(name, args string) {
-	// collapse: if the last message is the same tool, reuse it
-	if len(m.messages) > 0 {
-		last := &m.messages[len(m.messages)-1]
-		if last.kind == messageToolFlow && last.toolName == name {
-			last.toolArgs = args
-			last.toolDone = false
-			return
-		}
-	}
-	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name, toolArgs: args})
 }
 
 func (m *model) appendThink() {
@@ -1249,17 +1197,6 @@ func (m *model) freezeChain() {
 		return
 	}
 	m.messages[idx].duration = time.Since(m.chainStart)
-}
-
-func (m *model) appendToLastText(text string) {
-	if len(m.messages) == 0 {
-		return
-	}
-	last := len(m.messages) - 1
-	if m.messages[last].kind != messageText {
-		return
-	}
-	m.messages[last].text += text
 }
 
 func (m *model) appendAssistant(text string) {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -64,8 +65,22 @@ func NewClient(url string) *Client {
 	}
 }
 
-func (c *Client) ResetSession() error {
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/reset", "application/json", nil)
+// postJSON marshals payload (when non-nil) and POSTs it to path.
+func (c *Client) postJSON(path string, payload any) (*http.Response, error) {
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		body = bytes.NewReader(data)
+	}
+	return c.HTTPClient.Post(c.BaseURL+path, "application/json", body)
+}
+
+// postOK POSTs payload to path and expects a 200 response.
+func (c *Client) postOK(path string, payload any) error {
+	resp, err := c.postJSON(path, payload)
 	if err != nil {
 		return err
 	}
@@ -74,68 +89,51 @@ func (c *Client) ResetSession() error {
 		return fmt.Errorf("server returned status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// postDecode POSTs payload to path and decodes the JSON response into v.
+func (c *Client) postDecode(path string, payload any, v any) error {
+	resp, err := c.postJSON(path, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+// getJSON GETs path and decodes the JSON response into v.
+func (c *Client) getJSON(path string, v any) error {
+	resp, err := c.HTTPClient.Get(c.BaseURL + path)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+func (c *Client) ResetSession() error {
+	return c.postOK("/reset", nil)
 }
 
 func (c *Client) SetMode(auto bool) error {
-	body, err := json.Marshal(map[string]any{"auto": auto})
-	if err != nil {
-		return err
-	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/mode", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-	return nil
+	return c.postOK("/mode", map[string]any{"auto": auto})
 }
 
 func (c *Client) SendQuestion(id string, answers [][]string) error {
-	body, err := json.Marshal(map[string]any{"id": id, "answers": answers})
-	if err != nil {
-		return err
-	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/question", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-	return nil
+	return c.postOK("/question", map[string]any{"id": id, "answers": answers})
 }
 
 func (c *Client) SendConfirm(id string, ok bool) error {
-	body, err := json.Marshal(map[string]any{"id": id, "ok": ok})
-	if err != nil {
-		return err
-	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/confirm", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-	return nil
+	return c.postOK("/confirm", map[string]any{"id": id, "ok": ok})
 }
 
 func (c *Client) ListModels() ([]string, string, error) {
-	resp, err := c.HTTPClient.Get(c.BaseURL + "/models")
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
 	var result struct {
 		Models  []string `json:"models"`
 		Current string   `json:"current"`
 		Error   string   `json:"error"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.getJSON("/models", &result); err != nil {
 		return nil, "", err
 	}
 	if result.Error != "" {
@@ -145,25 +143,17 @@ func (c *Client) ListModels() ([]string, string, error) {
 }
 
 func (c *Client) Connect(provider, apiURL, apiKey, model string) error {
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"provider": provider,
 		"api_url":  apiURL,
 		"api_key":  apiKey,
 		"model":    model,
-	})
-	if err != nil {
-		return err
 	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/connect", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
 	var result struct {
 		OK    bool   `json:"ok"`
 		Error string `json:"error"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.postDecode("/connect", payload, &result); err != nil {
 		return err
 	}
 	if !result.OK {
@@ -172,86 +162,35 @@ func (c *Client) Connect(provider, apiURL, apiKey, model string) error {
 	return nil
 }
 
-func (c *Client) SetAPIURL(url string) error {
-	body, err := json.Marshal(map[string]any{"api_url": url})
-	if err != nil {
-		return err
-	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/api_url/set", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("api_url/set: %s", resp.Status)
-	}
-	return nil
-}
-
 func (c *Client) SetModel(model string) error {
-	body, err := json.Marshal(map[string]any{"model": model})
-	if err != nil {
-		return err
-	}
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/model/set", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("model/set: %s", resp.Status)
-	}
-	return nil
+	return c.postOK("/model/set", map[string]any{"model": model})
 }
 
 func (c *Client) GetStatus() (*StatusResult, error) {
-	resp, err := c.HTTPClient.Get(c.BaseURL + "/status")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 	var result StatusResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.getJSON("/status", &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 func (c *Client) Compact() (*CompactResult, error) {
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/compact", "application/json", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 	var result CompactResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.postDecode("/compact", nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 func (c *Client) Shutdown() error {
-	resp, err := c.HTTPClient.Post(c.BaseURL+"/shutdown", "application/json", nil)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("shutdown: %s", resp.Status)
-	}
-	return nil
+	return c.postOK("/shutdown", nil)
 }
 
 func (c *Client) ListSkills() ([]Skill, error) {
-	resp, err := c.HTTPClient.Get(c.BaseURL + "/skills")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 	var result struct {
 		Skills []Skill `json:"skills"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.getJSON("/skills", &result); err != nil {
 		return nil, err
 	}
 	return result.Skills, nil

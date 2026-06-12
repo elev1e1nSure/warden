@@ -34,12 +34,7 @@ class Backend:
 		elif self.model:
 			self._init_ollama(self.model)
 
-	def _init_openrouter(self, api_url: str, api_key: str, model: str) -> None:
-		self.llm = OpenAIClient(api_url, api_key=api_key or None)
-		self.api_url = api_url
-		self.api_key = api_key
-		self.model = model
-		self.ollama = None
+	def _new_chat(self) -> None:
 		self.chat = ChatSession(
 			model=self.model,
 			client=self.llm,
@@ -47,18 +42,21 @@ class Backend:
 			question_manager=self.question_manager,
 		)
 
+	def _init_openrouter(self, api_url: str, api_key: str, model: str) -> None:
+		self.llm = OpenAIClient(api_url, api_key=api_key or None)
+		self.api_url = api_url
+		self.api_key = api_key
+		self.model = model
+		self.ollama = None
+		self._new_chat()
+
 	def _init_ollama(self, model: str) -> None:
 		self.llm = OllamaClient()
 		self.model = model
 		self.api_url = ""
 		self.api_key = ""
 		self.ollama = OllamaProcessManager(model=model)
-		self.chat = ChatSession(
-			model=self.model,
-			client=self.llm,
-			confirmation_manager=self.confirmation_manager,
-			question_manager=self.question_manager,
-		)
+		self._new_chat()
 
 	async def setup(self) -> None:
 		if self.ollama is None:
@@ -156,25 +154,6 @@ async def question_handler(request: web.Request) -> web.Response:
 	return web.Response(status=404, text="not found")
 
 
-async def api_url_set(request: web.Request) -> web.Response:
-	backend = _get_backend(request)
-	data = await request.json()
-	url = data.get("api_url", "").strip()
-	if not url:
-		return web.Response(status=400, text="api_url required")
-	backend.api_url = url
-	backend.llm = OpenAIClient(url)
-	backend.chat = ChatSession(
-		model=backend.model,
-		client=backend.llm,
-		confirmation_manager=backend.confirmation_manager,
-		question_manager=backend.question_manager,
-	)
-	info(f"api_url changed to {url}")
-	log_request("POST", "/api_url/set", 200)
-	return web.Response(text="ok")
-
-
 async def models_list(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	if backend.llm is None:
@@ -198,12 +177,7 @@ async def model_set(request: web.Request) -> web.Response:
 		return web.Response(status=400, text="model required")
 	backend.model = model
 	if backend.llm is not None:
-		backend.chat = ChatSession(
-			model=model,
-			client=backend.llm,
-			confirmation_manager=backend.confirmation_manager,
-			question_manager=backend.question_manager,
-		)
+		backend._new_chat()
 	info(f"model changed to {model}")
 	log_request("POST", "/model/set", 200)
 	return web.Response(text="ok")
@@ -419,7 +393,6 @@ async def main() -> Backend:
 	app.router.add_get("/skill/{name}", skill_get)
 	app.router.add_get("/models", models_list)
 	app.router.add_post("/model/set", model_set)
-	app.router.add_post("/api_url/set", api_url_set)
 	app.router.add_post("/connect", connect_handler)
 	app.router.add_post("/question", question_handler)
 	app.router.add_post("/compact", compact_handler)
