@@ -32,8 +32,6 @@ class Backend:
 		self.confirmation_manager = ConfirmationManager()
 		self.question_manager = QuestionManager()
 		self.memory_store = MemoryStore()
-		if self.memory_store.get_enabled():
-			info("memory enabled")
 		if self.model and self.api_url:
 			self._init_openrouter(self.api_url, self.api_key, self.model)
 		elif self.model:
@@ -163,9 +161,7 @@ async def memory_state_post(request: web.Request) -> web.Response:
 	data = await request.json()
 	enabled = bool(data.get("enabled", False))
 	backend.memory_store.set_enabled(enabled)
-	action = "enabled" if enabled else "disabled"
 	log_request("POST", "/memory/state", 200)
-	info(f"memory {action}")
 	return web.json_response({"enabled": enabled})
 
 
@@ -173,7 +169,6 @@ async def memory_clear(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	count = backend.memory_store.clear_entries()
 	log_request("POST", "/memory/clear", 200)
-	info(f"memory cleared: {count} entries")
 	return web.json_response({"cleared": count})
 
 
