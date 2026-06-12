@@ -63,7 +63,7 @@ class HttpRequestTool(Tool):
 				resp_cm = urllib.request.urlopen(req, context=ctx, timeout=timeout)
 			except urllib.error.HTTPError as e:
 				# HTTPError is also a response: surface status + body
-				raw = e.read()[:_MAX_BYTES]
+				raw = e.read(_MAX_BYTES)
 				return e.code, e.reason or "", raw.decode("utf-8", errors="replace")
 			with resp_cm as resp:
 				raw = resp.read(_MAX_BYTES)

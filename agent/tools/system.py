@@ -16,8 +16,8 @@ def _is_windows() -> bool:
 
 
 def _fmt_bytes(n: float) -> str:
-	for unit in ("B", "KB", "MB", "GB", "TB"):
-		if n < 1024 or unit == "TB":
+	for unit in ("B", "KB", "MB", "GB"):
+		if n < 1024:
 			return f"{n:.1f}{unit}"
 		n /= 1024
 	return f"{n:.1f}TB"

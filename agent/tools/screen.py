@@ -49,13 +49,20 @@ class ImageLocateTool(Tool):
 		if not Path(path).exists():
 			return f"error: image not found: {path}"
 		confidence = args.get("confidence")
+		if confidence is not None:
+			try:
+				confidence = float(confidence)
+			except (ValueError, TypeError):
+				return "error: confidence must be a number between 0 and 1"
+			if not (0 <= confidence <= 1):
+				return "error: confidence must be between 0 and 1"
 		try:
 			import pyautogui
 
 			def _locate():
 				try:
 					if confidence is not None:
-						return pyautogui.locateOnScreen(path, confidence=float(confidence))
+						return pyautogui.locateOnScreen(path, confidence=confidence)
 					return pyautogui.locateOnScreen(path)
 				except TypeError:
 					# older pyautogui without confidence / opencv missing

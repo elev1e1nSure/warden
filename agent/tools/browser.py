@@ -15,6 +15,23 @@ from agent.tools.input import _get_screenshot_dir, _cleanup_old_screenshots
 _SESSION: Dict[str, Any] = {"pw": None, "browser": None, "page": None}
 
 
+async def _close_session() -> None:
+	"""Close the persistent browser and playwright instances."""
+	browser = _SESSION.get("browser")
+	if browser is not None:
+		try:
+			await browser.close()
+		except Exception:
+			pass
+	pw = _SESSION.get("pw")
+	if pw is not None:
+		try:
+			await pw.stop()
+		except Exception:
+			pass
+	_SESSION.update(pw=None, browser=None, page=None)
+
+
 async def _get_page():
 	"""Return the live interactive page, creating the browser lazily."""
 	from playwright.async_api import async_playwright
@@ -22,6 +39,8 @@ async def _get_page():
 	page = _SESSION.get("page")
 	if page is not None and not page.is_closed():
 		return page
+	# Clean up a stale session before creating a new one.
+	await _close_session()
 	pw = await async_playwright().start()
 	browser = await pw.chromium.launch(headless=True)
 	ctx = await browser.new_context(locale="en-US")
