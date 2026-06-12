@@ -2,51 +2,19 @@
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
-# ── helpers ──────────────────────────────────────────────────────────────
+function Ok($msg)  { Write-Host "[ OK ] $msg" -ForegroundColor Green }
+function Info($msg){ Write-Host "[ .. ] $msg" -ForegroundColor DarkGray }
+function Err($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red; exit 1 }
 
-function Tag($text, $color) {
-    Write-Host "[$text]" -NoNewline -ForegroundColor $color
-    Write-Host " " -NoNewline
-}
-
-function Ok($msg)  { Tag " OK " Green; Write-Host $msg }
-function Info($msg){ Tag " .. " DarkGray; Write-Host $msg }
-function Err($msg) { Tag "FAIL" Red; Write-Host $msg }
-
-function Spinner($durationSec, $label) {
-    $chars = '/','-','\','|'
-    $end = [DateTime]::Now.AddSeconds($durationSec)
-    $i = 0
-    while ([DateTime]::Now -lt $end) {
-        Write-Host "`r$($chars[$i % 4]) $label" -NoNewline -ForegroundColor Cyan
-        Start-Sleep -Milliseconds 80
-        $i++
-    }
-    Write-Host "`r$label" -ForegroundColor DarkGray
-}
-
-# ── banner ───────────────────────────────────────────────────────────────
-
-Clear-Host
-Write-Host ""
 Write-Host "warden build script" -ForegroundColor Cyan
-Write-Host ""
-
-# ── deps ─────────────────────────────────────────────────────────────────
 
 Info "checking dependencies..."
 
-$go = Get-Command go -ErrorAction SilentlyContinue
-if (-not $go) { Err "Go is not installed or not in PATH"; exit 1 }
+if (-not (Get-Command go -ErrorAction SilentlyContinue)) { Err "Go is not installed or not in PATH" }
 Ok "Go          $($(& go version).Split(' ')[2])"
 
-$py = Get-Command python -ErrorAction SilentlyContinue
-if (-not $py) { Err "Python is not installed or not in PATH"; exit 1 }
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Err "Python is not installed or not in PATH" }
 Ok "Python      $($(& python --version 2>&1))"
-
-Write-Host ""
-
-# ── build ────────────────────────────────────────────────────────────────
 
 Info "building warden.exe..."
 $start = Get-Date
@@ -56,18 +24,11 @@ try {
     $out = go build -o "$root\warden.exe" . 2>&1
     if ($LASTEXITCODE -ne 0) { throw $out }
 } catch {
-    Write-Host ""
-    Err "build failed"
-    Write-Host ""
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    exit 1
+    Err "build failed`n$($_.Exception.Message)"
 } finally {
     Pop-Location
 }
 
 $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 2)
-
-Write-Host ""
 Ok "warden.exe built in ${elapsed}s"
 Write-Host "path: $root\warden.exe" -ForegroundColor DarkGray
-Write-Host ""
