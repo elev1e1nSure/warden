@@ -18,20 +18,18 @@ function Spinner($durationSec, $label) {
     $end = [DateTime]::Now.AddSeconds($durationSec)
     $i = 0
     while ([DateTime]::Now -lt $end) {
-        Write-Host "`r  $($chars[$i % 4]) $label" -NoNewline -ForegroundColor Cyan
+        Write-Host "`r$($chars[$i % 4]) $label" -NoNewline -ForegroundColor Cyan
         Start-Sleep -Milliseconds 80
         $i++
     }
-    Write-Host "`r    $label" -ForegroundColor DarkGray
+    Write-Host "`r$label" -ForegroundColor DarkGray
 }
 
 # ── banner ───────────────────────────────────────────────────────────────
 
 Clear-Host
 Write-Host ""
-Write-Host "  warden build script" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  =========================================" -ForegroundColor DarkGray
+Write-Host "warden build script" -ForegroundColor Cyan
 Write-Host ""
 
 # ── deps ─────────────────────────────────────────────────────────────────
@@ -71,7 +69,5 @@ $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 2)
 
 Write-Host ""
 Ok "warden.exe built in ${elapsed}s"
-Write-Host "    path: $root\warden.exe" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  =========================================" -ForegroundColor DarkGray
+Write-Host "path: $root\warden.exe" -ForegroundColor DarkGray
 Write-Host ""
