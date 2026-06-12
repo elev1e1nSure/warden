@@ -616,7 +616,7 @@ func renderConfirmBlock(inner confirmMsg, width int) string {
 	var b strings.Builder
 
 	// Tool name line — same style as chat tool lines
-	b.WriteString("  " + AccentStyle().Render("¶") + "  " + ToolStyle().Bold(true).Render(inner.tool))
+	b.WriteString("  " + AccentStyle().Render("▸") + "  " + ToolStyle().Bold(true).Render(inner.tool))
 	b.WriteString("\n")
 
 	// Command / path preview — split into lines, show up to 4, dim + indented
