@@ -507,6 +507,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.thinkDone = false
 			m.toolRunning = false
 			m.lastAssistantRaw = ""
+			m.loading = true
 			if m.verboseMode {
 				m.activityIdx = m.resetOrAppendThink()
 			} else {
@@ -576,6 +577,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case confirmMsg:
 			m.confirming = true
+			m.loading = false
 			m.confirmID = inner.id
 			m.confirmCh = msg.ch
 			m.confirmTool = inner.tool
@@ -596,6 +598,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case questionMsg:
 			m.questioning = true
+			m.loading = false
 			m.questionID = inner.id
 			m.questionCh = msg.ch
 			m.questionsData = inner.questions
