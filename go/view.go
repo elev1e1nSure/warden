@@ -56,9 +56,9 @@ func renderDiffStats(s string) (string, string) {
 const wardenVersion = "v0.1.0"
 
 var toolDisplayNames = map[string]string{
-	"google_search":  "Web Search",
-	"youtube_search": "Web Search",
-	"grep":           "Search",
+	"google_search":      "Web Search",
+	"youtube_search":     "Web Search",
+	"grep":               "Search",
 	"glob":               "Find",
 	"browser_read":       "Read",
 	"file_read":          "Read",
@@ -730,9 +730,9 @@ func (m model) renderWaveSpinner() string {
 	mid := GreenMid
 	faint := GreenFaint
 	if m.autoMode {
-		peak = Amber
-		mid = AmberMid
-		faint = AmberFaint
+		peak = Blue
+		mid = BlueMid
+		faint = BlueFaint
 	}
 	for i := 0; i < n; i++ {
 		dist := i - pos
@@ -780,9 +780,9 @@ func (m model) renderFullWave() string {
 	mid := GreenMid
 	faint := GreenFaint
 	if m.autoMode {
-		peak = Amber
-		mid = AmberMid
-		faint = AmberFaint
+		peak = Blue
+		mid = BlueMid
+		faint = BlueFaint
 	}
 	// glow radius scales with terminal width
 	halo := n / 6
@@ -817,7 +817,7 @@ func (m model) renderFullWave() string {
 func (m model) renderStatusBar() string {
 	mode := AccentStyle().Render("Ask")
 	if m.autoMode {
-		mode = lipgloss.NewStyle().Foreground(Amber).Bold(true).Render("Auto")
+		mode = lipgloss.NewStyle().Foreground(Blue).Bold(true).Render("Auto")
 	}
 	dot := FaintStyle().Render(" · ")
 	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
@@ -829,7 +829,7 @@ func (m model) renderStatusBar() string {
 	case m.quitPending:
 		hint = ErrorStyle().Render("ctrl+c") + DimStyle().Render(" quit · any key abort")
 	case m.selectMode:
-		keyColor := Amber
+		keyColor := Blue
 		if !m.autoMode {
 			keyColor = Green
 		}
@@ -837,13 +837,13 @@ func (m model) renderStatusBar() string {
 	case m.confirming:
 		hint = DimStyle().Render("Y run  N cancel")
 	case m.streaming:
-		keyColor := Amber
+		keyColor := Blue
 		if !m.autoMode {
 			keyColor = Green
 		}
 		hint = lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
 	default:
-		keyColor := Amber
+		keyColor := Blue
 		if !m.autoMode {
 			keyColor = Green
 		}
@@ -875,7 +875,7 @@ func (m model) renderStatusBar() string {
 func (m model) renderInput() string {
 	borderColor := GreenMid
 	if m.autoMode {
-		borderColor = AmberMid
+		borderColor = BlueMid
 	}
 	if m.streaming || m.confirming {
 		borderColor = Faint
@@ -989,7 +989,7 @@ func (m model) renderConnectWizard() string {
 	err := ErrorStyle()
 	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
 	if m.autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Amber)
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
 	}
 	key := func(s string) string { return keyStyle.Render(s) }
 
@@ -1072,7 +1072,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	accent := WardenStyleAuto(autoMode)
 	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
 	if autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Amber)
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
 	}
 	key := func(s string) string { return keyStyle.Render(s) }
 	hint := key("↑↓") + DimStyle().Render(" navigate   ") +
@@ -1098,11 +1098,50 @@ func (m model) renderHint() string {
 	accent := WardenStyleAuto(m.autoMode)
 	if strings.HasPrefix(val, "/") {
 		matches := matchSlash(val)
-		lines := make([]string, 0, len(matches))
-		for _, cmd := range matches {
+		if len(matches) == 0 {
+			return ""
+		}
+		selected := m.slashIdx
+		if selected < 0 || selected >= len(matches) {
+			selected = 0
+		}
+		const maxVisible = 5
+		start := 0
+		if len(matches) > maxVisible {
+			start = selected - maxVisible/2
+			if start < 0 {
+				start = 0
+			}
+			if start > len(matches)-maxVisible {
+				start = len(matches) - maxVisible
+			}
+		}
+		end := start + maxVisible
+		if end > len(matches) {
+			end = len(matches)
+		}
+		lines := make([]string, 0, end-start)
+		for i := start; i < end; i++ {
+			cmd := matches[i]
+			active := i == selected
 			name := fmt.Sprintf("/%-13s", cmd.name[1:])
+			nameStyle := SlashNameStyle(active)
+			descStyle := SlashDescStyle(active)
+			descLimit := m.width - lipgloss.Width(name) - 6
+			if active {
+				descLimit = m.width - lipgloss.Width(name) - 4
+			}
+			if descLimit < 0 {
+				descLimit = 0
+			}
+			if active {
+				lines = append(lines,
+					"  "+AccentStyle().Render("›")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
+				)
+				continue
+			}
 			lines = append(lines,
-				accent.Render(name)+"  "+DimStyle().Render(cmd.desc),
+				"    "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
 			)
 		}
 		return strings.Join(lines, "\n")

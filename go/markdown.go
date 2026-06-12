@@ -34,13 +34,13 @@ var wardenMarkdownStyle = []byte(`{
   "h1": {
     "block_prefix": "\n",
     "block_suffix": "\n",
-    "color": "#D4A576",
+    "color": "#38BDF8",
     "bold": true
   },
   "h2": {
     "block_prefix": "\n",
     "block_suffix": "\n",
-    "color": "#D4A576",
+    "color": "#38BDF8",
     "bold": true
   },
   "h3": {

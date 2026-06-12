@@ -9,7 +9,7 @@ import (
 
 var (
 	green  = lipgloss.Color("#00D47A")
-	amber  = lipgloss.Color("#FFD700")
+	blue   = lipgloss.Color("#38BDF8")
 	red    = lipgloss.Color("#ff4444")
 	dim    = lipgloss.Color("#666666")
 	faint  = lipgloss.Color("#444444")
@@ -21,7 +21,7 @@ var (
 	cDim    = lipgloss.NewStyle().Foreground(dim)
 	cFaint  = lipgloss.NewStyle().Foreground(faint)
 	cGreen  = lipgloss.NewStyle().Foreground(green)
-	cAmber  = lipgloss.NewStyle().Foreground(amber).Bold(true)
+	cBlue   = lipgloss.NewStyle().Foreground(blue).Bold(true)
 	cWhite  = lipgloss.NewStyle().Foreground(white).Bold(true)
 	cRed    = lipgloss.NewStyle().Foreground(red)
 	cHeader = lipgloss.NewStyle().Foreground(white).Bold(true).Padding(0, 1)

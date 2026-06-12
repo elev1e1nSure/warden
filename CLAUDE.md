@@ -48,7 +48,7 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 - no colored text backgrounds. only text + color + bold
 - **accent colors:**
   - green `#00D47A` — primary accent: mode in status bar, Warden label, active input border, slash command names in hints, wave spinner peak
-  - yellow `#FFD700` — secondary accent: "you" label in user messages, tool names in tool lines
+  - blue `#38BDF8` — secondary accent: tool names in tool lines, Auto mode highlights
   - red `#ff4444` — errors only
   - dim `#666666` — metadata: timestamps, result text, descriptions
   - faint `#444444` — separators, inactive wave chars

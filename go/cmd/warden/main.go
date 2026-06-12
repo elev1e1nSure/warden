@@ -26,7 +26,7 @@ const (
 
 var (
 	green  = lipgloss.Color("#00D47A")
-	amber  = lipgloss.Color("#D4A576")
+	blue   = lipgloss.Color("#38BDF8")
 	faint  = lipgloss.Color("#555555")
 	subtle = lipgloss.Color("#888888")
 	danger = lipgloss.Color("#cc5555")
@@ -111,7 +111,7 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m launchModel) View() string {
-	title := lipgloss.NewStyle().Foreground(amber).Bold(true).Render("warden")
+	title := lipgloss.NewStyle().Foreground(blue).Bold(true).Render("warden")
 	var body string
 	switch m.state {
 	case stateBoot, stateWaiting:
