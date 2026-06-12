@@ -184,6 +184,31 @@ class MemoryStore:
 				return None
 			return json.loads(row[0])
 
+	def get_context_text(self) -> str:
+		"""Format latest snapshot as a short context block for the LLM."""
+		snap = self.get_latest_snapshot()
+		if not snap:
+			return ""
+		lines: list[str] = ["[Memory context]"]
+		user = snap.get("user", {})
+		for k, v in user.items():
+			if v:
+				lines.append(f"- User {k}: {v}")
+		projects = snap.get("projects", [])
+		if projects:
+			names = [p["name"] for p in projects if p.get("name")]
+			if names:
+				lines.append(f"- Projects: {', '.join(names)}")
+			for p in projects:
+				stack = p.get("tech_stack", [])
+				if stack:
+					lines.append(f"- Tech stack: {', '.join(stack)}")
+		prefs = snap.get("preferences", {})
+		for k, v in prefs.items():
+			if v:
+				lines.append(f"- Preference {k}: {v}")
+		return "\n".join(lines)
+
 	def get_stats(self) -> dict[str, Any]:
 		with self._conn() as conn:
 			enabled = self.get_enabled()

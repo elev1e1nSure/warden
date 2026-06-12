@@ -255,6 +255,10 @@ class ChatSession:
 			yield ("warden_start", {})
 
 			system = build_system(self.model)
+			if self.memory_store is not None and self.memory_store.get_enabled():
+				mem_ctx = self.memory_store.get_context_text()
+				if mem_ctx:
+					system = mem_ctx + "\n\n" + system
 			messages = [{"role": "system", "content": system}] + self.history
 
 			llm_result: dict = {}
