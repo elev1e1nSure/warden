@@ -44,7 +44,12 @@ warden/
 │   ├── main.go          # точка входа TUI (package tui)
 │   ├── model.go         # bubbletea-модель
 │   ├── client.go        # HTTP-клиент
-│   ├── view.go          # рендеринг, строка состояния
+│   ├── view.go          # компоновка экрана, viewport
+│   ├── status.go        # строка состояния, волна, поле ввода
+│   ├── blocks.go        # блоки подтверждений и вопросов
+│   ├── render.go        # вспомогательные функции рендеринга
+│   ├── diff.go          # рендеринг unified diff
+│   ├── tools.go         # отображение имён инструментов
 │   ├── slash.go         # обработка слэш-команд
 │   ├── commands.go      # bubbletea-команды
 │   ├── styles.go        # lipgloss-стили
@@ -226,6 +231,6 @@ ollama run qwen3:8b
 
 ### удалённо (OpenRouter)
 
-Установить `OPENROUTER_API_KEY` и запустить с `--provider openrouter --model <model-id>`.
+Создать `~/.warden-config.json` или использовать `/connect` внутри TUI.
 
 Бесплатная модель для быстрого старта: `poolside/laguna-m.1:free`

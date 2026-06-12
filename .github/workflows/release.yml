@@ -138,8 +138,13 @@ jobs:
           | Key | Action |
           |---|---|
           | Enter | Send message |
-          | Esc x2 | Stop generation |
+          | Esc | Interrupt stream |
+          | Esc x2 | Force-stop |
           | Shift+Tab | Toggle Ask / Auto mode |
+          | Tab | Complete slash command |
+          | Up / Down | Scroll during stream / navigate history |
+          | Scroll wheel | Scroll (5 lines per tick) |
+          | Ctrl+W | Delete last word in input |
           | Ctrl+C | Exit |
 
           ## Source

@@ -43,22 +43,20 @@ opencode/  — reference: opencode-ai/opencode repo for feature research
 
 ## visual
 
-- no colored text backgrounds. only text + color + bold
 - **accent colors:**
-  - green `#00D47A` — primary accent: mode in status bar, Warden label, active input border, slash command names in hints, wave spinner peak
+  - green `#8AB89A` — primary accent: mode in status bar, Warden label, active input border, slash command names in hints, wave peak
   - blue `#38BDF8` — secondary accent: tool names in tool lines, Auto mode highlights
   - red `#ff4444` — errors only
   - dim `#666666` — metadata: timestamps, result text, descriptions
-  - faint `#444444` — separators, inactive wave chars
-- **layout:** no top header; status bar at bottom (2 lines); rounded border on input
-- **status bar line 1:** `ask · model · provider` — mode in green, rest dim
-- **status bar line 2:** wave spinner (green `█▓▒░` bouncing) + hint (`esc interrupt` or confirm prompt)
-- **wave spinner:** 7 positions, peak bounces left-right using `█▓▒░░░░`; idle = `·······` faint
-- **input:** `RoundedBorder`, green-faint when idle, faint when streaming; prompt `> `
-- **user messages:** `  > text` — dim `>`
+  - faint `#2a2a2a` — separators, inactive wave chars
+- **layout:** no top header; chat viewport fills the screen; bottom area has full-width wave, rounded-border input, and single-line status bar
+- **status bar:** `Ask · model · hint [tokens]` — mode in green/blue, model in white, hint dim, token count right-aligned
+- **full-width wave:** bouncing glow of `·` dots under the input bar; green in Ask, blue in Auto; idle = faint dots
+- **input:** `RoundedBorder`, green when idle, blue in Auto, faint when streaming; prompt `> `
+- **user messages:** `#242424` background block with `  text` — no `>` prompt in history
 - **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, content rendered as markdown
 - **think line:** `[HH:MM]  + Thought: Xs` dim (no hint shown in UI)
-- **tool lines:** `▶ name  args` → `  ✓ name → result`; name in yellow, result dim, errors red
+- **tool lines:** `▶ name  args` → `  ✓ name → result`; name in blue, result dim, errors red
 - **slash hints:** 2 columns — command name (green, 14-char left-aligned) + description (dim)
 - controls: arrows, Enter, Esc, Ctrl+C
 - no buttons, no mouse clicks in the TUI itself
