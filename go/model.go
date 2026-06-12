@@ -801,8 +801,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateViewportHeight()
 		m.syncViewport()
 	}
-	m.viewport, cmd = m.viewport.Update(msg)
-	cmds = append(cmds, cmd)
+	// Don't scroll message history when the mouse wheel is used over the
+	// prompt bar or overlays (everything below the viewport).
+	if mouseMsg, ok := msg.(tea.MouseMsg); ok && (mouseMsg.Type == tea.MouseWheelUp || mouseMsg.Type == tea.MouseWheelDown) {
+		if mouseMsg.Y < m.layoutViewportHeight() {
+			m.viewport, cmd = m.viewport.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+	} else {
+		m.viewport, cmd = m.viewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	m.refreshHints()
 
