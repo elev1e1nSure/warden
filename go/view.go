@@ -19,6 +19,14 @@ func (m *model) renderMessages() []string {
 			break
 		}
 	}
+	// index of the latest chain-action entry — only it may animate
+	lastActionIdx := -1
+	for i := len(m.messages) - 1; i >= 0; i-- {
+		if m.messages[i].kind == messageChainAction {
+			lastActionIdx = i
+			break
+		}
+	}
 	out := make([]string, 0, len(m.messages))
 	for i, entry := range m.messages {
 		var rendered string
@@ -34,7 +42,7 @@ func (m *model) renderMessages() []string {
 		case messageChainCounter:
 			rendered = m.renderChainCounter(entry)
 		case messageChainAction:
-			rendered = m.renderChainAction(entry)
+			rendered = m.renderChainAction(entry, i == lastActionIdx)
 		case messageToolDiff:
 			rendered = renderUnifiedDiff(entry.text, m.width)
 		default:

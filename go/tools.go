@@ -369,17 +369,17 @@ func (m model) renderChainCounter(entry messageEntry) string {
 }
 
 // renderChainAction renders the single live "what's happening now" line.
-func (m model) renderChainAction(entry messageEntry) string {
+func (m model) renderChainAction(entry messageEntry, active bool) string {
 	if !m.loading {
 		return ""
-	}
-	dots := []string{".", "..", "..."}
-	if entry.thinking {
-		return DimStyle().Render("  " + entry.activity + dots[(m.spinner/3)%3])
 	}
 	line := entry.activity
 	if entry.toolArgs != "" {
 		line += " " + entry.toolArgs
 	}
+	if !active {
+		return DimStyle().Render("  " + line)
+	}
+	dots := []string{".", "..", "..."}
 	return DimStyle().Render("  " + line + dots[(m.spinner/3)%3])
 }
