@@ -40,7 +40,11 @@ _BASE_SYSTEM = (
 "Run relevant checks when possible. "
 
 "Continue until the task is done or clearly blocked. "
-"If blocked, say what failed and what is needed."
+"If blocked, say what failed and what is needed. "
+
+"If the user mentions preferences, projects, or tech stack, those facts may be "
+"remembered automatically when memory is enabled (/memory on)."
+
 
 )
 

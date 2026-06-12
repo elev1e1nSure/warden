@@ -37,6 +37,10 @@ type compactResultMsg struct {
 	tokensAfter  int
 	err          string
 }
+type memoryResultMsg struct {
+	text string
+	err  string
+}
 type updateResultMsg struct {
 	err error
 }

@@ -668,6 +668,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.syncViewport()
 
+	case memoryResultMsg:
+		m.loading = false
+		if msg.err != "" {
+			m.appendText(ErrorStyle().Render("  memory error: " + msg.err))
+		} else {
+			m.appendText(DimStyle().Render("  " + msg.text))
+		}
+		m.appendText("")
+		m.syncViewport()
+
 	case updateResultMsg:
 		m.loading = false
 		if msg.err != nil {

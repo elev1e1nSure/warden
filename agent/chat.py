@@ -1,8 +1,12 @@
 import re
+import uuid
 from typing import AsyncIterator, List, Dict, Any
 
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.llm_client import LLMChunk, LLMClient
+from agent.memory.aggregator import MemoryAggregator
+from agent.memory.extractor import MemoryExtractor
+from agent.memory.store import MemoryStore
 from agent.prompt import build_system
 from agent.tool_runner import execute_tool_call
 from agent.tools import REGISTRY
@@ -61,19 +65,26 @@ def _reasoning_details_text(details: list[dict[str, Any]] | None) -> str:
 class ChatSession:
 	def __init__(self, model: str, client: LLMClient,
 	             confirmation_manager: ConfirmationManager | None = None,
-	             question_manager: QuestionManager | None = None) -> None:
+	             question_manager: QuestionManager | None = None,
+	             memory_store: MemoryStore | None = None) -> None:
 		self.model = model
 		self.history: List[Dict[str, Any]] = []
 		self._client = client
 		self.confirmation_manager = confirmation_manager
 		self.question_manager = question_manager
+		self.memory_store = memory_store
+		self.session_id: str = str(uuid.uuid4())
+		self._extractor = MemoryExtractor()
 		self.token_count: int = 0
 		self.token_limit: int = _guess_context_limit(model)
 		self._cu_warned: dict = {"value": False}
 
 	def reset(self) -> None:
+		if self.memory_store is not None:
+			MemoryAggregator.finalize(self.memory_store, self.session_id)
 		self.history = []
 		self.token_count = 0
+		self.session_id = str(uuid.uuid4())
 
 	def _estimate_tokens(self) -> int:
 		total = 0
@@ -114,6 +125,15 @@ class ChatSession:
 
 	def add_user(self, text: str) -> None:
 		self.history.append({"role": "user", "content": text})
+		if self.memory_store is not None and self.memory_store.get_enabled():
+			for fact in self._extractor.extract(text):
+				self.memory_store.upsert_entry(
+					self.session_id,
+					fact.category,
+					fact.key,
+					fact.value,
+					fact.confidence,
+				)
 
 	def add_assistant(
 		self,
@@ -129,6 +149,15 @@ class ChatSession:
 		# Anthropic rejects thinking blocks with invalid signatures
 		# when they are round-tripped through JSON serialization.
 		self.history.append(msg)
+		if text and self.memory_store is not None and self.memory_store.get_enabled():
+			for fact in self._extractor.extract(text):
+				self.memory_store.upsert_entry(
+					self.session_id,
+					fact.category,
+					fact.key,
+					fact.value,
+					fact.confidence,
+				)
 
 	def add_tool_result(self, tool_name: str, result: str, tool_call_id: str = "") -> None:
 		entry: Dict[str, Any] = {"role": "tool", "content": result, "name": tool_name}

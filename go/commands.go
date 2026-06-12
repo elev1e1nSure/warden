@@ -133,6 +133,51 @@ func (m model) runCompact() tea.Cmd {
 	}
 }
 
+func (m model) runMemoryOn() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.SetMemoryState(true); err != nil {
+			return memoryResultMsg{err: err.Error()}
+		}
+		return memoryResultMsg{text: "memory enabled"}
+	}
+}
+
+func (m model) runMemoryOff() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.SetMemoryState(false); err != nil {
+			return memoryResultMsg{err: err.Error()}
+		}
+		return memoryResultMsg{text: "memory disabled"}
+	}
+}
+
+func (m model) runMemoryClear() tea.Cmd {
+	return func() tea.Msg {
+		count, err := m.client.ClearMemory()
+		if err != nil {
+			return memoryResultMsg{err: err.Error()}
+		}
+		return memoryResultMsg{text: fmt.Sprintf("memory cleared: %d entries", count)}
+	}
+}
+
+func (m model) runMemoryStatus() tea.Cmd {
+	return func() tea.Msg {
+		state, err := m.client.GetMemoryState()
+		if err != nil {
+			return memoryResultMsg{err: err.Error()}
+		}
+		status := "off"
+		if state.Enabled {
+			status = "on"
+		}
+		return memoryResultMsg{text: fmt.Sprintf(
+			"memory: %s | entries: %d | snapshots: %d | db: %d KB",
+			status, state.Entries, state.Snapshots, state.DBSize/1024,
+		)}
+	}
+}
+
 func (m model) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", "$env:WARDEN_CLIP | Set-Clipboard")

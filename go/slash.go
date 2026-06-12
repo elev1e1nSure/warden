@@ -18,6 +18,7 @@ var slashCommands = []slashCmd{
 	{"/connect", "Set up provider and model"},
 	{"/clear", "Clear chat and reset session"},
 	{"/compact", "Summarize conversation to free up context"},
+	{"/memory", "Toggle or show memory settings"},
 	{"/models", "Switch model"},
 	{"/update", "Download and install the latest release"},
 	{"/select", "Enable text selection (disables mouse capture)"},
@@ -124,6 +125,12 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.spinner = 0
 		m.syncViewport()
 		return true, tea.Batch(m.runCompact(), m.tick())
+	case "/memory":
+		m.clearHintState()
+		m.loading = true
+		m.spinner = 0
+		m.syncViewport()
+		return true, tea.Batch(m.runMemoryStatus(), m.tick())
 	case "/models":
 		m.clearHintState()
 		return true, m.fetchModels()
@@ -147,6 +154,30 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.clearHintState()
 		m.syncViewport()
 		return true, nil
+	}
+
+	// /memory subcommands
+	if strings.HasPrefix(trimmed, "/memory ") {
+		sub := strings.TrimSpace(strings.TrimPrefix(trimmed, "/memory"))
+		m.clearHintState()
+		m.loading = true
+		m.spinner = 0
+		m.syncViewport()
+		switch sub {
+		case "on":
+			return true, tea.Batch(m.runMemoryOn(), m.tick())
+		case "off":
+			return true, tea.Batch(m.runMemoryOff(), m.tick())
+		case "clear":
+			return true, tea.Batch(m.runMemoryClear(), m.tick())
+		case "status":
+			return true, tea.Batch(m.runMemoryStatus(), m.tick())
+		default:
+			m.loading = false
+			m.appendText(DimStyle().Render("  usage: /memory [on|off|clear|status]"))
+			m.syncViewport()
+			return true, nil
+		}
 	}
 	return true, nil
 }

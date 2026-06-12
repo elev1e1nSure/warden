@@ -9,6 +9,8 @@ from aiohttp.client_exceptions import ClientConnectionResetError
 
 from agent.chat import ChatSession
 from agent.llm_client import OllamaClient, OpenAIClient
+from agent.memory.aggregator import MemoryAggregator
+from agent.memory.store import MemoryStore
 from agent.ollama_process import OllamaProcessManager
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import info, warn, error, success, request as log_request
@@ -29,17 +31,23 @@ class Backend:
 		self.auto_mode: bool = False
 		self.confirmation_manager = ConfirmationManager()
 		self.question_manager = QuestionManager()
+		self.memory_store = MemoryStore()
+		if self.memory_store.get_enabled():
+			info("memory enabled")
 		if self.model and self.api_url:
 			self._init_openrouter(self.api_url, self.api_key, self.model)
 		elif self.model:
 			self._init_ollama(self.model)
 
 	def _new_chat(self) -> None:
+		if self.chat is not None and self.memory_store is not None:
+			MemoryAggregator.finalize(self.memory_store, self.chat.session_id)
 		self.chat = ChatSession(
 			model=self.model,
 			client=self.llm,
 			confirmation_manager=self.confirmation_manager,
 			question_manager=self.question_manager,
+			memory_store=self.memory_store,
 		)
 
 	def _init_openrouter(self, api_url: str, api_key: str, model: str) -> None:
@@ -84,7 +92,8 @@ async def reset(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	backend.confirmation_manager.cancel_all()
 	backend.question_manager.cancel_all()
-	backend.chat.reset()
+	if backend.chat is not None:
+		backend.chat.reset()
 	try:
 		_cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
 	except Exception:
@@ -122,6 +131,8 @@ async def shutdown_handler(request: web.Request) -> web.Response:
 	backend = _get_backend(request)
 	backend.confirmation_manager.cancel_all()
 	backend.question_manager.cancel_all()
+	if backend.chat is not None and backend.memory_store is not None:
+		MemoryAggregator.finalize(backend.memory_store, backend.chat.session_id)
 	log_request("POST", "/shutdown", 200)
 	info("graceful shutdown requested")
 	shutdown_event = request.app.get("shutdown_event")
@@ -138,6 +149,39 @@ async def compact_handler(request: web.Request) -> web.Response:
 	result = await backend.chat.compact()
 	info(f"compacted: {result['tokens_before']} → {result['tokens_after']} tokens")
 	return web.json_response(result)
+
+
+async def memory_state_get(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	stats = backend.memory_store.get_stats()
+	log_request("GET", "/memory/state", 200)
+	return web.json_response(stats)
+
+
+async def memory_state_post(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	data = await request.json()
+	enabled = bool(data.get("enabled", False))
+	backend.memory_store.set_enabled(enabled)
+	action = "enabled" if enabled else "disabled"
+	log_request("POST", "/memory/state", 200)
+	info(f"memory {action}")
+	return web.json_response({"enabled": enabled})
+
+
+async def memory_clear(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	count = backend.memory_store.clear_entries()
+	log_request("POST", "/memory/clear", 200)
+	info(f"memory cleared: {count} entries")
+	return web.json_response({"cleared": count})
+
+
+async def memory_snapshot(request: web.Request) -> web.Response:
+	backend = _get_backend(request)
+	snap = backend.memory_store.get_latest_snapshot()
+	log_request("GET", "/memory/snapshot", 200)
+	return web.json_response(snap or {})
 
 
 async def question_handler(request: web.Request) -> web.Response:
@@ -396,6 +440,10 @@ async def main() -> Backend:
 	app.router.add_post("/connect", connect_handler)
 	app.router.add_post("/question", question_handler)
 	app.router.add_post("/compact", compact_handler)
+	app.router.add_get("/memory/state", memory_state_get)
+	app.router.add_post("/memory/state", memory_state_post)
+	app.router.add_post("/memory/clear", memory_clear)
+	app.router.add_get("/memory/snapshot", memory_snapshot)
 	app.router.add_post("/shutdown", shutdown_handler)
 	runner = web.AppRunner(app)
 	await runner.setup()

@@ -26,6 +26,13 @@ type CompactResult struct {
 	TokensAfter  int    `json:"tokens_after"`
 }
 
+type MemoryState struct {
+	Enabled   bool `json:"enabled"`
+	Entries   int  `json:"entries"`
+	Snapshots int  `json:"snapshots"`
+	DBSize    int  `json:"db_size"`
+}
+
 type TokenMsg struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -184,6 +191,36 @@ func (c *Client) Compact() (*CompactResult, error) {
 
 func (c *Client) Shutdown() error {
 	return c.postOK("/shutdown", nil)
+}
+
+func (c *Client) GetMemoryState() (*MemoryState, error) {
+	var result MemoryState
+	if err := c.getJSON("/memory/state", &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) SetMemoryState(enabled bool) error {
+	return c.postOK("/memory/state", map[string]any{"enabled": enabled})
+}
+
+func (c *Client) ClearMemory() (int, error) {
+	var result struct {
+		Cleared int `json:"cleared"`
+	}
+	if err := c.postDecode("/memory/clear", nil, &result); err != nil {
+		return 0, err
+	}
+	return result.Cleared, nil
+}
+
+func (c *Client) GetMemorySnapshot() (map[string]any, error) {
+	var result map[string]any
+	if err := c.getJSON("/memory/snapshot", &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (c *Client) ListSkills() ([]Skill, error) {
