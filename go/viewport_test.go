@@ -30,6 +30,7 @@ func TestSyncViewportPreservesManualScrollWhenIdle(t *testing.T) {
 	m.height = 20
 	m.viewport.Width = 80
 	m.viewport.Height = 5
+	m.loading = false // simulate idle state after backend ready
 
 	for i := 0; i < 40; i++ {
 		m.appendText(fmt.Sprintf("line %02d", i))
