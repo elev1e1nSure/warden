@@ -69,6 +69,7 @@ class ChatSession:
 		self.question_manager = question_manager
 		self.token_count: int = 0
 		self.token_limit: int = _guess_context_limit(model)
+		self._cu_warned: dict = {"value": False}
 
 	def reset(self) -> None:
 		self.history = []
@@ -212,6 +213,7 @@ class ChatSession:
 			confirmation_manager=self.confirmation_manager,
 			question_manager=self.question_manager,
 			add_tool_result_fn=self.add_tool_result,
+			cu_warned=self._cu_warned,
 		):
 			yield event
 

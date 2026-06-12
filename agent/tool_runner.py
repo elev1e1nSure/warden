@@ -14,6 +14,15 @@ from agent.tools.input import CU_MAX_SIDE
 
 
 _SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
+_CU_TOOLS = {"screenshot", "mouse", "keyboard"}
+
+_CU_WARNING_TITLE = "Computer use is experimental"
+_CU_WARNING_DETAILS = [
+    "The agent will control your mouse, keyboard, and screen directly.",
+    "It can click, type, and interact with any open window.",
+    "Use only in a trusted environment — stop with Esc or move cursor to the top-left corner.",
+    "This confirmation appears once per session.",
+]
 
 
 def _extract_saved_path(result: str) -> str | None:
@@ -57,6 +66,7 @@ async def execute_tool_call(
 	confirmation_manager: ConfirmationManager | None,
 	question_manager: QuestionManager | None,
 	add_tool_result_fn,
+	cu_warned: dict | None = None,
 ) -> AsyncIterator[tuple]:
 	"""Execute a single tool call. Yields events and records results in history."""
 	try:
@@ -76,6 +86,31 @@ async def execute_tool_call(
 
 	args = parse_args(raw_args)
 	args_str = ", ".join(f"{k}={v}" for k, v in args.items())
+
+	# ── computer use: one-time session warning (bypasses auto mode) ──
+	if name in _CU_TOOLS and cu_warned is not None and not cu_warned["value"]:
+		if confirmation_manager is None:
+			add_tool_result_fn(name, "cancelled: no confirmation manager")
+			yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
+			return
+		call_id, _ = confirmation_manager.register()
+		yield ("confirm", {
+			"id": call_id,
+			"tool": name,
+			"risk": "confirm",
+			"title": _CU_WARNING_TITLE,
+			"summary": "computer use requires physical control of your machine",
+			"details": _CU_WARNING_DETAILS,
+			"args": args_str,
+			"preview": args_str,
+			"default": "cancel",
+		})
+		ok = await confirmation_manager.wait(call_id)
+		if not ok:
+			add_tool_result_fn(name, "cancelled by user")
+			yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
+			return
+		cu_warned["value"] = True
 
 	# ── question tool: special interactive flow ──
 	if name == "question":
