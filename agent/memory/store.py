@@ -184,30 +184,69 @@ class MemoryStore:
 				return None
 			return json.loads(row[0])
 
-	def get_context_text(self) -> str:
-		"""Format all memory entries as a context block for the LLM.
+	def delete_entry(self, key: str) -> int:
+		with self._conn() as conn:
+			cur = conn.execute("DELETE FROM memory_entries WHERE key = ?", (key,))
+			conn.commit()
+			return cur.rowcount
 
-		Reads live entries (not snapshots) so facts learned in the current
-		session are immediately visible to the model.
+	def get_context_text(
+		self,
+		session_id: str | None = None,
+		min_confidence: float = 0.5,
+		max_entries: int = 30,
+	) -> str:
+		"""Format memory snapshot and current session entries as a context block.
+
+		Starts with the latest long-term snapshot, then overlays entries from
+		the current session so newly learned facts are immediately visible.
 		"""
-		entries = self.get_entries()
-		if not entries:
+		snapshot = self.get_latest_snapshot() or {}
+		entries = self.get_entries(session_id=session_id)
+		entries = [e for e in entries if e["confidence"] >= min_confidence][:max_entries]
+
+		if not snapshot and not entries:
 			return ""
 
-		by_cat: dict[str, dict[str, str]] = {}
-		for e in entries:
-			by_cat.setdefault(e["category"], {})[e["key"]] = e["value"]
-
 		lines: list[str] = ["[Memory]"]
-		for k, v in by_cat.get("user", {}).items():
+
+		# Snapshot (long-term memory)
+		user = snapshot.get("user", {})
+		for k, v in user.items():
 			lines.append(f"- user {k}: {v}")
-		tech = sorted(by_cat.get("tech_stack", {}).values())
-		if tech:
-			lines.append(f"- tech stack: {', '.join(tech)}")
-		for k, v in by_cat.get("preference", {}).items():
-			lines.append(f"- prefers {k}: {v}")
-		for k, v in by_cat.get("project", {}).items():
-			lines.append(f"- project: {v}")
+
+		projects = snapshot.get("projects", [])
+		for p in projects:
+			name = p.get("name", "unknown")
+			ts = p.get("tech_stack", [])
+			if ts:
+				lines.append(f"- project {name} (stack: {', '.join(ts)})")
+			else:
+				lines.append(f"- project: {name}")
+
+		prefs = snapshot.get("preferences", {})
+		for k, v in prefs.items():
+			lines.append(f"- preference {k}: {v}")
+
+		global_ts = snapshot.get("tech_stack", [])
+		if global_ts:
+			lines.append(f"- tech stack: {', '.join(global_ts)}")
+
+		# Current session overrides / additions
+		if entries:
+			by_cat: dict[str, dict[str, str]] = {}
+			for e in entries:
+				by_cat.setdefault(e["category"], {})[e["key"]] = e["value"]
+
+			for k, v in by_cat.get("user", {}).items():
+				lines.append(f"- user {k}: {v} (current session)")
+			tech = sorted(by_cat.get("tech_stack", {}).values())
+			if tech:
+				lines.append(f"- tech stack: {', '.join(tech)} (current session)")
+			for k, v in by_cat.get("preference", {}).items():
+				lines.append(f"- preference {k}: {v} (current session)")
+			for k, v in by_cat.get("project", {}).items():
+				lines.append(f"- project: {v} (current session)")
 
 		return "\n".join(lines) if len(lines) > 1 else ""
 

@@ -49,6 +49,41 @@ class MemoryAggregator:
 
 	@classmethod
 	def finalize(cls, store: MemoryStore, session_id: str) -> None:
-		"""Aggregate and persist snapshot for a session."""
+		"""Aggregate and persist snapshot for a session, merging with prior long-term memory."""
 		snapshot = cls.aggregate(store, session_id)
+		prev = store.get_latest_snapshot()
+		if prev:
+			snapshot = cls._merge_snapshots(prev, snapshot)
 		store.save_snapshot(session_id, snapshot)
+		store.clear_entries(session_id)
+
+	@staticmethod
+	def _merge_snapshots(prev: dict[str, Any], curr: dict[str, Any]) -> dict[str, Any]:
+		"""Merge two snapshots, letting current values win on key conflicts."""
+		result: dict[str, Any] = {**prev, **curr}
+		result["updated_at"] = curr.get("updated_at", datetime.now(timezone.utc).isoformat())
+
+		# Merge simple dict fields
+		result["user"] = {**prev.get("user", {}), **curr.get("user", {})}
+		result["preferences"] = {**prev.get("preferences", {}), **curr.get("preferences", {})}
+
+		# Merge projects by name
+		prev_projects = {p["name"]: p for p in prev.get("projects", []) if "name" in p}
+		curr_projects = {p["name"]: p for p in curr.get("projects", []) if "name" in p}
+		merged_projects = {**prev_projects, **curr_projects}
+		result["projects"] = list(merged_projects.values())
+
+		# Merge tech_stack sets
+		prev_ts = set(prev.get("tech_stack", []))
+		curr_ts = set(curr.get("tech_stack", []))
+		for p in prev.get("projects", []):
+			prev_ts.update(p.get("tech_stack", []))
+		for p in curr.get("projects", []):
+			curr_ts.update(p.get("tech_stack", []))
+		all_ts = prev_ts | curr_ts
+		if all_ts:
+			result["tech_stack"] = sorted(all_ts)
+		elif "tech_stack" in result:
+			del result["tech_stack"]
+
+		return result

@@ -1,56 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import os
-import tempfile
-from pathlib import Path
 from typing import Any, Dict
 
-
+from agent.memory.store import MemoryStore
 from agent.tools.base import Tool
-
-
-def _memory_path() -> Path:
-	"""Location of the long-term memory store (overridable via WARDEN_MEMORY_PATH)."""
-	override = os.environ.get("WARDEN_MEMORY_PATH")
-	if override:
-		return Path(override)
-	return Path.home() / ".warden" / "memory.json"
-
-
-def _load(path: Path) -> dict:
-	try:
-		raw = path.read_text(encoding="utf-8")
-	except FileNotFoundError:
-		return {}
-	except OSError:
-		return {}
-	try:
-		data = json.loads(raw)
-	except json.JSONDecodeError:
-		return {}
-	return data if isinstance(data, dict) else {}
-
-
-def _save(path: Path, data: dict) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	# atomic write so a crash mid-write can't corrupt the store
-	fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
-	try:
-		with os.fdopen(fd, "w", encoding="utf-8") as f:
-			json.dump(data, f, ensure_ascii=False, indent=2)
-		os.replace(tmp, path)
-	finally:
-		if os.path.exists(tmp):
-			os.unlink(tmp)
 
 
 class MemoryTool(Tool):
 	name = "memory"
 	description = (
-		"Long-term key/value notes that persist across sessions "
-		"(stored in ~/.warden/memory.json). "
+		"Read or write persistent memory facts that survive across sessions. "
 		"action: get (one key or all), set (key + value), delete (key), list (keys), clear (all). "
 		"Use to remember user facts, preferences, and project details between sessions."
 	)
@@ -60,6 +20,9 @@ class MemoryTool(Tool):
 		"value": {"type": "string", "description": "Note value (required for set)"},
 	}
 
+	def __init__(self) -> None:
+		self._store = MemoryStore()
+
 	def tool_definition(self) -> dict:
 		d = super().tool_definition()
 		d["function"]["parameters"]["required"] = ["action"]
@@ -68,43 +31,61 @@ class MemoryTool(Tool):
 	async def execute(self, args: Dict[str, Any]) -> str:
 		action = str(args.get("action", "")).strip().lower()
 		key = str(args.get("key", "")).strip()
-		path = _memory_path()
+		value = args.get("value")
 		try:
-			return await asyncio.to_thread(self._run, action, key, args.get("value"), path)
+			return await asyncio.to_thread(self._run, action, key, value)
 		except Exception as e:
 			return f"error: {e}"
 
-	def _run(self, action: str, key: str, value: Any, path: Path) -> str:
-		data = _load(path)
+	def _run(self, action: str, key: str, value: Any) -> str:
 		if action == "list":
-			if not data:
+			entries = self._store.get_entries()
+			if not entries:
 				return "(empty)"
-			return "\n".join(sorted(data.keys()))
+			return "\n".join(
+				sorted({f"{e['category']}/{e['key']}: {e['value']}" for e in entries})
+			)
+
 		if action == "get":
+			entries = self._store.get_entries()
 			if not key:
-				if not data:
+				if not entries:
 					return "(empty)"
-				return "\n".join(f"{k}: {v}" for k, v in sorted(data.items()))
-			if key not in data:
+				return "\n".join(
+					sorted(f"{e['category']}/{e['key']}: {e['value']}" for e in entries)
+				)
+			matches = [e for e in entries if key.lower() in e["key"].lower()]
+			if not matches:
 				return f"(no note for '{key}')"
-			return f"{key}: {data[key]}"
+			return "\n".join(
+				f"{e['category']}/{e['key']}: {e['value']}" for e in matches
+			)
+
 		if action == "set":
 			if not key:
 				return "error: key is required for set"
 			if value is None:
 				return "error: value is required for set"
-			data[key] = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-			_save(path, data)
+			val = value if isinstance(value, str) else str(value)
+			self._store.upsert_entry(
+				session_id="tool",
+				category="memory",
+				key=key,
+				value=val,
+				confidence=1.0,
+			)
 			return f"saved: {key}"
+
 		if action == "delete":
 			if not key:
 				return "error: key is required for delete"
-			if key not in data:
+			deleted = self._store.delete_entry(key)
+			if deleted == 0:
 				return f"(no note for '{key}')"
-			del data[key]
-			_save(path, data)
 			return f"deleted: {key}"
+
 		if action == "clear":
-			_save(path, {})
-			return "cleared all notes"
+			count = self._store.clear_entries()
+			return f"cleared {count} notes"
+
 		return "error: action must be get, set, delete, list, or clear"

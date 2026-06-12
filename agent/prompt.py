@@ -42,8 +42,10 @@ _BASE_SYSTEM = (
 "Continue until the task is done or clearly blocked. "
 "If blocked, say what failed and what is needed. "
 
-"If the user mentions preferences, projects, or tech stack, those facts may be "
-"remembered automatically when memory is enabled (/memory on)."
+"If a [Memory] block appears above, it contains known facts about the user, their projects, "
+"and preferences. Use these facts to personalise responses and avoid asking for information "
+"you already have. When the user mentions new preferences, projects, or tech stack, "
+"those facts are remembered automatically when memory is enabled (/memory on)."
 
 
 )

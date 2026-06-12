@@ -92,6 +92,38 @@ class TestSnapshots:
 		assert store.get_latest_snapshot() is None
 
 
+class TestDeleteEntry:
+	def test_delete_existing(self, store: MemoryStore) -> None:
+		store.upsert_entry("s1", "user", "name", "Alice", 1.0)
+		deleted = store.delete_entry("name")
+		assert deleted == 1
+		assert store.get_entries() == []
+
+	def test_delete_missing(self, store: MemoryStore) -> None:
+		assert store.delete_entry("missing") == 0
+
+
+class TestContextWithSnapshot:
+	def test_snapshot_included(self, store: MemoryStore) -> None:
+		store.save_snapshot("s1", {"user": {"name": "Alice"}})
+		ctx = store.get_context_text()
+		assert "Alice" in ctx
+		assert "[Memory]" in ctx
+
+	def test_current_session_overlay(self, store: MemoryStore) -> None:
+		store.save_snapshot("s1", {"user": {"name": "Alice"}})
+		store.upsert_entry("s2", "user", "name", "Bob", 0.9)
+		ctx = store.get_context_text(session_id="s2")
+		assert "Alice" in ctx
+		assert "Bob" in ctx
+		assert "current session" in ctx
+
+	def test_confidence_filter(self, store: MemoryStore) -> None:
+		store.upsert_entry("s1", "user", "name", "Alice", 0.3)
+		ctx = store.get_context_text(session_id="s1", min_confidence=0.5)
+		assert "Alice" not in ctx
+
+
 class TestStats:
 	def test_stats(self, store: MemoryStore) -> None:
 		store.set_enabled(True)

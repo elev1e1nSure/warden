@@ -247,7 +247,7 @@ class ChatSession:
 
 			system = build_system(self.model)
 			if self.memory_store is not None and self.memory_store.get_enabled():
-				mem_ctx = self.memory_store.get_context_text()
+				mem_ctx = self.memory_store.get_context_text(session_id=self.session_id)
 				if mem_ctx:
 					system = mem_ctx + "\n\n" + system
 			messages = [{"role": "system", "content": system}] + self.history
