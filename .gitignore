@@ -24,7 +24,7 @@ go/warden.exe
 .tmp/
 
 # Scratch files
-TODO.md
+
 
 # Claude worktrees
 .claude/

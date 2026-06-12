@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+
+def _db_path() -> Path:
+	override = os.environ.get("WARDEN_MEMORY_DB")
+	if override:
+		return Path(override)
+	return Path.home() / ".warden" / "memory.db"
+
+
+class MemoryStore:
+	"""SQLite-backed persistent memory layer."""
+
+	def __init__(self, db_path: Path | None = None) -> None:
+		self.db_path = db_path or _db_path()
+		self.db_path.parent.mkdir(parents=True, exist_ok=True)
+		self._init_db()
+
+	def _conn(self) -> sqlite3.Connection:
+		return sqlite3.connect(str(self.db_path))
+
+	def _init_db(self) -> None:
+		with self._conn() as conn:
+			conn.execute(
+				"""
+				CREATE TABLE IF NOT EXISTS memory_state (
+					key TEXT PRIMARY KEY,
+					value TEXT NOT NULL,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+				"""
+			)
+			conn.execute(
+				"""
+				CREATE TABLE IF NOT EXISTS memory_entries (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					session_id TEXT NOT NULL,
+					timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+					category TEXT NOT NULL,
+					key TEXT NOT NULL,
+					value TEXT NOT NULL,
+					confidence REAL NOT NULL DEFAULT 1.0,
+					source_message_id TEXT
+				)
+				"""
+			)
+			conn.execute(
+				"""
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_cat_key
+				ON memory_entries(category, key)
+				"""
+			)
+			conn.execute(
+				"""
+				CREATE TABLE IF NOT EXISTS memory_snapshots (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					session_id TEXT NOT NULL,
+					timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+					data TEXT NOT NULL
+				)
+				"""
+			)
+			conn.commit()
+
+	def set_enabled(self, enabled: bool) -> None:
+		with self._conn() as conn:
+			conn.execute(
+				"""
+				INSERT INTO memory_state(key, value, updated_at)
+				VALUES ('enabled', ?, CURRENT_TIMESTAMP)
+				ON CONFLICT(key) DO UPDATE SET
+					value = excluded.value,
+					updated_at = CURRENT_TIMESTAMP
+				""",
+				("1" if enabled else "0",),
+			)
+			conn.commit()
+
+	def get_enabled(self) -> bool:
+		with self._conn() as conn:
+			row = conn.execute(
+				"SELECT value FROM memory_state WHERE key = 'enabled'"
+			).fetchone()
+			return row is not None and row[0] == "1"
+
+	def upsert_entry(
+		self,
+		session_id: str,
+		category: str,
+		key: str,
+		value: str,
+		confidence: float = 1.0,
+		source_message_id: str | None = None,
+	) -> None:
+		with self._conn() as conn:
+			conn.execute(
+				"""
+				INSERT INTO memory_entries
+				(session_id, category, key, value, confidence, source_message_id)
+				VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT(category, key) DO UPDATE SET
+					session_id = excluded.session_id,
+					value = excluded.value,
+					confidence = excluded.confidence,
+					source_message_id = excluded.source_message_id,
+					timestamp = CURRENT_TIMESTAMP
+				""",
+				(session_id, category, key, value, confidence, source_message_id),
+			)
+			conn.commit()
+
+	def get_entries(
+		self,
+		session_id: str | None = None,
+		category: str | None = None,
+	) -> list[dict[str, Any]]:
+		query = """
+			SELECT
+				id,
+				session_id,
+				timestamp,
+				category,
+				key,
+				value,
+				confidence,
+				source_message_id
+			FROM memory_entries
+		"""
+		conds: list[str] = []
+		params: list[Any] = []
+
+		if session_id is not None:
+			conds.append("session_id = ?")
+			params.append(session_id)
+		if category is not None:
+			conds.append("category = ?")
+			params.append(category)
+
+		if conds:
+			query += " WHERE " + " AND ".join(conds)
+
+		query += " ORDER BY timestamp DESC"
+
+		with self._conn() as conn:
+			conn.row_factory = sqlite3.Row
+			rows = conn.execute(query, params).fetchall()
+			return [dict(r) for r in rows]
+
+	def clear_entries(self, session_id: str | None = None) -> int:
+		with self._conn() as conn:
+			if session_id is not None:
+				cur = conn.execute(
+					"DELETE FROM memory_entries WHERE session_id = ?",
+					(session_id,),
+				)
+			else:
+				cur = conn.execute("DELETE FROM memory_entries")
+			conn.commit()
+			return cur.rowcount
+
+	def save_snapshot(self, session_id: str, data: dict[str, Any]) -> None:
+		with self._conn() as conn:
+			conn.execute(
+				"INSERT INTO memory_snapshots(session_id, data) VALUES (?, ?)",
+				(session_id, json.dumps(data, ensure_ascii=False)),
+			)
+			conn.commit()
+
+	def get_latest_snapshot(self) -> dict[str, Any] | None:
+		with self._conn() as conn:
+			row = conn.execute(
+				"""
+				SELECT data FROM memory_snapshots
+				ORDER BY id DESC LIMIT 1
+				"""
+			).fetchone()
+			if row is None:
+				return None
+			return json.loads(row[0])
+
+	def get_stats(self) -> dict[str, Any]:
+		with self._conn() as conn:
+			enabled = self.get_enabled()
+			count = conn.execute(
+				"SELECT COUNT(*) FROM memory_entries"
+			).fetchone()[0]
+			snapshot_count = conn.execute(
+				"SELECT COUNT(*) FROM memory_snapshots"
+			).fetchone()[0]
+		db_size = self.db_path.stat().st_size if self.db_path.exists() else 0
+		return {
+			"enabled": enabled,
+			"entries": count,
+			"snapshots": snapshot_count,
+			"db_size": db_size,
+		}
