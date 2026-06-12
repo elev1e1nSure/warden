@@ -219,10 +219,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type != tea.KeyEsc {
 			m.escPending = false
 		}
-		// Only clear quitPending on non-control keys (Ctrl alone shouldn't reset)
-		if !strings.HasPrefix(string(msg.Type), "ctrl") && msg.Type != tea.KeyCtrlC {
-			m.quitPending = false
-		}
+		// Don't auto-clear quitPending - only clear explicitly on cancel actions
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			if m.streaming {
@@ -332,6 +329,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyEsc:
+			m.quitPending = false
 			if m.selectMode {
 				m.selectMode = false
 				return m, tea.EnableMouseCellMotion
@@ -446,6 +444,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastRuneAt = time.Now()
 
 		case tea.KeyEnter:
+			m.quitPending = false
 			if m.modelPicking {
 				if m.modelPickIdx < len(m.modelFiltered) {
 					chosen := m.modelFiltered[m.modelPickIdx]
