@@ -86,3 +86,94 @@ async def test_screenshot_attaches_image_to_history(tmp_path, monkeypatch):
     imgs = [m for m in history if m.get("role") == "user" and m.get("images")]
     assert imgs, "screenshot result should attach an image message to history"
     assert isinstance(imgs[0]["images"][0], str) and imgs[0]["images"][0]
+
+
+# ── _resolve_preview ──────────────────────────────────────────────────────────
+
+def test_resolve_preview_command():
+	from agent.tool_runner import _resolve_preview
+	assert _resolve_preview({"command": "ls"}, "fallback") == "ls"
+
+
+def test_resolve_preview_path():
+	from agent.tool_runner import _resolve_preview
+	assert "test.txt" in _resolve_preview({"path": "test.txt"}, "fallback")
+
+
+def test_resolve_preview_fallback():
+	from agent.tool_runner import _resolve_preview
+	assert _resolve_preview({}, "fallback") == "fallback"
+
+
+# ── execute_tool_call ─────────────────────────────────────────────────────────
+
+async def test_unknown_tool():
+	import agent.tool_runner as tr
+	results = []
+	def add_result(name, result, call_id=""):
+		results.append((name, result))
+	tc = {"function": {"name": "unknown_tool", "arguments": {}}, "id": "call_1"}
+	async for _ in tr.execute_tool_call(tc, True, [], None, None, add_result):
+		pass
+	assert any("error" in r for _, r in results)
+
+
+async def test_blocked_tool(monkeypatch):
+	import agent.tool_runner as tr
+	from agent.safety import SafetyDecision
+	monkeypatch.setattr(tr, "assess_tool_call", lambda name, args, mode: SafetyDecision("blocked", "unsafe", "details"))
+	history = []
+	def add_result(name, result, call_id=""):
+		history.append({"role": "tool", "name": name, "content": result})
+	class FakeTool:
+		name = "bash"
+		async def execute(self, args):
+			return "ok"
+	monkeypatch.setitem(tr.REGISTRY, "bash", FakeTool())
+	tc = {"function": {"name": "bash", "arguments": {"command": "rm -rf /"}}, "id": "call_1"}
+	events = []
+	async for ev in tr.execute_tool_call(tc, True, history, None, None, add_result):
+		events.append(ev)
+	assert any("blocked" in str(ev) for ev in events)
+
+
+async def test_confirm_cancelled(monkeypatch):
+	import agent.tool_runner as tr
+	from agent.safety import SafetyDecision
+	monkeypatch.setattr(tr, "assess_tool_call", lambda name, args, mode: SafetyDecision("confirm", "risky", "details"))
+	class FakeCM:
+		def register(self):
+			return ("cid", None)
+		async def wait(self, cid):
+			return False
+	class FakeTool:
+		name = "file_write"
+		async def execute(self, args):
+			return "ok"
+	monkeypatch.setitem(tr.REGISTRY, "file_write", FakeTool())
+	history = []
+	def add_result(name, result, call_id=""):
+		history.append({"role": "tool", "name": name, "content": result})
+	tc = {"function": {"name": "file_write", "arguments": {"path": "x.txt", "content": "hi"}}, "id": "call_1"}
+	events = []
+	async for ev in tr.execute_tool_call(tc, True, history, FakeCM(), None, add_result):
+		events.append(ev)
+	assert any("cancelled" in str(ev) for ev in events)
+
+
+async def test_tool_timeout(monkeypatch):
+	import agent.tool_runner as tr
+	import asyncio
+	class FakeTool:
+		name = "slow"
+		async def execute(self, args):
+			await asyncio.sleep(100)
+	monkeypatch.setitem(tr.REGISTRY, "slow", FakeTool())
+	history = []
+	def add_result(name, result, call_id=""):
+		history.append({"role": "tool", "name": name, "content": result})
+	tc = {"function": {"name": "slow", "arguments": {}}, "id": "call_1"}
+	events = []
+	async for ev in tr.execute_tool_call(tc, True, history, None, None, add_result):
+		events.append(ev)
+	assert any("timeout" in str(ev) for ev in events)
