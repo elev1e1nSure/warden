@@ -38,6 +38,7 @@ func (m *model) renderMessages() []string {
 
 	out := make([]string, 0, len(m.messages)+1)
 	out = append(out, "") // top padding
+	prevRenderedEmpty := true
 	for i, entry := range m.messages {
 		var rendered string
 		switch entry.kind {
@@ -56,9 +57,21 @@ func (m *model) renderMessages() []string {
 		default:
 			rendered = indentLines(entry.text, gutter)
 		}
+
+		// blank line above action blocks and above assistant text when something preceded them
+		if rendered != "" && !prevRenderedEmpty {
+			switch entry.kind {
+			case messageThink, messageChainAction, messageToolActivity:
+				rendered = "\n" + rendered
+			case messageAssistant:
+				rendered = "\n" + rendered
+			}
+		}
+
 		// always keep messageText (blank lines serve as turn separators)
 		if rendered != "" || entry.kind == messageText {
 			out = append(out, rendered)
+			prevRenderedEmpty = rendered == ""
 		}
 	}
 	return out
