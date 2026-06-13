@@ -27,13 +27,12 @@ function Line($mark, $msg, $color) {
 }
 
 function Ok($msg)   { Line "[ok]" $msg "green" }
-function Info($msg) { Line "[..]" $msg "dim" }
+function Info($msg) { Line "  " $msg "dim" }
 function Run($msg)  { Line "[>>]" $msg "blue" }
 function Err($msg)  { Line "[!!]" $msg "red"; exit 1 }
 
 if ($useAnsi) {
     Write-Host "$(Paint 'warden' green) $(Paint 'build' dim)"
-    Write-Host "$(Paint '................................' dim)"
 } else {
     Write-Host "warden build"
 }
