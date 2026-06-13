@@ -27,6 +27,71 @@ func TestSlashNavigationDoesNotChangeInput(t *testing.T) {
 	}
 }
 
+func TestBangNavigationDoesNotChangeInput(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.width = 80
+	m.height = 20
+	m.viewport.Width = 80
+	m.viewport.Height = 5
+	m.skills = []Skill{
+		{Name: "alpha", Description: "Alpha skill"},
+		{Name: "beta", Description: "Beta skill"},
+		{Name: "gamma", Description: "Gamma skill"},
+	}
+	m.textinput.SetValue("!")
+	m.refreshHints()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+
+	if got := m.textinput.Value(); got != "!" {
+		t.Fatalf("bang navigation changed input: got %q", got)
+	}
+	if m.skillsIdx != 1 {
+		t.Fatalf("bang navigation did not move selection: got %d", m.skillsIdx)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(model)
+	if m.skillsIdx != 0 {
+		t.Fatalf("bang navigation did not move back: got %d", m.skillsIdx)
+	}
+}
+
+func TestBangTabCompletesCommonPrefix(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.skills = []Skill{
+		{Name: "build-web", Description: "Build web"},
+		{Name: "build-worker", Description: "Build worker"},
+	}
+	m.textinput.SetValue("!bu")
+	m.refreshHints()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(model)
+
+	if got := m.textinput.Value(); got != "!build-w" {
+		t.Fatalf("expected common skill prefix, got %q", got)
+	}
+}
+
+func TestBangTabCompletesSingleMatch(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.skills = []Skill{
+		{Name: "cat-text", Description: "Cat text"},
+		{Name: "skill-creator", Description: "Skill creator"},
+	}
+	m.textinput.SetValue("!cat")
+	m.refreshHints()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(model)
+
+	if got := m.textinput.Value(); got != "!cat-text" {
+		t.Fatalf("expected full skill name, got %q", got)
+	}
+}
+
 func TestRenderHintScrollsSlashCommandsWithoutMarkers(t *testing.T) {
 	m := initialModel("test-model", true)
 	m.width = 80

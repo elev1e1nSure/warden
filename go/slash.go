@@ -284,7 +284,7 @@ func matchBang(prefix string, skills []Skill) []Skill {
 	}
 	var out []Skill
 	for _, s := range skills {
-		if strings.HasPrefix(s.Name, lower) {
+		if strings.HasPrefix(strings.ToLower(s.Name), lower) {
 			out = append(out, s)
 		}
 	}
