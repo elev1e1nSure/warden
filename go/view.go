@@ -49,8 +49,6 @@ func (m *model) renderMessages() []string {
 			rendered = indentLines(m.renderMarkdown(entry.text), gutter+contentIndent)
 		case messageToolActivity:
 			rendered = indentLines(entry.text, gutter)
-		case messageChainCounter:
-			rendered = indentLines(m.renderChainCounter(entry), gutter)
 		case messageChainAction:
 			rendered = indentLines(m.renderChainAction(entry, i == lastActionIdx), gutter)
 		case messageToolDiff:

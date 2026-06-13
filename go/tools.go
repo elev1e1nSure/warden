@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 var toolDisplayNames = map[string]string{
@@ -342,31 +341,6 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 		return prefix + m.pulse() + m.shimmer(entry.toolName+detail)
 	}
 	return DimStyle().Render(prefix + entry.toolName + detail)
-}
-
-// renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
-// While live the time ticks; once duration is set the line is frozen.
-func (m model) renderChainCounter(entry messageEntry) string {
-	if entry.text != "" {
-		return entry.text
-	}
-	if len(m.chainOrder) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(m.chainOrder)+1)
-	for _, name := range m.chainOrder {
-		label := toolPastTense(name)
-		if c := m.chainCounts[name]; c > 1 {
-			label += fmt.Sprintf(" ×%d", c)
-		}
-		parts = append(parts, label)
-	}
-	dur := entry.duration
-	if dur == 0 {
-		dur = time.Since(m.chainStart)
-	}
-	parts = append(parts, formatThinkDuration(dur))
-	return DimStyle().Render(contentIndent + strings.Join(parts, " · "))
 }
 
 // renderChainAction renders the single live "what's happening now" line.

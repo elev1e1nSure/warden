@@ -12,42 +12,6 @@ func TestStartChain(t *testing.T) {
 	}
 }
 
-func TestBumpChain(t *testing.T) {
-	m := newTestModel()
-	m.bumpChain("search")
-	m.bumpChain("search")
-	m.bumpChain("fetch")
-	if m.chainCounts["search"] != 2 {
-		t.Errorf("expected search count 2, got %d", m.chainCounts["search"])
-	}
-	if m.chainCounts["fetch"] != 1 {
-		t.Errorf("expected fetch count 1, got %d", m.chainCounts["fetch"])
-	}
-}
-
-func TestCounterIdx(t *testing.T) {
-	m := newTestModel()
-	if m.counterIdx() != -1 {
-		t.Errorf("expected -1 for empty messages")
-	}
-	m.messages = append(m.messages, messageEntry{kind: messageChainCounter})
-	if m.counterIdx() != 0 {
-		t.Errorf("expected 0, got %d", m.counterIdx())
-	}
-}
-
-func TestEnsureCounter(t *testing.T) {
-	m := newTestModel()
-	m.ensureCounter()
-	if m.counterIdx() != 0 {
-		t.Errorf("expected counter at 0")
-	}
-	m.ensureCounter()
-	if len(m.messages) != 1 {
-		t.Errorf("expected only 1 counter message")
-	}
-}
-
 func TestSetAction(t *testing.T) {
 	m := newTestModel()
 	m.setAction("running", "ls", false)
@@ -77,9 +41,9 @@ func TestClearAction(t *testing.T) {
 func TestFreezeChain(t *testing.T) {
 	m := newTestModel()
 	m.startChain()
-	m.ensureCounter()
+	m.setAction("Thinking", "", true)
 	m.freezeChain()
-	if m.counterIdx() >= 0 {
-		t.Errorf("expected counter removed when no tools ran")
+	if len(m.messages) != 0 {
+		t.Errorf("expected action line removed after freezeChain")
 	}
 }

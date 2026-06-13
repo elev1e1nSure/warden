@@ -273,8 +273,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				display := toolDisplayName(inner.name)
 				m.clearAction()
-				m.ensureCounter()
-				m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
+					m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
 			}
 			m.syncViewport()
 			cmds = append(cmds, readNext(msg.ch))
@@ -288,8 +287,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.appendToolActivity(summary)
 				}
-			} else {
-				m.bumpChain(toolDisplayName(inner.tool.Name))
 			}
 			if m.verboseMode && inner.tool.Diff != "" {
 				m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
