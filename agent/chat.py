@@ -84,8 +84,14 @@ def _clean_visible_text(text: str) -> str:
 	return _EMOJI_RE.sub("", text)
 
 
-def _skill_context_messages(skill: Skill) -> list[dict[str, Any]]:
+def _skill_context_messages(skill: Skill, args: str | None = None) -> list[dict[str, Any]]:
 	call_id = f"call_skill_{skill.name.replace('-', '_')}"
+	skill_args = {"name": skill.name}
+	if args:
+		skill_args["args"] = args
+	content = wrap_skill_content(skill)
+	if args:
+		content = f"User provided arguments: {args}\n\n{content}"
 	return [
 		{
 			"role": "assistant",
@@ -96,7 +102,7 @@ def _skill_context_messages(skill: Skill) -> list[dict[str, Any]]:
 					"type": "function",
 					"function": {
 						"name": "skill",
-						"arguments": json.dumps({"name": skill.name}),
+						"arguments": json.dumps(skill_args),
 					},
 				}
 			],
@@ -105,7 +111,7 @@ def _skill_context_messages(skill: Skill) -> list[dict[str, Any]]:
 			"role": "tool",
 			"name": "skill",
 			"tool_call_id": call_id,
-			"content": wrap_skill_content(skill),
+			"content": content,
 		},
 	]
 
@@ -331,6 +337,7 @@ class ChatSession:
 		text: str,
 		auto_mode: bool = False,
 		skill_name: str | None = None,
+		skill_args: str | None = None,
 	) -> AsyncIterator[tuple[str, Any]]:
 		turn_context: list[dict[str, Any]] = []
 		if skill_name:
@@ -338,7 +345,7 @@ class ChatSession:
 			if skill is None:
 				yield ("token", f"skill not found: {skill_name}")
 				return
-			turn_context = _skill_context_messages(skill)
+			turn_context = _skill_context_messages(skill, skill_args)
 
 		history_insert_at = len(self.history) + 1
 		self.add_user(text)

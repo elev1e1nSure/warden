@@ -2,8 +2,6 @@
 
 import datetime
 
-from agent.skills import format_catalog
-
 _BASE_SYSTEM = (
     "You are Warden, a local AI agent for computer control, web browsing, coding, and everyday tasks. "
     "Answer in the user's language. "
@@ -44,9 +42,6 @@ def build_system(model: str | None = None) -> str:
     )
     if model:
         out += f" Configured model name: {model}."
-    catalog = format_catalog()
-    if catalog:
-        out += "\n\n" + catalog
     return out
 
 

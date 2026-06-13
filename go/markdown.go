@@ -11,8 +11,6 @@ import (
 var wardenMarkdownStyle = []byte(`{
   "document": {
     "block_suffix": "\n",
-    "margin_left": 2,
-    "margin_right": 2,
     "color": "252"
   },
   "block_quote": {
@@ -125,8 +123,8 @@ func (m *model) ensureMarkdownRenderer() {
 	}
 	m.mdWidth = m.width
 	// wrap width must account for gutter (sideMargin) + contentIndent (2) added
-	// after rendering, so glamour's margin_left:2 + sideMargin columns are offset.
-	wrapWidth := m.width - m.sideMargin()
+	// after rendering.
+	wrapWidth := m.width - m.sideMargin() - len(contentIndent)
 	if wrapWidth < 20 {
 		wrapWidth = 20
 	}
@@ -141,7 +139,7 @@ func (m *model) ensureMarkdownRenderer() {
 }
 
 // renderMarkdown converts markdown text to styled terminal output.
-// Trims glamour's surrounding blank lines and strips its default 2-space left margin.
+// Trims glamour's surrounding blank lines.
 func (m *model) renderMarkdown(text string) string {
 	if text == "" {
 		return text
@@ -153,15 +151,5 @@ func (m *model) renderMarkdown(text string) string {
 	if err != nil {
 		return text
 	}
-	out = strings.Trim(out, "\n")
-	lines := strings.Split(out, "\n")
-	for i, line := range lines {
-		// Only trim glamour's default 2-space margin, preserve code indentation
-		if len(line) >= 2 && line[:2] == "  " {
-			lines[i] = line[2:]
-		} else {
-			lines[i] = line
-		}
-	}
-	return strings.Join(lines, "\n")
+	return strings.Trim(out, "\n")
 }

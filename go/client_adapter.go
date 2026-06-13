@@ -62,8 +62,12 @@ func (m model) sendMessage(text string) tea.Cmd {
 	}
 }
 
-func (m model) sendSkill(name string) tea.Cmd {
-	ch := m.client.StreamChat(map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name})
+func (m model) sendSkill(name, args string) tea.Cmd {
+	payload := map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name}
+	if args != "" {
+		payload["args"] = args
+	}
+	ch := m.client.StreamChat(payload)
 	return func() tea.Msg {
 		return startStreamMsg{ch: ch}
 	}

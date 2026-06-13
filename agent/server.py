@@ -335,6 +335,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	data = await request.json()
 	text = data.get("text", "")
 	skill_name = data.get("skill")
+	skill_args = data.get("args")
 	log_request("POST", "/chat")
 	info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
 
@@ -351,7 +352,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 
 	try:
 		stream = (
-			backend.chat.stream(text, auto_mode=backend.auto_mode, skill_name=skill_name)
+			backend.chat.stream(text, auto_mode=backend.auto_mode, skill_name=skill_name, skill_args=skill_args)
 			if skill_name
 			else backend.chat.stream(text, auto_mode=backend.auto_mode)
 		)

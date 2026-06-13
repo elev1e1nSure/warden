@@ -22,7 +22,7 @@ const (
 	port              = 8765
 	startupTimeout    = 60 * time.Second
 	healthCheckPeriod = 1500 * time.Millisecond
-	spinnerPeriod     = 120 * time.Millisecond
+	spinnerPeriod     = 16 * time.Millisecond
 )
 
 var (
@@ -115,7 +115,7 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m launchModel) View() string {
 	title := lipgloss.NewStyle().Foreground(blue).Bold(true).Render("warden")
-	elapsed := time.Since(m.startedAt).Round(100 * time.Millisecond)
+	elapsed := time.Since(m.startedAt).Round(time.Millisecond)
 	if elapsed < 0 {
 		elapsed = 0
 	}

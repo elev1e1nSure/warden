@@ -191,3 +191,30 @@ func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
 		t.Fatalf("expected using-skill marker, got %#v", m.messages)
 	}
 }
+
+func TestHandleBangKnownSkillWithArgsStartsBackendInvocation(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.skills = []client.Skill{{Name: "demo", Description: "Demo skill"}}
+
+	handled, cmd := m.handleBang("!demo arg1 arg2")
+
+	if !handled {
+		t.Fatalf("expected bang to be handled")
+	}
+	if cmd == nil {
+		t.Fatalf("expected stream command for known skill")
+	}
+	if m.messages[0].kind != messageUser || m.messages[0].text != "!demo arg1 arg2" {
+		t.Fatalf("expected full user text with args, got %#v", m.messages[0])
+	}
+	foundMarker := false
+	for _, msg := range m.messages {
+		if strings.Contains(msg.text, "Using skill: demo") {
+			foundMarker = true
+			break
+		}
+	}
+	if !foundMarker {
+		t.Fatalf("expected using-skill marker, got %#v", m.messages)
+	}
+}

@@ -304,6 +304,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	// Don't scroll message history when the mouse wheel is used over the
 	// prompt bar or overlays (everything below the viewport).
+	oldYOffset := m.viewport.YOffset
 	if mouseMsg, ok := msg.(tea.MouseMsg); ok && (mouseMsg.Type == tea.MouseWheelUp || mouseMsg.Type == tea.MouseWheelDown) {
 		if mouseMsg.Y < m.layoutViewportHeight() {
 			m.viewport, cmd = m.viewport.Update(msg)
@@ -312,6 +313,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else {
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
+	}
+	if m.viewport.YOffset > oldYOffset {
+		m.userScrolled = true
 	}
 
 	m.refreshHints()
@@ -362,19 +366,21 @@ func (m *model) beginStream(text string) tea.Cmd {
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
+	m.userScrolled = false
 	m.syncViewport()
 	return tea.Batch(m.sendMessage(text), m.tick())
 }
 
-func (m *model) beginSkillStream(name string) tea.Cmd {
+func (m *model) beginSkillStream(name, args string) tea.Cmd {
 	m.streamStart = len(m.messages)
 	m.resetInput()
 	m.startChain()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
+	m.userScrolled = false
 	m.syncViewport()
-	return tea.Batch(m.sendSkill(name), m.tick())
+	return tea.Batch(m.sendSkill(name, args), m.tick())
 }
 
 // finishStream resets streaming state at turn end; returns a compact command

@@ -245,9 +245,15 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 
 	// `!<name>` (no space) = skill invocation
 	if strings.HasPrefix(text, "!") {
-		name := strings.TrimSpace(strings.TrimPrefix(text, "!"))
-		if name == "" {
+		trimmed := strings.TrimPrefix(text, "!")
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
 			return true, nil
+		}
+		name := fields[0]
+		var args string
+		if len(fields) > 1 {
+			args = strings.TrimSpace(strings.TrimPrefix(trimmed, name))
 		}
 		if !m.hasSkill(name) {
 			m.appendText(ErrorStyle().Render("  skill not found: " + name))
@@ -255,12 +261,12 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 			m.syncViewport()
 			return true, nil
 		}
-		m.recordHistory("!" + name)
-		m.messages = append(m.messages, messageEntry{kind: messageUser, text: "!" + name})
+		m.recordHistory(text)
+		m.messages = append(m.messages, messageEntry{kind: messageUser, text: text})
 		m.appendText("")
 		m.appendText(DimStyle().Render("  Using skill: " + name))
 		m.syncViewport()
-		return true, m.beginSkillStream(name)
+		return true, m.beginSkillStream(name, args)
 	}
 
 	return false, nil
