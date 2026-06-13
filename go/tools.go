@@ -378,8 +378,8 @@ func (m model) renderChainAction(entry messageEntry, active bool) string {
 		line += " " + entry.toolArgs
 	}
 	if !active {
-		return DimStyle().Render("  " + line)
+		return DimStyle().Render(line)
 	}
 	dots := []string{".", "..", "..."}
-	return DimStyle().Render("  " + line + dots[(m.spinner/3)%3])
+	return DimStyle().Render(line + dots[(m.spinner/3)%3])
 }

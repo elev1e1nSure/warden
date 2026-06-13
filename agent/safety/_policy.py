@@ -54,8 +54,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             return _d("blocked", "dangerous path", "File path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
         if not is_path_within_workspace(path, workspace):
-            return _d("confirm", "writes outside workspace", "Writing file outside workspace", [f"path: {path}"])
-        return _d("confirm", "modifies files", "Writing file inside workspace", [f"path: {path}"])
+            return _d("confirm", "writes outside workspace", "Writing file outside workspace")
+        return _d("confirm", "modifies files", "Writing file inside workspace")
 
     # file_delete
     if tool_name in ("file_delete", "delete"):
@@ -64,9 +64,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             return _d("blocked", "dangerous path", "File path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
         if not is_path_within_workspace(path, workspace):
-            return _d("blocked", "deletes outside workspace", "Deleting file outside workspace is blocked",
-                      [f"path: {path}"])
-        return _d("confirm", "destructive file operation", "Deleting file inside workspace", [f"path: {path}"])
+            return _d("blocked", "deletes outside workspace", "Deleting file outside workspace is blocked")
+        return _d("confirm", "destructive file operation", "Deleting file inside workspace")
 
     # file_read
     if tool_name in ("file_read", "read"):
@@ -75,8 +74,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             return _d("blocked", "dangerous path", "File path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
         if not is_path_within_workspace(path, workspace):
-            return _d("confirm", "reads outside workspace", "Reading file outside workspace", [f"path: {path}"])
-        return _d("safe", "read-only", "Reading file", [f"path: {path}"])
+            return _d("confirm", "reads outside workspace", "Reading file outside workspace")
+        return _d("safe", "read-only", "Reading file")
 
     # file_list
     if tool_name in ("file_list", "list"):
@@ -85,8 +84,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             return _d("blocked", "dangerous path", "Path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
         if not is_path_within_workspace(path, workspace):
-            return _d("confirm", "lists outside workspace", "Listing directory outside workspace", [f"path: {path}"])
-        return _d("safe", "read-only", "Listing directory", [f"path: {path}"])
+            return _d("confirm", "lists outside workspace", "Listing directory outside workspace")
+        return _d("safe", "read-only", "Listing directory")
 
     # todowrite / skill
     if tool_name == "todowrite":
@@ -172,10 +171,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
                       ["UNC path, device path, or traversal detected"])
         if not is_path_within_workspace(src, workspace) or not is_path_within_workspace(dest, workspace):
             return _d("blocked", "path outside workspace",
-                      "file_move/file_copy outside workspace is blocked",
-                      [f"src: {src}", f"dest: {dest}"])
-        return _d("confirm", "mutates filesystem", f"{tool_name} inside workspace",
-                  [f"src: {src}", f"dest: {dest}"])
+                      "file_move/file_copy outside workspace is blocked")
+        return _d("confirm", "mutates filesystem", f"{tool_name} inside workspace")
 
     # archive
     if tool_name == "archive":
@@ -185,26 +182,21 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             return _d("blocked", "dangerous path", "Archive path is outside allowed scope",
                       ["UNC path, device path, or traversal detected"])
         if action == "list":
-            return _d("safe", "read-only", "Listing archive", [f"path: {path}"])
+            return _d("safe", "read-only", "Listing archive")
         if action == "create":
             sources = norm.get("sources", []) or []
             if not is_path_within_workspace(path, workspace):
-                return _d("blocked", "path outside workspace", "Archive path is outside workspace",
-                          [f"path: {path}"])
+                return _d("blocked", "path outside workspace", "Archive path is outside workspace")
             for s in sources:
                 if is_dangerous_path(str(s)) or not is_path_within_workspace(str(s), workspace):
                     return _d("blocked", "source outside workspace",
-                              "Archive source is outside workspace",
-                              [f"src: {s}"])
-            return _d("confirm", "creates archive", "Creating archive",
-                      [f"path: {path}", f"{len(sources)} source(s)"])
+                              "Archive source is outside workspace")
+            return _d("confirm", "creates archive", "Creating archive")
         if action == "extract":
             dest = str(norm.get("dest", "")) or path
             if is_dangerous_path(dest) or not is_path_within_workspace(dest, workspace):
-                return _d("blocked", "path outside workspace", "Extract dest is outside workspace",
-                          [f"dest: {dest}"])
-            return _d("confirm", "extracts archive", "Extracting archive",
-                      [f"path: {path}", f"dest: {dest}"])
+                return _d("blocked", "path outside workspace", "Extract dest is outside workspace")
+            return _d("confirm", "extracts archive", "Extracting archive")
         return _d("confirm", "unknown archive action", f"archive {action}",
                   ["action must be list, extract, or create"])
 

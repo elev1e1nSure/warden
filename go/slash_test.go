@@ -58,7 +58,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 	}
 }
 
-func TestBangTabCompletesCommonPrefix(t *testing.T) {
+func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 	m := initialModel("test-model", true)
 	m.skills = []Skill{
 		{Name: "build-web", Description: "Build web"},
@@ -66,12 +66,13 @@ func TestBangTabCompletesCommonPrefix(t *testing.T) {
 	}
 	m.textinput.SetValue("!bu")
 	m.refreshHints()
+	m.skillsIdx = 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = updated.(model)
 
-	if got := m.textinput.Value(); got != "!build-w" {
-		t.Fatalf("expected common skill prefix, got %q", got)
+	if got := m.textinput.Value(); got != "!build-worker" {
+		t.Fatalf("expected selected skill, got %q", got)
 	}
 }
 
@@ -92,9 +93,9 @@ func TestBangTabCompletesSingleMatch(t *testing.T) {
 	}
 }
 
-func TestSlashTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
+func TestSlashTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 	m := initialModel("test-model", true)
-	m.textinput.SetValue("/")
+	m.textinput.SetValue("/c")
 	m.refreshHints()
 	m.slashIdx = 1
 

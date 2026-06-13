@@ -82,7 +82,7 @@ func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 
 	if !m.verboseMode {
 		if !animating {
-			return DimStyle().Render("  Thought: " + formatThinkDuration(duration))
+			return DimStyle().Render("Thought: " + formatThinkDuration(duration))
 		}
 		dots := []string{".", "..", "..."}
 		dotIdx := ((m.spinner / 3) + 1) % 3
@@ -90,16 +90,16 @@ func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 		if entry.activity != "" {
 			verb = entry.activity
 		}
-		return DimStyle().Render("  " + verb + dots[dotIdx])
+		return DimStyle().Render(verb + dots[dotIdx])
 	}
 
 	var summary string
 	if animating {
 		dots := []string{".", "..", "..."}
 		dotIdx := ((m.spinner / 3) + 1) % 3
-		summary = DimStyle().Render("  Thinking" + dots[dotIdx])
+		summary = DimStyle().Render("Thinking" + dots[dotIdx])
 	} else {
-		summary = DimStyle().Render("  + Thought: " + formatThinkDuration(duration))
+		summary = DimStyle().Render("+ Thought: " + formatThinkDuration(duration))
 	}
 	body := compactThinkText(entry.text)
 	if body == "" {

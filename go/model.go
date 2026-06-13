@@ -330,36 +330,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			val := m.textinput.Value()
 			if strings.HasPrefix(val, "!") {
 				matches := matchBang(val, m.skills)
-				if len(matches) > 0 && strings.TrimSpace(val) == "!" {
+				if len(matches) > 0 {
 					idx := m.skillsIdx
 					if idx < 0 || idx >= len(matches) {
 						idx = 0
 					}
 					m.textinput.SetValue("!" + matches[idx].Name)
 					m.textinput.CursorEnd()
-				} else if len(matches) == 1 {
-					m.textinput.SetValue("!" + matches[0].Name)
-					m.textinput.CursorEnd()
-				} else if len(matches) > 1 {
-					m.textinput.SetValue(bangCommonPrefix(matches))
-					m.textinput.CursorEnd()
 				}
+				m.syncInputHeight()
+				m.refreshHints()
+				m.syncViewport()
+				return m, nil
 			} else {
 				matches := matchSlash(val)
-				if len(matches) > 0 && strings.TrimSpace(val) == "/" {
+				if len(matches) > 0 {
 					idx := m.slashIdx
 					if idx < 0 || idx >= len(matches) {
 						idx = 0
 					}
 					m.textinput.SetValue(matches[idx].name)
 					m.textinput.CursorEnd()
-				} else if len(matches) == 1 {
-					m.textinput.SetValue(matches[0].name)
-					m.textinput.CursorEnd()
-				} else if len(matches) > 1 {
-					m.textinput.SetValue(slashCommonPrefix(matches))
-					m.textinput.CursorEnd()
 				}
+				m.syncInputHeight()
+				m.refreshHints()
+				m.syncViewport()
+				return m, nil
 			}
 
 		case tea.KeyShiftTab:

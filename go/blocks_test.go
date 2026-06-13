@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRenderConfirmBlock(t *testing.T) {
@@ -43,5 +44,30 @@ func TestRenderModelPicker(t *testing.T) {
 	result := renderModelPicker(models, 1, 0, false)
 	if !strings.Contains(result, "gpt-4") {
 		t.Errorf("expected model names in output")
+	}
+}
+
+func TestRenderThinkEntryHasNoLeadingIndent(t *testing.T) {
+	m := initialModel("test-model", true)
+	got := m.renderThinkEntry(messageEntry{duration: 2 * time.Second}, false)
+
+	if strings.Contains(got, "  Thought:") || strings.Contains(got, "  Thinking") {
+		t.Fatalf("expected no leading indent in think line, got %q", got)
+	}
+	if !strings.Contains(got, "Thought:") {
+		t.Fatalf("expected think summary, got %q", got)
+	}
+}
+
+func TestRenderChainActionHasNoLeadingIndent(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.loading = true
+	got := m.renderChainAction(messageEntry{activity: "Thinking"}, true)
+
+	if strings.Contains(got, "  Thinking") {
+		t.Fatalf("expected no leading indent in chain action, got %q", got)
+	}
+	if !strings.Contains(got, "Thinking") {
+		t.Fatalf("expected chain action text, got %q", got)
 	}
 }

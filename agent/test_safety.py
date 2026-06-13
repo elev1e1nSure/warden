@@ -240,6 +240,20 @@ class TestToolAssessment:
 		d = _decision("file_write", {"path": "new.txt", "content": "hello"})
 		assert d.risk == "confirm"
 
+	def test_file_confirm_details_are_concise(self) -> None:
+		cwd = os.getcwd()
+		cases = [
+			("file_write", {"path": "new.txt", "content": "hello"}, None),
+			("file_read", {"path": os.path.join(cwd, "README.md")}, cwd),
+			("file_delete", {"path": os.path.join(cwd, "old.txt")}, cwd),
+			("file_list", {"path": cwd}, cwd),
+			("file_move", {"src": os.path.join(cwd, "src.txt"), "dest": os.path.join(cwd, "dst.txt")}, cwd),
+			("archive", {"action": "create", "path": os.path.join(cwd, "archive.zip"), "sources": [os.path.join(cwd, "src.txt")]}, cwd),
+		]
+		for tool, args, case_cwd in cases:
+			d = assess_tool_call(tool, args, cwd=case_cwd)
+			assert all(not detail.startswith("path:") for detail in d.details)
+
 	def test_file_write_outside_confirm(self) -> None:
 		d = _decision("file_write", {"path": "D:/outside.txt", "content": "hello"})
 		assert d.risk == "confirm"
