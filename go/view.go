@@ -66,8 +66,6 @@ func (m *model) renderMessages() []string {
 			rendered = indentLines(m.renderChainAction(entry, i == lastActionIdx), gutter)
 		case messageToolDiff:
 			rendered = indentLines(renderUnifiedDiff(entry.text, m.barWidth()), gutter)
-		case messageChainSummary:
-			rendered = indentLines(m.renderChainSummary(entry, hovered), gutter)
 		default:
 			rendered = indentLines(entry.text, gutter)
 		}
@@ -75,7 +73,7 @@ func (m *model) renderMessages() []string {
 		// blank line above action blocks and above assistant text when something preceded them
 		if rendered != "" && !prevRenderedEmpty {
 			switch entry.kind {
-			case messageThink, messageChainAction, messageToolActivity, messageChainSummary:
+			case messageThink, messageChainAction, messageToolActivity:
 				rendered = "\n" + rendered
 			case messageAssistant:
 				rendered = "\n" + rendered

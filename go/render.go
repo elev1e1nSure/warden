@@ -160,119 +160,12 @@ func (m model) renderThinkEntry(entry messageEntry, active bool, hovered bool) s
 
 	animating := active && entry.duration == 0 && m.loading
 
-	base := DimStyle()
-	if hovered && !animating {
-		base = HoverStyle()
-	}
-
-	if !m.verboseMode {
-		if !animating {
-			toggle := "+ "
-			if entry.expanded {
-				toggle = "- "
-			}
-			summary := base.Render(contentIndent + toggle + "Thought: " + formatThinkDuration(duration))
-			if entry.expanded && entry.text != "" {
-				body := compactThinkText(entry.text)
-				width := m.width - lipgloss.Width(bodyIndent)
-				if width < 1 {
-					width = 1
-				}
-				parts := wrapWords(body, width)
-				lines := make([]string, 0, len(parts)+1)
-				lines = append(lines, summary)
-				for _, part := range parts {
-					lines = append(lines, DimStyle().Render(bodyIndent+part))
-				}
-				return strings.Join(lines, "\n")
-			}
-			return summary
-		}
+	if animating {
 		verb := "Thinking"
 		if entry.activity != "" {
 			verb = entry.activity
 		}
 		return contentIndent + m.pulse() + m.shimmer(verb)
-	}
-
-	// verbose mode
-	var summary string
-	if animating {
-		summary = contentIndent + m.pulse() + m.shimmer("Thinking")
-	} else {
-		toggle := "+ "
-		if entry.expanded {
-			toggle = "- "
-		}
-		summary = base.Render(contentIndent + toggle + "Thought: " + formatThinkDuration(duration))
-	}
-
-	if !entry.expanded || animating {
-		return summary
-	}
-
-	body := compactThinkText(entry.text)
-	if body == "" {
-		return summary
-	}
-
-	firstWidth := m.width - lipgloss.Width(bodyIndent)
-	if firstWidth < 1 {
-		firstWidth = 1
-	}
-
-	parts := wrapWords(body, firstWidth)
-	lines := make([]string, 0, len(parts)+1)
-	lines = append(lines, summary)
-	for _, part := range parts {
-		lines = append(lines, DimStyle().Render(bodyIndent+part))
-	}
-	return strings.Join(lines, "\n")
-}
-
-// renderChainSummary renders the persistent turn summary (non-verbose mode).
-// Not rendered until finalized (turnDur > 0).
-// Collapsed: "  + Thought · Searched  2.1s"
-// Expanded:  "  - Thought · Searched  2.1s" + action details
-func (m model) renderChainSummary(entry messageEntry, hovered bool) string {
-	if entry.turnDur == 0 {
-		// streaming phase: render as live indicator
-		animating := m.loading && entry.thinking
-
-		if entry.expanded && m.thinkBuf != "" {
-			// show think text streaming in real time
-			var summaryLine string
-			if animating {
-				summaryLine = contentIndent + m.pulse() + m.shimmer("Thinking")
-			} else if entry.activity != "" {
-				summaryLine = DimStyle().Render(contentIndent + "- " + entry.activity)
-			} else {
-				summaryLine = DimStyle().Render(contentIndent + "- Thought")
-			}
-			maxWidth := m.barWidth() - len(bodyIndent)
-			if maxWidth < 10 {
-				maxWidth = 10
-			}
-			body := compactThinkText(m.thinkBuf)
-			lines := []string{summaryLine}
-			for _, part := range wrapWords(body, maxWidth) {
-				lines = append(lines, DimStyle().Render(bodyIndent+part))
-			}
-			return strings.Join(lines, "\n")
-		}
-
-		// collapsed live view
-		if entry.activity == "" {
-			return "" // between think and tokens: nothing to show
-		}
-		verb := entry.activity
-		if entry.toolArgs != "" {
-			verb += " " + entry.toolArgs
-		}
-		if animating {
-			return contentIndent + m.pulse() + m.shimmer(verb)
-		}
-		return DimStyle().Render(contentIndent + verb)
 	}
 
 	base := DimStyle()
@@ -284,24 +177,22 @@ func (m model) renderChainSummary(entry messageEntry, hovered bool) string {
 	if entry.expanded {
 		toggle = "- "
 	}
-	summary := base.Render(contentIndent + toggle + "Thought  " + formatThinkDuration(entry.turnDur))
+	summary := base.Render(contentIndent + toggle + "Thought: " + formatThinkDuration(duration))
 
-	if !entry.expanded || len(entry.actions) == 0 {
+	if !entry.expanded || entry.text == "" {
 		return summary
 	}
 
-	maxWidth := m.barWidth() - len(bodyIndent)
-	if maxWidth < 10 {
-		maxWidth = 10
+	body := compactThinkText(entry.text)
+	firstWidth := m.width - lipgloss.Width(bodyIndent)
+	if firstWidth < 1 {
+		firstWidth = 1
 	}
-	lines := []string{summary}
-	for _, a := range entry.actions {
-		if a.thinkText != "" {
-			body := compactThinkText(a.thinkText)
-			for _, part := range wrapWords(body, maxWidth) {
-				lines = append(lines, DimStyle().Render(bodyIndent+part))
-			}
-		}
+	parts := wrapWords(body, firstWidth)
+	lines := make([]string, 0, len(parts)+1)
+	lines = append(lines, summary)
+	for _, part := range parts {
+		lines = append(lines, DimStyle().Render(bodyIndent+part))
 	}
 	return strings.Join(lines, "\n")
 }

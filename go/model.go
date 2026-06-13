@@ -82,11 +82,6 @@ type model struct {
 	lineMap []int
 	// index of message currently under the mouse cursor (-1 = none)
 	hoveredMsgIdx int
-	// turn action collection (non-verbose): reset on wardenStartMsg
-	turnStartedAt   time.Time
-	turnThought     bool
-	turnTools       []turnAction
-	chainSummaryIdx int // index into messages of the placeholder summary entry (-1 = none)
 	// paste handling: stored payloads referenced by [pasted #N] placeholders
 	pastes     []string
 	lastRuneAt time.Time
@@ -182,10 +177,9 @@ func initialModel(modelName string, connected bool) model {
 		modelName:      modelName,
 		connected:      connected,
 		loading:        true,
-		runningToolIdx:  -1,
-		slashIdx:        -1,
-		chainSummaryIdx: -1,
-		hoveredMsgIdx:   -1,
+		runningToolIdx: -1,
+		slashIdx:       -1,
+		hoveredMsgIdx:  -1,
 		skillsIdx:      -1,
 		activityIdx:    -1,
 	}
@@ -375,8 +369,7 @@ func (m model) isClickable(idx int) bool {
 	}
 	e := m.messages[idx]
 	return (e.kind == messageThink && e.text != "") ||
-		(e.kind == messageToolActivity && e.toolResult != "") ||
-		(e.kind == messageChainSummary && (e.turnDur > 0 || m.thinkBuf != ""))
+		(e.kind == messageToolActivity && e.toolDone && e.toolResult != "")
 }
 
 // resolveConfirm closes the confirm dialog and sends the verdict to the backend.
@@ -418,7 +411,6 @@ func (m model) answerQuestion(answer string) (model, tea.Cmd) {
 func (m *model) beginStream(text string) tea.Cmd {
 	m.streamStart = len(m.messages)
 	m.resetInput()
-	m.startChain()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
@@ -430,7 +422,6 @@ func (m *model) beginStream(text string) tea.Cmd {
 func (m *model) beginSkillStream(name, args string) tea.Cmd {
 	m.streamStart = len(m.messages)
 	m.resetInput()
-	m.startChain()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
@@ -448,23 +439,7 @@ func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
 	m.escPending = false
 	m.quitPending = false
 	m.userScrolled = false
-	if m.verboseMode {
-		m.finishThink()
-	} else {
-		m.freezeChain()
-		// finalize the placeholder: only persist thought, tools disappear
-		if m.chainSummaryIdx >= 0 && m.chainSummaryIdx < len(m.messages) {
-			if m.turnThought {
-				e := &m.messages[m.chainSummaryIdx]
-				e.turnDur = time.Since(e.startedAt)
-				e.actions = []turnAction{{display: "Thought", thinkText: m.thinkBuf}}
-			}
-			// if no thinking happened, placeholder stays unfinalized (turnDur=0, doesn't render)
-		}
-		m.chainSummaryIdx = -1
-		m.turnThought = false
-		m.turnTools = nil
-	}
+	m.finishThink()
 	m.thinkBuf = ""
 	m.thinkDone = false
 	m.activityIdx = -1

@@ -1,43 +1,19 @@
 package tui
 
-// ── non-verbose tool chain ──
-// During a turn the live action state is stored directly on the
-// messageChainSummary placeholder (chainSummaryIdx). This lets the summary
-// entry be both the animated live indicator and the final collapsed summary.
-
-func (m *model) startChain() {}
-
-// setAction updates the live action verb on the summary placeholder.
-// Falls back to a separate messageChainAction entry when no placeholder exists
-// (verbose mode or during skill streams that bypass wardenStartMsg).
-func (m *model) setAction(verb, detail string, thinking bool) {
-	if m.chainSummaryIdx >= 0 && m.chainSummaryIdx < len(m.messages) {
-		e := &m.messages[m.chainSummaryIdx]
-		e.activity = verb
-		e.toolArgs = detail
-		e.thinking = thinking
-		return
-	}
+// setAction updates or appends a live messageChainAction entry.
+// Used by skill streams and other callers that don't go through wardenStartMsg.
+func (m *model) setAction(verb, detail string) {
 	if n := len(m.messages); n > 0 && m.messages[n-1].kind == messageChainAction {
 		e := &m.messages[n-1]
 		e.activity = verb
 		e.toolArgs = detail
-		e.thinking = thinking
 		return
 	}
-	m.messages = append(m.messages, messageEntry{kind: messageChainAction, activity: verb, toolArgs: detail, thinking: thinking})
+	m.messages = append(m.messages, messageEntry{kind: messageChainAction, activity: verb, toolArgs: detail})
 }
 
-// clearAction clears the live activity from the placeholder (or removes a
-// standalone messageChainAction). Returns true if something was cleared.
+// clearAction removes a trailing messageChainAction entry. Returns true if one was removed.
 func (m *model) clearAction() bool {
-	if m.chainSummaryIdx >= 0 && m.chainSummaryIdx < len(m.messages) {
-		e := &m.messages[m.chainSummaryIdx]
-		e.activity = ""
-		e.toolArgs = ""
-		e.thinking = false
-		return true
-	}
 	if n := len(m.messages); n > 0 && m.messages[n-1].kind == messageChainAction {
 		m.messages = m.messages[:n-1]
 		return true
@@ -45,17 +21,8 @@ func (m *model) clearAction() bool {
 	return false
 }
 
-// freezeChain ends the turn: clear live activity from placeholder (entry
-// itself stays to become the finalized summary).
+// freezeChain drops any trailing messageChainAction at turn end.
 func (m *model) freezeChain() {
-	if m.chainSummaryIdx >= 0 && m.chainSummaryIdx < len(m.messages) {
-		e := &m.messages[m.chainSummaryIdx]
-		e.activity = ""
-		e.toolArgs = ""
-		e.thinking = false
-		return
-	}
-	// fallback for standalone messageChainAction
 	if n := len(m.messages); n > 0 && m.messages[n-1].kind == messageChainAction {
 		m.messages = m.messages[:n-1]
 	}

@@ -4,19 +4,13 @@ import (
 	"testing"
 )
 
-func TestStartChain(t *testing.T) {
-	m := newTestModel()
-	m.startChain()
-	// startChain is now a no-op after counter removal; just ensure no panic
-}
-
 func TestSetAction(t *testing.T) {
 	m := newTestModel()
-	m.setAction("running", "ls", false)
+	m.setAction("running", "ls")
 	if len(m.messages) != 1 || m.messages[0].kind != messageChainAction {
 		t.Errorf("expected 1 action message")
 	}
-	m.setAction("fetching", "url", true)
+	m.setAction("fetching", "url")
 	if len(m.messages) != 1 || m.messages[0].activity != "fetching" {
 		t.Errorf("expected action updated in place")
 	}
@@ -24,7 +18,7 @@ func TestSetAction(t *testing.T) {
 
 func TestClearAction(t *testing.T) {
 	m := newTestModel()
-	m.setAction("running", "x", false)
+	m.setAction("running", "x")
 	if !m.clearAction() {
 		t.Errorf("expected clearAction to return true")
 	}
@@ -38,8 +32,7 @@ func TestClearAction(t *testing.T) {
 
 func TestFreezeChain(t *testing.T) {
 	m := newTestModel()
-	m.startChain()
-	m.setAction("Thinking", "", true)
+	m.setAction("Thinking", "")
 	m.freezeChain()
 	if len(m.messages) != 0 {
 		t.Errorf("expected action line removed after freezeChain")

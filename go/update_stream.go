@@ -24,43 +24,19 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.toolRunning = false
 		m.lastAssistantRaw = ""
 		m.loading = true
-		m.turnStartedAt = time.Now()
-		m.turnThought = false
-		m.turnTools = nil
-		if m.verboseMode {
-			m.activityIdx = m.resetOrAppendThink()
-			m.chainSummaryIdx = -1
-		} else {
-			// create placeholder summary entry now (before assistant text)
-			// so it appears above the response; finalized in finishStream
-			m.chainSummaryIdx = len(m.messages)
-			m.messages = append(m.messages, messageEntry{
-				kind:      messageChainSummary,
-				startedAt: time.Now(),
-			})
-			m.setAction("Thinking", "", true)
-		}
+		m.activityIdx = m.resetOrAppendThink()
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case thinkMsg:
 		m.thinkBuf += inner.text
-		m.turnThought = true
-		if m.verboseMode {
-			m.updateThink(inner.text)
-		} else {
-			m.setAction("Thinking", "", true)
-		}
+		m.updateThink(inner.text)
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case tokenMsg:
 		if !m.thinkDone {
-			if m.verboseMode {
-				m.finishThink()
-			} else {
-				m.clearAction()
-			}
+			m.finishThink()
 			m.appendAssistant("")
 			m.thinkDone = true
 		}
@@ -71,32 +47,26 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 
 	case toolStartMsg:
 		m.toolRunning = true
-		if m.verboseMode {
-			m.finishThink()
-			m.appendToolActivity(toolStartLine(inner.name, inner.args))
-			m.runningToolIdx = len(m.messages) - 1
-		} else {
-			display := toolDisplayName(inner.name)
-			m.clearAction()
-			m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
-		}
+		m.finishThink()
+		m.startToolActivity(inner.name, inner.args)
+		m.runningToolIdx = len(m.messages) - 1
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case toolMsg:
 		m.toolRunning = false
-		if m.verboseMode {
-			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
-			if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
-				m.messages[m.runningToolIdx].text = summary
-				m.messages[m.runningToolIdx].toolResult = inner.tool.Result
-			} else {
-				m.messages = append(m.messages, messageEntry{
-					kind:       messageToolActivity,
-					text:       summary,
-					toolResult: inner.tool.Result,
-				})
-			}
+		summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
+		if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
+			m.messages[m.runningToolIdx].text = summary
+			m.messages[m.runningToolIdx].toolResult = inner.tool.Result
+			m.messages[m.runningToolIdx].toolDone = true
+		} else {
+			m.messages = append(m.messages, messageEntry{
+				kind:       messageToolActivity,
+				text:       summary,
+				toolResult: inner.tool.Result,
+				toolDone:   true,
+			})
 		}
 		if (m.verboseMode || m.diffMode) && inner.tool.Diff != "" {
 			m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
@@ -130,11 +100,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 	case questionMsg:
 		m.questioning = true
 		m.loading = false
-		if m.verboseMode {
-			m.finishThink()
-		} else {
-			m.clearAction()
-		}
+		m.finishThink()
 		m.questionID = inner.id
 		m.questionCh = msg.ch
 		m.questionsData = inner.questions

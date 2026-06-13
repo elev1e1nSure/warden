@@ -107,20 +107,11 @@ const (
 	messageWarden             // warden label (skipped in render)
 	messageThink
 	messageAssistant
-	messageToolActivity // tool line, filtered out at turn end in normal mode
-	messageToolDiff     // diff block, persists in history even in non-verbose mode
+	messageToolActivity // persistent tool line: pending while running, summary when done
+	messageToolDiff     // diff block
 	messageToolFlow     // live tool activity shown as flowing lines (verbose)
-	messageChainAction  // non-verbose: single live "what's happening now" line
-	messageChainSummary // non-verbose: collapsed turn summary, persists after turn
+	messageChainAction  // single live "what's happening now" line (skill streams / compat)
 )
-
-// turnAction records a single action (think or tool call) within a turn.
-type turnAction struct {
-	display   string // tool display name or "Thinking"
-	detail    string // short detail: query, command, file path
-	result    string // raw tool result
-	thinkText string // full think content (for "Thinking" actions)
-}
 
 type messageEntry struct {
 	kind       messageKind
@@ -128,14 +119,11 @@ type messageEntry struct {
 	startedAt  time.Time
 	duration   time.Duration
 	activity   string // present-tense verb for the live action line
-	toolName   string // display name for messageToolFlow
-	toolArgs   string // tool arguments / detail (query, url, file) for display
+	toolName   string // display name for pending tool (messageToolActivity while running)
+	toolArgs   string // tool arguments / detail for display
 	toolDone   bool   // true when the tool has finished
-	thinking   bool   // chain action line: model is reasoning (animated dots)
 	expanded   bool   // user toggled expanded detail view
 	toolResult string // raw tool result for expanded view (messageToolActivity)
-	actions    []turnAction  // for messageChainSummary: ordered list of turn actions
-	turnDur    time.Duration // for messageChainSummary: total turn duration
 }
 
 func (m *model) appendText(text string) {
@@ -143,7 +131,18 @@ func (m *model) appendText(text string) {
 }
 
 func (m *model) appendToolActivity(text string) {
-	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text})
+	m.messages = append(m.messages, messageEntry{kind: messageToolActivity, text: text, toolDone: true})
+}
+
+// startToolActivity appends a pending tool entry. The entry animates until
+// finishToolActivity updates it with the completed summary.
+func (m *model) startToolActivity(name, args string) {
+	display := toolDisplayName(name)
+	m.messages = append(m.messages, messageEntry{
+		kind:     messageToolActivity,
+		toolName: display,
+		toolArgs: actionDetail(display, args),
+	})
 }
 
 func (m *model) appendToolFlow(name, args string) {

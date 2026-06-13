@@ -343,13 +343,28 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
-// renderToolActivityEntry renders a completed tool summary line with optional
-// expanded full result and +/- toggle indicator.
+// renderToolActivityEntry renders a tool line.
+// While pending (toolDone=false): animated pulse+shimmer.
+// When done: static summary with optional +/- expand toggle.
 func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string {
+	if !entry.toolDone {
+		// pending: animate only while loading
+		line := entry.toolName
+		if entry.toolArgs != "" {
+			line += "  " + entry.toolArgs
+		}
+		if m.loading {
+			return contentIndent + m.pulse() + m.shimmer(line)
+		}
+		return DimStyle().Render(contentIndent + "~ " + line)
+	}
+
+	// completed: no expandable content — just return the summary line
 	if entry.toolResult == "" {
 		return entry.text
 	}
-	// Replace leading "→" with "+/-" indicator on the summary line.
+
+	// Replace leading "→" with "+/-" indicator when result is expandable.
 	arrow := ToolStyle().Render(contentIndent + "→ ")
 	toggle := "+"
 	if entry.expanded {
@@ -360,9 +375,8 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 		indicatorStyle = HoverStyle()
 	}
 	indicator := indicatorStyle.Render(contentIndent + toggle + " ")
-
-	// Rebuild summary with indicator replacing arrow.
 	summaryLine := strings.Replace(entry.text, arrow, indicator, 1)
+
 	if !entry.expanded {
 		return summaryLine
 	}
