@@ -92,7 +92,7 @@ agent/                   — Python backend
 - **tool lines:** `▶ name  args` → `  ✓ name → result`; name blue, result dim, errors red
 - **slash hints:** 2 columns — name (green, 14-char) + description (dim)
 - **controls:** arrows, Enter, Esc, Ctrl+C, Shift+Tab (toggle mode), Tab (complete), Ctrl+W (delete word)
-- **prefix hints:** `/` → slash commands; `!` → skills
+- **prefix hints:** `/` → slash commands; `!` → skills.
 - `/connect` — interactive provider/model picker; `/select` — text-selection mode (disables mouse capture)
 
 ## skills
