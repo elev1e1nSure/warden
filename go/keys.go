@@ -14,7 +14,8 @@ import (
 func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	modal := m.confirming || m.questioning || m.modelPicking
 
-	// Native bracketed paste or multi-rune burst
+	// Native bracketed paste (or multi-rune burst): collapse big/multiline
+	// pastes into a [pasted #N] placeholder, insert small ones inline.
 	if msg.Type == tea.KeyRunes && (msg.Paste || len(msg.Runes) > 1) && !modal {
 		m.insertPaste(string(msg.Runes))
 		m.lastRuneAt = time.Now()
@@ -22,10 +23,11 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.refreshHints()
 		return m, m.focusInput(), true
 	}
-
+	// Clear pending confirmations if user presses a different key
 	if msg.Type != tea.KeyEsc {
 		m.escPending = false
 	}
+	// Don't auto-clear quitPending - only clear explicitly on cancel actions
 
 	switch msg.Type {
 	case tea.KeyCtrlC:
@@ -57,6 +59,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			}
 			return m, nil, true
 		}
+		// history recall when cursor is on the first line
 		if !m.confirming && !m.questioning && m.textinput.Line() == 0 && len(m.history) > 0 {
 			if m.historyIdx > 0 {
 				m.historyIdx--
@@ -87,6 +90,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			}
 			return m, nil, true
 		}
+		// history recall when cursor is on the last line
 		if !m.confirming && !m.questioning && m.textinput.Line() == m.textinput.LineCount()-1 && len(m.history) > 0 {
 			if m.historyIdx < len(m.history)-1 {
 				m.historyIdx++
@@ -104,7 +108,9 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	case tea.KeyCtrlW:
 		if !m.questioning && !m.confirming {
 			val := m.textinput.Value()
+			// Find word boundary using runes to handle multi-byte characters
 			runes := []rune(val)
+			// Search backwards from end for word boundary
 			idx := len(runes)
 			for idx > 0 {
 				r := runes[idx-1]
@@ -113,6 +119,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				}
 				idx--
 			}
+			// Trim trailing whitespace/punctuation before the word
 			for idx > 0 {
 				r := runes[idx-1]
 				if !unicode.IsSpace(r) && !unicode.IsPunct(r) {
@@ -130,22 +137,32 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		val := m.textinput.Value()
 		if strings.HasPrefix(val, "!") {
 			matches := matchBang(val, m.skills)
-			if len(matches) == 1 {
-				m.textinput.SetValue("!" + matches[0].Name)
-				m.textinput.CursorEnd()
-			} else if len(matches) > 1 {
-				m.textinput.SetValue(bangCommonPrefix(matches))
+			if len(matches) > 0 {
+				idx := m.skillsIdx
+				if idx < 0 || idx >= len(matches) {
+					idx = 0
+				}
+				m.textinput.SetValue("!" + matches[idx].Name)
 				m.textinput.CursorEnd()
 			}
+			m.syncInputHeight()
+			m.refreshHints()
+			m.syncViewport()
+			return m, nil, true
 		} else {
 			matches := matchSlash(val)
-			if len(matches) == 1 {
-				m.textinput.SetValue(matches[0].name)
-				m.textinput.CursorEnd()
-			} else if len(matches) > 1 {
-				m.textinput.SetValue(slashCommonPrefix(matches))
+			if len(matches) > 0 {
+				idx := m.slashIdx
+				if idx < 0 || idx >= len(matches) {
+					idx = 0
+				}
+				m.textinput.SetValue(matches[idx].name)
 				m.textinput.CursorEnd()
 			}
+			m.syncInputHeight()
+			m.refreshHints()
+			m.syncViewport()
+			return m, nil, true
 		}
 
 	case tea.KeyShiftTab:
@@ -160,6 +177,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.selectMode = false
 			return m, tea.EnableMouseCellMotion, true
 		}
+
 		if m.modelPicking {
 			m.modelPicking = false
 			m.modelList = nil
@@ -174,6 +192,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.escPending = true
 				return m, nil, true
 			}
+			// Second ESC — confirmed cancel
 			m.escPending = false
 			m.interruptStream = true
 			m.streaming = false
@@ -192,78 +211,34 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			ch := m.questionCh
 			id := m.questionID
 			m = m.clearQuestionState()
-			m.loading = true
 			m.updateViewportHeight()
 			m.syncViewport()
-			return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch), m.tick()), true
+			return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch)), true
 		}
 		if m.confirming {
-			m.confirming = false
-			ch := m.confirmCh
-			id := m.confirmID
-			m.confirmID = ""
-			m.confirmCh = nil
-			m.confirmTool = ""
-			m.textinput.Placeholder = ""
-			m.loading = true
-			m.resetInput()
-			m.updateViewportHeight()
-			m.syncViewport()
-			return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch), m.tick()), true
+			newM, cmd := m.resolveConfirm(false)
+			return newM, cmd, true
 		}
 		m.resetInput()
 
 	case tea.KeyRunes:
 		if m.confirming {
-			r := strings.ToLower(string(msg.Runes))
-			if r == "y" || r == "н" {
-				ch := m.confirmCh
-				id := m.confirmID
-				m.confirming = false
-				m.confirmID = ""
-				m.confirmCh = nil
-				m.confirmTool = ""
-				m.textinput.Placeholder = ""
-				m.loading = true
-				m.resetInput()
-				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, true), readNext(ch), m.tick()), true
-			}
-			if r == "n" || r == "т" {
-				ch := m.confirmCh
-				id := m.confirmID
-				m.confirming = false
-				m.confirmID = ""
-				m.confirmCh = nil
-				m.confirmTool = ""
-				m.textinput.Placeholder = ""
-				m.loading = true
-				m.resetInput()
-				return m, tea.Batch(m.focusInput(), m.sendConfirm(id, false), readNext(ch), m.tick()), true
+			switch strings.ToLower(string(msg.Runes)) {
+			case "y", "н":
+				newM, cmd := m.resolveConfirm(true)
+				return newM, cmd, true
+			case "n", "т":
+				newM, cmd := m.resolveConfirm(false)
+				return newM, cmd, true
 			}
 			return m, nil, true
 		}
 		if m.questioning {
 			q := m.questionsData[m.questionIdx]
 			if len(q.Options) > 0 {
-				input := string(msg.Runes)
-				if num, err := parseOptionNumber(input); err == nil && num >= 1 && num <= len(q.Options) {
-					idx := num - 1
-					m.questionAnswers = append(m.questionAnswers, []string{q.Options[idx].Label})
-					m.questionIdx++
-					if m.questionIdx >= len(m.questionsData) {
-						ch := m.questionCh
-						id := m.questionID
-						answers := m.questionAnswers
-						savedQuestions := m.questionsData
-						m = m.clearQuestionState()
-						m.appendQuizHistory(savedQuestions, answers)
-						m.loading = true
-						m.updateViewportHeight()
-						m.syncViewport()
-						return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch), m.tick()), true
-					}
-					m.syncViewport()
-					return m, m.focusInput(), true
+				if num, err := parseOptionNumber(string(msg.Runes)); err == nil && num >= 1 && num <= len(q.Options) {
+					newM, cmd := m.answerQuestion(q.Options[num-1].Label)
+					return newM, cmd, true
 				}
 			}
 		}
@@ -289,22 +264,8 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			if len(q.Options) == 0 {
 				text := strings.TrimSpace(m.textinput.Value())
 				m.resetInput()
-				m.questionAnswers = append(m.questionAnswers, []string{text})
-				m.questionIdx++
-				if m.questionIdx >= len(m.questionsData) {
-					ch := m.questionCh
-					id := m.questionID
-					answers := m.questionAnswers
-					savedQuestions := m.questionsData
-					m = m.clearQuestionState()
-					m.appendQuizHistory(savedQuestions, answers)
-					m.loading = true
-					m.updateViewportHeight()
-					m.syncViewport()
-					return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch), m.tick()), true
-				}
-				m.syncViewport()
-				return m, m.focusInput(), true
+				newM, cmd := m.answerQuestion(text)
+				return newM, cmd, true
 			}
 			return m, nil, true
 		}
@@ -314,7 +275,8 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		if m.streaming {
 			return m, nil, true
 		}
-		// Enter-guard: legacy console pasted newline arrives as KeyEnter in rune burst
+		// Enter-guard: on legacy consoles a pasted newline arrives as a
+		// KeyEnter inside a rune burst — treat it as a newline, not submit.
 		if time.Since(m.lastRuneAt) < 8*time.Millisecond {
 			m.textinput.InsertString("\n")
 			m.lastRuneAt = time.Now()
@@ -341,18 +303,6 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.textinput.CursorEnd()
 			}
 		}
-		if strings.HasPrefix(val, "!") {
-			matches := matchBang(val, m.skills)
-			if len(matches) > 0 {
-				idx := m.skillsIdx
-				if idx < 0 || idx >= len(matches) {
-					idx = 0
-				}
-				val = "!" + matches[idx].Name
-				m.textinput.SetValue(val)
-				m.textinput.CursorEnd()
-			}
-		}
 		text := strings.TrimSpace(m.expandPastes(val))
 		if text == "" {
 			return m, nil, true
@@ -361,6 +311,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.resetInput()
 			return m, cmd, true
 		}
+
 		if strings.HasPrefix(text, "!") {
 			if handled, cmd := m.handleBang(text); handled {
 				m.resetInput()
@@ -368,21 +319,16 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			}
 			return m, nil, true
 		}
+
 		if !m.connected {
 			m.resetInput()
 			return m, nil, true
 		}
+
 		m.recordHistory(text)
-		m.streamStart = len(m.messages)
 		m.messages = append(m.messages, messageEntry{kind: messageUser, text: text})
 		m.appendText("")
-		m.resetInput()
-		m.startChain()
-		m.streaming = true
-		m.loading = true
-		m.spinner = 0
-		m.syncViewport()
-		return m, tea.Batch(m.sendMessage(text), m.tick()), true
+		return m, m.beginStream(text), true
 	}
 
 	return m, nil, false
