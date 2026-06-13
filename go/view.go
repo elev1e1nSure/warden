@@ -111,13 +111,9 @@ func (m *model) layoutViewportHeight() int {
 	}
 
 	// input box: top-pad + N content lines + blank spacer + status + bottom-pad
-	// wave: 1 line, token line: conditional, bottom "": 1 line
+	// wave: 1 line, bottom "": 1 line
 	inputHeight := m.inputLineCount() + 4
-	tokenHeight := 0
-	if m.tokenLimit > 0 && m.tokenCount > 0 {
-		tokenHeight = 1
-	}
-	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 2 + tokenHeight
+	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 2
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -168,10 +164,6 @@ func (m model) View() string {
 		layers = append(layers, m.renderHint())
 	}
 
-	if tl := m.renderTokenLine(); tl != "" {
-		layers = append(layers, m.renderFullWave(), m.renderInput(), tl, "")
-	} else {
-		layers = append(layers, m.renderFullWave(), m.renderInput(), "")
-	}
+	layers = append(layers, m.renderFullWave(), m.renderInput(), "")
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }

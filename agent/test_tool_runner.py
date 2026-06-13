@@ -177,3 +177,64 @@ async def test_tool_timeout(monkeypatch):
 	async for ev in tr.execute_tool_call(tc, True, history, None, None, add_result):
 		events.append(ev)
 	assert any("timeout" in str(ev) for ev in events)
+
+
+# ── _truncate ────────────────────────────────────────────────────────────────
+
+def test_truncate_short_text_unchanged():
+	from agent.tool_runner import _truncate
+	assert _truncate("hello") == "hello"
+
+def test_truncate_empty_unchanged():
+	from agent.tool_runner import _truncate
+	assert _truncate("") == ""
+
+def test_truncate_by_lines():
+	from agent.tool_runner import _truncate, _TRUNCATE_MAX_LINES
+	text = "\n".join(str(i) for i in range(_TRUNCATE_MAX_LINES + 100))
+	out = _truncate(text)
+	assert "truncated" in out
+	# marker should report the original count
+	assert str(_TRUNCATE_MAX_LINES + 100) in out
+
+def test_truncate_by_bytes():
+	from agent.tool_runner import _truncate
+	# 1MB of "a" — hits byte cap, not line cap
+	text = "a" * (1024 * 1024)
+	out = _truncate(text, max_lines=10_000_000, max_bytes=50_000)
+	assert "truncated" in out
+	assert len(out.encode("utf-8")) < 1024 * 1024  # must be much smaller
+
+def test_truncate_preserves_under_limit():
+	from agent.tool_runner import _truncate
+	text = "a\nb\nc"
+	assert _truncate(text) == text
+
+def test_truncate_under_line_limit_over_byte_limit():
+	from agent.tool_runner import _truncate
+	# 100 short lines, each with many bytes
+	text = "\n".join("x" * 1000 for _ in range(100))
+	out = _truncate(text, max_lines=10_000, max_bytes=50_000)
+	assert "truncated" in out
+
+def test_tool_result_is_truncated(monkeypatch):
+	"""End-to-end: a tool returning a huge string gets truncated in history."""
+	import agent.tool_runner as tr
+	class HugeTool:
+		name = "huge"
+		async def execute(self, args):
+			return "x" * (200 * 1024)
+	monkeypatch.setitem(tr.REGISTRY, "huge", HugeTool())
+	history = []
+	def add_result(name, result, call_id=""):
+		history.append({"role": "tool", "name": name, "content": result})
+	tc = {"function": {"name": "huge", "arguments": {}}, "id": "call_1"}
+	import asyncio
+	async def run():
+		async for _ in tr.execute_tool_call(tc, True, history, None, None, add_result):
+			pass
+	asyncio.run(run())
+	tool_msgs = [m for m in history if m.get("role") == "tool"]
+	assert tool_msgs, "expected tool result in history"
+	assert "truncated" in tool_msgs[0]["content"]
+	assert len(tool_msgs[0]["content"]) < 200 * 1024

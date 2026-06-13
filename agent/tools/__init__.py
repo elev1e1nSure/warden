@@ -50,6 +50,7 @@ from agent.tools.screen import ImageLocateTool, OcrTool, WaitForTool
 from agent.tools.system import SystemInfoTool, NotifyTool
 from agent.tools.http import HttpRequestTool
 from agent.tools.memory import MemoryTool
+from agent.tools.lsp import LspTool
 
 REGISTRY = {
 	t.name: t for t in [
@@ -93,5 +94,6 @@ REGISTRY = {
 		SystemInfoTool(),
 		NotifyTool(),
 		MemoryTool(),
+		LspTool(),
 	]
 }

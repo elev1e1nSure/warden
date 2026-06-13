@@ -227,19 +227,6 @@ func (m model) renderStatusContent(width int, bg lipgloss.Color) string {
 	return left
 }
 
-// renderTokenLine renders a right-aligned dim token usage line below the input box.
-func (m model) renderTokenLine() string {
-	if m.tokenLimit <= 0 || m.tokenCount <= 0 {
-		return ""
-	}
-	pct := m.tokenCount * 100 / m.tokenLimit
-	k := float64(m.tokenCount) / 1000.0
-	text := fmt.Sprintf("%.1fK (%d%%)", k, pct)
-	styled := DimStyle().Render(text)
-	padded := lipgloss.PlaceHorizontal(m.barWidth(), lipgloss.Right, styled)
-	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, padded)
-}
-
 // renderInput renders the input box with an integrated status footer, centered in the terminal.
 // Layout: ▌ top-pad / textarea / blank spacer / status / bottom-pad
 func (m model) renderInput() string {

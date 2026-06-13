@@ -16,13 +16,45 @@ from agent.tools.input import CU_MAX_SIDE
 _SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
 _CU_TOOLS = {"screenshot", "mouse", "keyboard"}
 
+# Truncate limits (mirrors opencode's truncate.ts: 2000 lines / 50KB)
+_TRUNCATE_MAX_LINES = 2000
+_TRUNCATE_MAX_BYTES = 50_000
+_TRUNCATE_MARKER = "\n…[truncated: showing first {} of {} lines, {} of {} bytes]…\n"
+
 _CU_WARNING_TITLE = "Computer use is a work in progress"
 _CU_WARNING_DETAILS = [
-    "This feature is early and rough — expect mistakes, misclicks, and wrong coordinates.",
-    "The agent sees a downscaled screenshot and may misjudge positions.",
-    "Move the cursor to the top-left corner to abort at any time.",
-    "This notice appears once per session.",
+	"This feature is early and rough — expect mistakes, misclicks, and wrong coordinates.",
+	"The agent sees a downscaled screenshot and may misjudge positions.",
+	"Move the cursor to the top-left corner to abort at any time.",
+	"This notice appears once per session.",
 ]
+
+
+def _truncate(text: str, max_lines: int = _TRUNCATE_MAX_LINES, max_bytes: int = _TRUNCATE_MAX_BYTES) -> str:
+	"""Cut large tool outputs so they don't blow up the LLM context.
+
+	Mirrors opencode's truncate.ts: keep first max_lines lines, then cap at max_bytes.
+	Adds an explicit marker with the original totals so the model knows it lost data.
+	"""
+	if not isinstance(text, str):
+		return text
+	if not text:
+		return text
+	lines = text.split("\n")
+	total_lines = len(lines)
+	total_bytes = len(text.encode("utf-8"))
+	if total_lines <= max_lines and total_bytes <= max_bytes:
+		return text
+	truncated = "\n".join(lines[:max_lines])
+	truncated_bytes = len(truncated.encode("utf-8"))
+	if truncated_bytes > max_bytes:
+		# hard byte cap; keep whole lines
+		enc = truncated.encode("utf-8")
+		truncated = enc[:max_bytes].decode("utf-8", errors="ignore")
+	marker = _TRUNCATE_MARKER.format(
+		min(total_lines, max_lines), total_lines, len(truncated.encode("utf-8")), total_bytes,
+	)
+	return truncated + marker
 
 
 def _extract_saved_path(result: str) -> str | None:
@@ -183,6 +215,10 @@ async def execute_tool_call(
 		result_val = f"error: {e}"
 	diff_str = result_val.diff if isinstance(result_val, ToolResult) else None
 	result_str = result_val.result if isinstance(result_val, ToolResult) else result_val
+	# Truncate large outputs so we don't blow up the LLM context.
+	# Errors and tool results with explicit diffs are kept as-is (diff is small by design).
+	if isinstance(result_str, str) and not diff_str:
+		result_str = _truncate(result_str)
 	log_tool(name, args_str, result_str[:200] if result_str else None)
 	payload: dict = {"name": name, "args": args_str, "result": result_str}
 	if diff_str:
