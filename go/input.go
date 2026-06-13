@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // refreshHints recomputes slash/bang hint visibility and resizes the viewport.
@@ -110,39 +109,20 @@ func (m model) clearQuestionState() model {
 }
 
 func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) {
-	accent := WardenStyleAuto(m.autoMode)
-	accentCol := Green
-	if m.autoMode {
-		accentCol = Blue
-	}
-	answerStyle := lipgloss.NewStyle().Foreground(accentCol)
-
-	labels := make([]string, len(questions))
-	maxw := 0
+	var parts []string
 	for i, q := range questions {
 		label := q.Header
 		if label == "" {
 			label = q.Question
 		}
-		labels[i] = label
-		if w := lipgloss.Width(label); w > maxw {
-			maxw = w
-		}
-	}
-
-	var b strings.Builder
-	for i, label := range labels {
 		ans := "—"
 		if i < len(answers) && len(answers[i]) > 0 {
 			ans = strings.Join(answers[i], ", ")
 		}
-		if i > 0 {
-			b.WriteString("\n")
-		}
-		pad := strings.Repeat(" ", maxw-lipgloss.Width(label))
-		b.WriteString(accent.Render("✓") + "  " + DimStyle().Render(label+pad) + "   " + answerStyle.Render(ans))
+		parts = append(parts, label+": "+ans)
 	}
-	m.appendText(b.String())
+	line := strings.Join(parts, " · ")
+	m.appendText(DimStyle().Render(contentIndent + line))
 }
 
 func parseOptionNumber(input string) (int, error) {

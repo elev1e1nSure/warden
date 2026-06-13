@@ -315,6 +315,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case questionMsg:
 			m.questioning = true
 			m.loading = false
+			if m.verboseMode {
+				m.finishThink()
+			} else {
+				m.clearAction()
+			}
 			m.questionID = inner.id
 			m.questionCh = msg.ch
 			m.questionsData = inner.questions
@@ -574,7 +579,7 @@ func (m model) answerQuestion(answer string) (model, tea.Cmd) {
 	m.appendQuizHistory(saved, answers)
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch))
+	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch), m.tick())
 }
 
 // beginStream marks the start of a streaming turn and sends text to the backend.
