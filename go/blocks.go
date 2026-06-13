@@ -60,9 +60,9 @@ func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode 
 	if total > 1 {
 		header = fmt.Sprintf("%s (%d/%d)", q.Header, idx+1, total)
 	}
-	b.WriteString(accent.Render("? ") + HeaderStyle().Render(header))
+	b.WriteString(contentIndent + accent.Render("? ") + HeaderStyle().Render(header))
 	b.WriteString("\n")
-	b.WriteString(DimStyle().Render(q.Question))
+	b.WriteString(contentIndent + DimStyle().Render(q.Question))
 	b.WriteString("\n")
 
 	if len(q.Options) > 0 {
@@ -74,22 +74,22 @@ func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode 
 			if opt.Description != "" {
 				sep := DimStyle().Render("  —  ")
 				used := len(numStr) + lipgloss.Width(label) + lipgloss.Width(sep) + 2
-				limit := width - used
+				limit := width - used - lipgloss.Width(contentIndent)
 				if limit < 10 {
 					limit = 10
 				}
 				desc := DimStyle().Render(truncateRunes(opt.Description, limit))
-				b.WriteString(num + label + sep + desc)
+				b.WriteString(contentIndent + num + label + sep + desc)
 			} else {
-				b.WriteString(num + label)
+				b.WriteString(contentIndent + num + label)
 			}
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(DimStyle().Render("press 1–" + fmt.Sprintf("%d", len(q.Options)) + " to select"))
+		b.WriteString(contentIndent + DimStyle().Render("press 1–"+fmt.Sprintf("%d", len(q.Options))+" to select"))
 	} else {
 		b.WriteString("\n")
-		b.WriteString(DimStyle().Render("type your answer and press enter"))
+		b.WriteString(contentIndent + DimStyle().Render("type your answer and press enter"))
 	}
 
 	return b.String()
