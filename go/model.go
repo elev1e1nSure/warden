@@ -60,10 +60,6 @@ type model struct {
 	modelScrollTop int
 	// activity tracking (index of current think/activity entry)
 	activityIdx int
-	// tool chain (non-verbose collapsing): grouped tally + turn timing
-	chainCounts map[string]int
-	chainOrder  []string
-	chainStart  time.Time
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
 	// interrupt state

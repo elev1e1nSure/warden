@@ -120,7 +120,6 @@ const (
 	messageToolActivity // tool line, filtered out at turn end in normal mode
 	messageToolDiff     // diff block, persists in history even in non-verbose mode
 	messageToolFlow     // live tool activity shown as flowing lines (verbose)
-	messageChainCounter // non-verbose: running grouped tool tally, frozen at turn end
 	messageChainAction  // non-verbose: single live "what's happening now" line
 )
 

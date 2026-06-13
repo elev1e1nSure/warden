@@ -1,15 +1,10 @@
 package tui
 
-import "time"
-
 // ── non-verbose tool chain ──
 // During a turn there is one live action line that updates in place
 // ("Fetching <url>" / "Thinking..."). At turn end the action line is dropped.
 
 func (m *model) startChain() {
-	m.chainCounts = map[string]int{}
-	m.chainOrder = nil
-	m.chainStart = time.Now()
 }
 
 // setAction updates the live action line in place, or appends it at the tail.

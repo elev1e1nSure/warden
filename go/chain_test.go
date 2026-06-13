@@ -7,9 +7,7 @@ import (
 func TestStartChain(t *testing.T) {
 	m := newTestModel()
 	m.startChain()
-	if m.chainCounts == nil {
-		t.Errorf("expected chainCounts initialized")
-	}
+	// startChain is now a no-op after counter removal; just ensure no panic
 }
 
 func TestSetAction(t *testing.T) {
