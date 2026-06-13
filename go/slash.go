@@ -253,7 +253,7 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 		}
 		m.recordHistory("!" + name)
 		m.messages = append(m.messages, messageEntry{kind: messageUser, text: "!" + name})
-		m.appendText(DimStyle().Render("Using skill: " + name))
+		m.appendText(DimStyle().Render("  Using skill: " + name))
 		m.appendText("")
 		m.syncViewport()
 		return true, m.beginSkillStream(name)
