@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+	"warden/internal/client"
 
 	tui "warden"
 
@@ -323,8 +324,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}
 
-	client := tui.NewClient(fmt.Sprintf("http://localhost:%d", port))
-	client.Shutdown()
+	cli := client.NewClient(fmt.Sprintf("http://localhost:%d", port))
+	cli.Shutdown()
 
 	if backend != nil {
 		stopBackend(backend)

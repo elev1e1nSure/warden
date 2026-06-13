@@ -29,20 +29,6 @@ func (m model) checkBackend() tea.Cmd {
 	}
 }
 
-func (m model) sendMessage(text string) tea.Cmd {
-	ch := m.client.SendMessage(text)
-	return func() tea.Msg {
-		return startStreamMsg{ch: ch}
-	}
-}
-
-func (m model) sendSkill(name string) tea.Cmd {
-	ch := m.client.SendSkill(name)
-	return func() tea.Msg {
-		return startStreamMsg{ch: ch}
-	}
-}
-
 func (m model) sendQuestion(id string, answers [][]string) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendQuestion(id, answers)
@@ -98,16 +84,6 @@ func saveAutoMode(auto bool) {
 	}
 	data, _ := json.Marshal(map[string]bool{"auto_mode": auto})
 	os.WriteFile(path, data, 0644)
-}
-
-func readNext(ch <-chan tea.Msg) tea.Cmd {
-	return func() tea.Msg {
-		inner, ok := <-ch
-		if !ok {
-			return doneMsg{}
-		}
-		return nextMsg{inner: inner, ch: ch}
-	}
 }
 
 func (m model) fetchStatus(brief bool) tea.Cmd {

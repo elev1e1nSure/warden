@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"warden/internal/client"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -33,7 +34,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 	m.height = 20
 	m.viewport.Width = 80
 	m.viewport.Height = 5
-	m.skills = []Skill{
+	m.skills = []client.Skill{
 		{Name: "alpha", Description: "Alpha skill"},
 		{Name: "beta", Description: "Beta skill"},
 		{Name: "gamma", Description: "Gamma skill"},
@@ -60,7 +61,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 
 func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 	m := initialModel("test-model", true)
-	m.skills = []Skill{
+	m.skills = []client.Skill{
 		{Name: "build-web", Description: "Build web"},
 		{Name: "build-worker", Description: "Build worker"},
 	}
@@ -78,7 +79,7 @@ func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 
 func TestBangTabCompletesSingleMatch(t *testing.T) {
 	m := initialModel("test-model", true)
-	m.skills = []Skill{
+	m.skills = []client.Skill{
 		{Name: "cat-text", Description: "Cat text"},
 		{Name: "skill-creator", Description: "Skill creator"},
 	}
@@ -109,7 +110,7 @@ func TestSlashTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 
 func TestBangTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
 	m := initialModel("test-model", true)
-	m.skills = []Skill{
+	m.skills = []client.Skill{
 		{Name: "alpha", Description: "Alpha skill"},
 		{Name: "beta", Description: "Beta skill"},
 	}
@@ -163,7 +164,7 @@ func TestHandleBangUnknownSkillShowsError(t *testing.T) {
 
 func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
 	m := initialModel("test-model", true)
-	m.skills = []Skill{{Name: "demo", Description: "Demo skill"}}
+	m.skills = []client.Skill{{Name: "demo", Description: "Demo skill"}}
 
 	handled, cmd := m.handleBang("!demo")
 

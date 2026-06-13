@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"warden/internal/client"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -51,7 +52,7 @@ func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 	return b.String()
 }
 
-func renderQuestionBlock(q QuestionItem, idx, total, width int, autoMode bool) string {
+func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode bool) string {
 	var b strings.Builder
 
 	accent := WardenStyleAuto(autoMode)

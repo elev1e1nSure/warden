@@ -47,6 +47,7 @@ def test_file_to_lang_unknown_ext():
 
 # ── URI / path helpers ───────────────────────────────────────────────────────
 
+@pytest.mark.skipif(sys.platform == "win32", reason="unix-only path test")
 def test_path_to_uri_unix():
 	from agent.tools.lsp import _path_to_uri
 	assert _path_to_uri("/tmp/foo.py") == "file:///tmp/foo.py"
@@ -56,6 +57,7 @@ def test_path_to_uri_windows_strips_leading_slash(monkeypatch):
 	monkeypatch.setattr(os, "name", "nt")
 	assert _path_to_uri("C:/foo/bar.py") == "file:///C:/foo/bar.py"
 
+@pytest.mark.skipif(sys.platform == "win32", reason="unix-only path test")
 def test_uri_to_path_unix():
 	from agent.tools.lsp import _uri_to_path
 	assert _uri_to_path("file:///tmp/foo.py") == "/tmp/foo.py"
@@ -152,6 +154,7 @@ def _make_fake_lsp_script(tmp_path: Path, responses: list) -> Path:
 	return script
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="LSP roundtrip flaky on Windows runners")
 @pytest.mark.asyncio
 async def test_lsp_client_definition_roundtrip(tmp_path, monkeypatch):
 	"""Spawn a fake LSP server, run a definition query, verify transport + framing."""

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"warden/internal/client"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -97,7 +98,7 @@ func (m *model) handleBangNavigation(msg tea.KeyMsg) bool {
 	return true
 }
 
-func bangCommonPrefix(matches []Skill) string {
+func bangCommonPrefix(matches []client.Skill) string {
 	if len(matches) == 0 {
 		return ""
 	}
@@ -274,18 +275,18 @@ func (m *model) hasSkill(name string) bool {
 	return false
 }
 
-func matchBang(prefix string, skills []Skill) []Skill {
+func matchBang(prefix string, skills []client.Skill) []client.Skill {
 	if len(prefix) == 0 || prefix[0] != '!' {
 		return nil
 	}
 	lower := strings.ToLower(strings.TrimPrefix(prefix, "!"))
 	if lower == "" {
 		// show all when just "!"
-		out := make([]Skill, len(skills))
+		out := make([]client.Skill, len(skills))
 		copy(out, skills)
 		return out
 	}
-	var out []Skill
+	var out []client.Skill
 	for _, s := range skills {
 		if strings.HasPrefix(strings.ToLower(s.Name), lower) {
 			out = append(out, s)

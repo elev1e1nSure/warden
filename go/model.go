@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"warden/internal/client"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -16,7 +18,7 @@ import (
 type model struct {
 	viewport  viewport.Model
 	textinput textarea.Model
-	client    *Client
+	client    *client.Client
 	messages  []messageEntry
 	streaming bool
 	height    int
@@ -31,13 +33,13 @@ type model struct {
 	// confirmation
 	confirming  bool
 	confirmID   string
-	confirmCh   <-chan tea.Msg
+	confirmCh   <-chan client.Event
 	confirmTool string
 	// question
 	questioning     bool
 	questionID      string
-	questionCh      <-chan tea.Msg
-	questionsData   []QuestionItem
+	questionCh      <-chan client.Event
+	questionsData   []client.QuestionItem
 	questionIdx     int
 	questionAnswers [][]string
 	// mode
@@ -94,7 +96,7 @@ type model struct {
 	skillsIdx   int
 	skillsTyped string
 	// skills (fetched from backend on startup)
-	skills    []Skill
+	skills    []client.Skill
 	skillsErr string
 	// markdown
 	mdRenderer *glamour.TermRenderer
@@ -162,7 +164,7 @@ func initialModel(modelName string, connected bool) model {
 	m := model{
 		textinput:      ti,
 		viewport:       vp,
-		client:         NewClient("http://localhost:8765"),
+		client:         client.NewClient("http://localhost:8765"),
 		messages:       []messageEntry{},
 		autoMode:       loadAutoMode(),
 		cwd:            cwd,

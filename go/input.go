@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"warden/internal/client"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -108,7 +109,7 @@ func (m model) clearQuestionState() model {
 	return m
 }
 
-func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) {
+func (m *model) appendQuizHistory(questions []client.QuestionItem, answers [][]string) {
 	var parts []string
 	for i, q := range questions {
 		label := q.Header

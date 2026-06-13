@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"warden/internal/client"
 )
 
 func TestRenderConfirmBlock(t *testing.T) {
@@ -23,10 +24,10 @@ func TestRenderConfirmBlock(t *testing.T) {
 }
 
 func TestRenderQuestionBlock(t *testing.T) {
-	q := QuestionItem{
+	q := client.QuestionItem{
 		Header:   "Test",
 		Question: "What?",
-		Options: []QuestionOption{
+		Options: []client.QuestionOption{
 			{Label: "Yes", Description: "Confirm"},
 		},
 	}

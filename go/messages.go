@@ -3,6 +3,8 @@ package tui
 import (
 	"time"
 
+	"warden/internal/client"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -10,12 +12,12 @@ import (
 
 type tokenMsg struct{ text string }
 type thinkMsg struct{ text string }
-type toolMsg struct{ tool ToolMsg }
+type toolMsg struct{ tool client.ToolMsg }
 type toolStartMsg struct {
 	name string
 	args string
 }
-type wardenStartMsg struct{ ch <-chan tea.Msg }
+type wardenStartMsg struct{}
 type confirmMsg struct {
 	id         string
 	tool       string
@@ -48,27 +50,15 @@ type backendReadyMsg struct{}
 type backendErrorMsg struct{}
 type tickMsg struct{}
 type shellResultMsg struct{ output string }
-type startStreamMsg struct{ ch <-chan tea.Msg }
+type startStreamMsg struct{ ch <-chan client.Event }
 type nextMsg struct {
 	inner tea.Msg
-	ch    <-chan tea.Msg
-}
-
-type QuestionOption struct {
-	Label       string
-	Description string
-}
-
-type QuestionItem struct {
-	Question string
-	Header   string
-	Options  []QuestionOption
-	Multiple bool
+	ch    <-chan client.Event
 }
 
 type questionMsg struct {
 	id        string
-	questions []QuestionItem
+	questions []client.QuestionItem
 }
 
 type statusResultMsg struct {
@@ -98,7 +88,7 @@ type connectResultMsg struct {
 	apiKey   string
 }
 type skillsResultMsg struct {
-	skills []Skill
+	skills []client.Skill
 	err    string
 }
 type skillLoadedMsg struct {
