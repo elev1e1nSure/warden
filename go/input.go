@@ -27,13 +27,22 @@ func (m *model) refreshHints() {
 	if len(slashMatches) == 0 {
 		m.slashIdx = -1
 		m.slashTyped = ""
-		return
 	}
-	if strings.HasPrefix(val, "/") {
+	if len(bangMatches) == 0 {
+		m.skillsIdx = -1
+		m.skillsTyped = ""
+	}
+	if strings.HasPrefix(val, "/") && len(slashMatches) > 0 {
 		if m.slashIdx < 0 || m.slashIdx >= len(slashMatches) || m.slashTyped != val {
 			m.slashIdx = 0
 		}
 		m.slashTyped = val
+	}
+	if strings.HasPrefix(val, "!") && len(bangMatches) > 0 {
+		if m.skillsIdx < 0 || m.skillsIdx >= len(bangMatches) || m.skillsTyped != val {
+			m.skillsIdx = 0
+		}
+		m.skillsTyped = val
 	}
 }
 

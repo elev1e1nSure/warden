@@ -95,6 +95,9 @@ type model struct {
 	// slash command cycling
 	slashIdx   int
 	slashTyped string
+	// skills hint cycling
+	skillsIdx   int
+	skillsTyped string
 	// skills (fetched from backend on startup)
 	skills    []Skill
 	skillsErr string
@@ -174,6 +177,7 @@ func initialModel(modelName string, connected bool) model {
 		loading:        true,
 		runningToolIdx: -1,
 		slashIdx:       -1,
+		skillsIdx:      -1,
 		activityIdx:    -1,
 	}
 	return m
@@ -777,6 +781,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
+		m.appendText(body)
 		cmds = append(cmds, m.beginStream(body))
 
 	case backendErrorMsg:
@@ -793,6 +798,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.syncInputHeight()
 	if m.slashIdx >= 0 && m.textinput.Value() != oldVal {
 		m.slashIdx = -1
+	}
+	if m.skillsIdx >= 0 && m.textinput.Value() != oldVal {
+		m.skillsIdx = -1
 	}
 	if m.modelPicking && m.textinput.Value() != oldVal {
 		m.modelFiltered = filterModels(m.modelList, m.textinput.Value())

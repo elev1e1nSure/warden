@@ -68,6 +68,49 @@ func (m *model) handleSlashNavigation(msg tea.KeyMsg) bool {
 	return true
 }
 
+func (m *model) handleBangNavigation(msg tea.KeyMsg) bool {
+	val := m.textinput.Value()
+	if !strings.HasPrefix(val, "!") {
+		return false
+	}
+	matches := matchBang(val, m.skills)
+	if len(matches) == 0 {
+		return false
+	}
+	if m.skillsIdx < 0 || m.skillsIdx >= len(matches) {
+		m.skillsIdx = 0
+	}
+	switch msg.Type {
+	case tea.KeyUp:
+		if m.skillsIdx == 0 {
+			m.skillsIdx = len(matches) - 1
+		} else {
+			m.skillsIdx--
+		}
+	case tea.KeyDown:
+		m.skillsIdx = (m.skillsIdx + 1) % len(matches)
+	default:
+		return false
+	}
+	m.updateViewportHeight()
+	m.syncViewport()
+	return true
+}
+
+func bangCommonPrefix(matches []Skill) string {
+	if len(matches) == 0 {
+		return ""
+	}
+	prefix := "!" + matches[0].Name
+	for _, s := range matches[1:] {
+		full := "!" + s.Name
+		for !strings.HasPrefix(full, prefix) {
+			prefix = prefix[:len(prefix)-1]
+		}
+	}
+	return prefix
+}
+
 func slashCommonPrefix(matches []slashCmd) string {
 	if len(matches) == 0 {
 		return ""

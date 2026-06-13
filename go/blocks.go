@@ -176,12 +176,51 @@ func (m model) renderHint() string {
 		return strings.Join(lines, "\n")
 	}
 	if strings.HasPrefix(val, "!") {
-		skills := matchBang(val, m.skills)
-		lines := make([]string, 0, len(skills))
-		for _, s := range skills {
+		matches := matchBang(val, m.skills)
+		if len(matches) == 0 {
+			return ""
+		}
+		selected := m.skillsIdx
+		if selected < 0 || selected >= len(matches) {
+			selected = 0
+		}
+		const maxVisible = 5
+		start := 0
+		if len(matches) > maxVisible {
+			start = selected - maxVisible/2
+			if start < 0 {
+				start = 0
+			}
+			if start > len(matches)-maxVisible {
+				start = len(matches) - maxVisible
+			}
+		}
+		end := start + maxVisible
+		if end > len(matches) {
+			end = len(matches)
+		}
+		lines := make([]string, 0, end-start)
+		for i := start; i < end; i++ {
+			s := matches[i]
+			active := i == selected
 			name := fmt.Sprintf("!%-13s", s.Name)
+			nameStyle := SlashNameStyle(active, m.autoMode)
+			descStyle := SlashDescStyle(active)
+			descLimit := m.width - lipgloss.Width(name) - 6
+			if active {
+				descLimit = m.width - lipgloss.Width(name) - 4
+			}
+			if descLimit < 0 {
+				descLimit = 0
+			}
+			if active {
+				lines = append(lines,
+					"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(s.Description, descLimit)),
+				)
+				continue
+			}
 			lines = append(lines,
-				accent.Render(name)+"  "+DimStyle().Render(s.Description),
+				"    "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(s.Description, descLimit)),
 			)
 		}
 		return strings.Join(lines, "\n")

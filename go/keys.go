@@ -43,6 +43,9 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		if m.handleSlashNavigation(msg) {
 			return m, nil, true
 		}
+		if m.handleBangNavigation(msg) {
+			return m, nil, true
+		}
 		if m.modelPicking {
 			if m.modelPickIdx > 0 {
 				m.modelPickIdx--
@@ -67,6 +70,9 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 
 	case tea.KeyDown:
 		if m.handleSlashNavigation(msg) {
+			return m, nil, true
+		}
+		if m.handleBangNavigation(msg) {
 			return m, nil, true
 		}
 		if m.modelPicking {
@@ -122,13 +128,24 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 
 	case tea.KeyTab:
 		val := m.textinput.Value()
-		matches := matchSlash(val)
-		if len(matches) == 1 {
-			m.textinput.SetValue(matches[0].name)
-			m.textinput.CursorEnd()
-		} else if len(matches) > 1 {
-			m.textinput.SetValue(slashCommonPrefix(matches))
-			m.textinput.CursorEnd()
+		if strings.HasPrefix(val, "!") {
+			matches := matchBang(val, m.skills)
+			if len(matches) == 1 {
+				m.textinput.SetValue("!" + matches[0].Name)
+				m.textinput.CursorEnd()
+			} else if len(matches) > 1 {
+				m.textinput.SetValue(bangCommonPrefix(matches))
+				m.textinput.CursorEnd()
+			}
+		} else {
+			matches := matchSlash(val)
+			if len(matches) == 1 {
+				m.textinput.SetValue(matches[0].name)
+				m.textinput.CursorEnd()
+			} else if len(matches) > 1 {
+				m.textinput.SetValue(slashCommonPrefix(matches))
+				m.textinput.CursorEnd()
+			}
 		}
 
 	case tea.KeyShiftTab:
@@ -320,6 +337,18 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 					idx = 0
 				}
 				val = matches[idx].name
+				m.textinput.SetValue(val)
+				m.textinput.CursorEnd()
+			}
+		}
+		if strings.HasPrefix(val, "!") {
+			matches := matchBang(val, m.skills)
+			if len(matches) > 0 {
+				idx := m.skillsIdx
+				if idx < 0 || idx >= len(matches) {
+					idx = 0
+				}
+				val = "!" + matches[idx].Name
 				m.textinput.SetValue(val)
 				m.textinput.CursorEnd()
 			}
