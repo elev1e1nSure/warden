@@ -32,6 +32,41 @@ _COMPACT_PROMPT = (
 	"Discard chatty filler."
 )
 
+
+def _has_images(messages: list) -> bool:
+	for msg in messages:
+		if msg.get("images"):
+			return True
+		content = msg.get("content")
+		if isinstance(content, list):
+			for part in content:
+				if isinstance(part, dict) and part.get("type") == "image_url":
+					return True
+	return False
+
+
+def _strip_images(messages: list) -> list:
+	result = []
+	for msg in messages:
+		if msg.get("images"):
+			result.append({k: v for k, v in msg.items() if k != "images"})
+		elif isinstance(msg.get("content"), list):
+			filtered = [p for p in msg["content"] if not (isinstance(p, dict) and p.get("type") == "image_url")]
+			m = dict(msg)
+			m["content"] = filtered if filtered else ""
+			result.append(m)
+		else:
+			result.append(msg)
+	return result
+
+
+def _is_vision_error(e: Exception) -> bool:
+	s = str(e).lower()
+	return any(kw in s for kw in (
+		"image", "vision", "multimodal", "does not support",
+		"unsupported content", "image_url", "not support image",
+	))
+
 def _guess_context_limit(model: str) -> int:
 	lower = model.lower()
 	# rough heuristics without hardcoded lists
@@ -198,6 +233,10 @@ class ChatSession:
 				messages=messages,
 				tools=_TOOLS,
 			):
+				if chunk.usage_tokens:
+					result["usage_tokens"] = chunk.usage_tokens
+					continue
+
 				if chunk.tool_calls:
 					collected_tool_calls.extend(chunk.tool_calls)
 
@@ -247,8 +286,30 @@ class ChatSession:
 							text_chunk = text_chunk[idx + 8:]
 							in_think = False
 		except Exception as e:
-			yield ("token", f"\nconnection error: {e}")
-			result["error"] = True
+			if _is_vision_error(e) and _has_images(messages):
+				yield ("token", "\nSorry, this model doesn't support images. Retrying without them...")
+				stripped = _strip_images(messages)
+				try:
+					async for chunk in self._client.chat(
+						model=self.model,
+						messages=stripped,
+						tools=_TOOLS,
+					):
+						if chunk.usage_tokens:
+							result["usage_tokens"] = chunk.usage_tokens
+							continue
+						if chunk.tool_calls:
+							collected_tool_calls.extend(chunk.tool_calls)
+						if chunk.content:
+							clean = _clean_visible_text(chunk.content)
+							yield ("token", clean)
+							full_content += clean
+				except Exception as e2:
+					yield ("token", f"\nconnection error: {e2}")
+					result["error"] = True
+			else:
+				yield ("token", f"\nconnection error: {e}")
+				result["error"] = True
 
 		result["content"] = full_content
 		result["tool_calls"] = collected_tool_calls
@@ -312,7 +373,8 @@ class ChatSession:
 				full_content,
 				collected_tool_calls or None,
 			)
-			self.token_count = self._estimate_tokens()
+			usage = llm_result.get("usage_tokens", 0)
+			self.token_count = usage if usage > 0 else self._estimate_tokens()
 
 			if not collected_tool_calls:
 				break

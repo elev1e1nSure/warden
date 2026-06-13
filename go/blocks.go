@@ -11,7 +11,7 @@ func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 	var b strings.Builder
 
 	accent := WardenStyleAuto(autoMode)
-	b.WriteString("  " + accent.Render("▸") + "  " + ToolStyle().Bold(true).Render(toolDisplayName(inner.tool)))
+	b.WriteString("  " + accent.Render("▸") + " " + accent.Render(toolDisplayName(inner.tool)))
 	b.WriteString("\n")
 
 	if inner.preview != "" {
@@ -39,9 +39,8 @@ func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 		details = []string{inner.summary}
 	}
 	if len(details) > 0 {
-		b.WriteString("\n")
 		for _, d := range details {
-			b.WriteString(DimStyle().Render("  " + d))
+			b.WriteString(DimStyle().Render("    " + d))
 			b.WriteString("\n")
 		}
 	}
@@ -62,17 +61,23 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int, autoMode bool) s
 	}
 	b.WriteString(accent.Render("? ") + HeaderStyle().Render(header))
 	b.WriteString("\n")
-	b.WriteString("  " + q.Question)
+	b.WriteString(DimStyle().Render(q.Question))
 	b.WriteString("\n")
 
 	if len(q.Options) > 0 {
 		b.WriteString("\n")
 		for i, opt := range q.Options {
-			num := accent.Render(fmt.Sprintf("  %d", i+1))
+			numStr := fmt.Sprintf("%d", i+1)
+			num := accent.Render(numStr)
 			label := "  " + opt.Label
 			if opt.Description != "" {
 				sep := DimStyle().Render("  —  ")
-				desc := DimStyle().Render(truncateRunes(opt.Description, width-lipgloss.Width(num)-lipgloss.Width(label)-lipgloss.Width(sep)))
+				used := len(numStr) + lipgloss.Width(label) + lipgloss.Width(sep) + 2
+				limit := width - used
+				if limit < 10 {
+					limit = 10
+				}
+				desc := DimStyle().Render(truncateRunes(opt.Description, limit))
 				b.WriteString(num + label + sep + desc)
 			} else {
 				b.WriteString(num + label)
@@ -80,10 +85,10 @@ func renderQuestionBlock(q QuestionItem, idx, total, width int, autoMode bool) s
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(DimStyle().Render("  press 1–" + fmt.Sprintf("%d", len(q.Options)) + " to select"))
+		b.WriteString(DimStyle().Render("press 1–" + fmt.Sprintf("%d", len(q.Options)) + " to select"))
 	} else {
 		b.WriteString("\n")
-		b.WriteString(DimStyle().Render("  type your answer and press enter"))
+		b.WriteString(DimStyle().Render("type your answer and press enter"))
 	}
 
 	return b.String()

@@ -117,7 +117,6 @@ func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) 
 	}
 	answerStyle := lipgloss.NewStyle().Foreground(accentCol)
 
-	// collect labels and compute the column width so answers line up
 	labels := make([]string, len(questions))
 	maxw := 0
 	for i, q := range questions {
@@ -131,21 +130,17 @@ func (m *model) appendQuizHistory(questions []QuestionItem, answers [][]string) 
 		}
 	}
 
-	plural := "s"
-	if len(questions) == 1 {
-		plural = ""
-	}
-
 	var b strings.Builder
-	b.WriteString(accent.Render("  ✓ ") +
-		DimStyle().Render(fmt.Sprintf("answered %d question%s", len(questions), plural)))
-	for i := range questions {
+	for i, label := range labels {
 		ans := "—"
 		if i < len(answers) && len(answers[i]) > 0 {
 			ans = strings.Join(answers[i], ", ")
 		}
-		pad := strings.Repeat(" ", maxw-lipgloss.Width(labels[i]))
-		b.WriteString("\n    " + DimStyle().Render(labels[i]+pad) + "   " + answerStyle.Render(ans))
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		pad := strings.Repeat(" ", maxw-lipgloss.Width(label))
+		b.WriteString(accent.Render("✓") + "  " + DimStyle().Render(label+pad) + "   " + answerStyle.Render(ans))
 	}
 	m.appendText(b.String())
 }
@@ -161,11 +156,8 @@ func (m *model) inputLineCount() int {
 	if val == "" {
 		return 1
 	}
-	// content width = textarea render width (m.width-6) minus prompt "> " (2)
-	contentW := m.width - 8
-	if contentW < 1 {
-		contentW = 1
-	}
+	// content width = centered textarea render width, no prompt
+	contentW := m.inputContentWidth()
 	lines := strings.Split(val, "\n")
 	total := 0
 	for _, line := range lines {

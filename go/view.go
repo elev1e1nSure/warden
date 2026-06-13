@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 const wardenVersion = "v0.1.0"
 
@@ -27,26 +31,32 @@ func (m *model) renderMessages() []string {
 			break
 		}
 	}
-	out := make([]string, 0, len(m.messages))
+	// gutter is the shared left margin for all content, matching the input box's
+	// side margin so messages line up with the bar below. The user block centers
+	// itself to the same width, so it's exempt.
+	gutter := strings.Repeat(" ", m.sideMargin())
+
+	out := make([]string, 0, len(m.messages)+1)
+	out = append(out, "") // top padding
 	for i, entry := range m.messages {
 		var rendered string
 		switch entry.kind {
 		case messageUser:
 			rendered = m.renderUserMsg(entry.text)
 		case messageThink:
-			rendered = m.renderThinkEntry(entry, i == lastThinkIdx)
+			rendered = indentLines(m.renderThinkEntry(entry, i == lastThinkIdx), gutter)
 		case messageAssistant:
-			rendered = indentLines(m.renderMarkdown(entry.text), "  ")
+			rendered = indentLines(m.renderMarkdown(entry.text), gutter+contentIndent)
 		case messageToolActivity:
-			rendered = entry.text
+			rendered = indentLines(entry.text, gutter)
 		case messageChainCounter:
-			rendered = m.renderChainCounter(entry)
+			rendered = indentLines(m.renderChainCounter(entry), gutter)
 		case messageChainAction:
-			rendered = m.renderChainAction(entry, i == lastActionIdx)
+			rendered = indentLines(m.renderChainAction(entry, i == lastActionIdx), gutter)
 		case messageToolDiff:
-			rendered = renderUnifiedDiff(entry.text, m.width)
+			rendered = indentLines(renderUnifiedDiff(entry.text, m.barWidth()), gutter)
 		default:
-			rendered = entry.text
+			rendered = indentLines(entry.text, gutter)
 		}
 		// always keep messageText (blank lines serve as turn separators)
 		if rendered != "" || entry.kind == messageText {
@@ -100,10 +110,14 @@ func (m *model) layoutViewportHeight() int {
 		cwHeight = lipgloss.Height(m.renderConnectWizard())
 	}
 
-	// input: border top + N content lines + border bottom
-	// status bar: 2 lines
-	inputHeight := m.inputLineCount() + 2
-	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 2
+	// input box: top-pad + N content lines + blank spacer + status + bottom-pad
+	// wave: 1 line, token line: conditional, bottom "": 1 line
+	inputHeight := m.inputLineCount() + 4
+	tokenHeight := 0
+	if m.tokenLimit > 0 && m.tokenCount > 0 {
+		tokenHeight = 1
+	}
+	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 2 + tokenHeight
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -121,36 +135,43 @@ func (m model) View() string {
 	}
 
 	layers := []string{m.viewport.View()}
+	gutter := strings.Repeat(" ", m.sideMargin())
 
 	if m.confirming {
-		layers = append(layers, renderConfirmBlock(confirmMsg{
+		block := renderConfirmBlock(confirmMsg{
 			title:   m.confirmTitle,
 			tool:    m.confirmTool,
 			risk:    m.confirmRisk,
 			summary: m.confirmSummary,
 			details: m.confirmDetails,
 			preview: m.confirmPreview,
-		}, m.width, m.autoMode))
+		}, m.barWidth(), m.autoMode)
+		layers = append(layers, indentLines(block, gutter))
 	}
 
 	if m.questioning && len(m.questionsData) > 0 {
-		layers = append(layers, renderQuestionBlock(
-			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.width, m.autoMode,
-		))
+		block := renderQuestionBlock(
+			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.barWidth(), m.autoMode,
+		)
+		layers = append(layers, indentLines(block, gutter))
 	}
 
 	if m.modelPicking {
-		layers = append(layers, renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode))
+		layers = append(layers, indentLines(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode), gutter))
 	}
 
 	if m.cwOpen {
-		layers = append(layers, m.renderConnectWizard())
+		layers = append(layers, indentLines(m.renderConnectWizard(), gutter))
 	}
 
 	if m.hintVisible {
 		layers = append(layers, m.renderHint())
 	}
 
-	layers = append(layers, m.renderFullWave(), m.renderInput(), m.renderStatusBar())
+	if tl := m.renderTokenLine(); tl != "" {
+		layers = append(layers, m.renderFullWave(), m.renderInput(), tl, "")
+	} else {
+		layers = append(layers, m.renderFullWave(), m.renderInput(), "")
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, layers...)
 }

@@ -79,7 +79,7 @@ func toolSummaryLine(name, args, result string) string {
 		result = "(empty)"
 	}
 	isErr := toolResultIsError(result)
-	arrow := ToolStyle().Render("  → ")
+	arrow := ToolStyle().Render(contentIndent + "→ ")
 	display := toolDisplayName(name)
 
 	// Shell tools: show the command, append result only when it has content.
@@ -167,11 +167,11 @@ func toolActivityLine(name string) string {
 	if !ok {
 		verb = "working"
 	}
-	return DimStyle().Render("  " + verb + "...")
+	return DimStyle().Render(contentIndent + verb + "...")
 }
 
 func toolStartLine(name, args string) string {
-	arrow := ToolStyle().Render("  → ")
+	arrow := ToolStyle().Render(contentIndent + "→ ")
 	display := ToolStyle().Render(toolDisplayName(name))
 	if args == "" {
 		return arrow + display
@@ -325,7 +325,7 @@ func pathBase(p string) string {
 }
 
 func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
-	prefix := "  "
+	prefix := contentIndent
 	detail := extractToolDetail(entry.toolName, entry.toolArgs)
 	if entry.toolDone {
 		past := toolPastTense(entry.toolName)
@@ -337,11 +337,9 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	if detail != "" {
 		detail = " -> " + detail
 	}
-	// Only the currently running tool gets the animated ellipsis
+	// Only the currently running tool gets the live breathing orb
 	if idx == m.runningToolIdx {
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + idx) % 3
-		return DimStyle().Render(prefix + entry.toolName + detail + dots[dotIdx])
+		return prefix + m.pulse() + DimStyle().Render(entry.toolName+detail)
 	}
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
@@ -349,6 +347,9 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 // renderChainCounter renders the grouped tool tally: "Searched ×2 · Fetched ×6 · 18s".
 // While live the time ticks; once duration is set the line is frozen.
 func (m model) renderChainCounter(entry messageEntry) string {
+	if entry.text != "" {
+		return entry.text
+	}
 	if len(m.chainOrder) == 0 {
 		return ""
 	}
@@ -365,7 +366,7 @@ func (m model) renderChainCounter(entry messageEntry) string {
 		dur = time.Since(m.chainStart)
 	}
 	parts = append(parts, formatThinkDuration(dur))
-	return DimStyle().Render("  " + strings.Join(parts, " · "))
+	return DimStyle().Render(contentIndent + strings.Join(parts, " · "))
 }
 
 // renderChainAction renders the single live "what's happening now" line.
@@ -378,8 +379,7 @@ func (m model) renderChainAction(entry messageEntry, active bool) string {
 		line += " " + entry.toolArgs
 	}
 	if !active {
-		return DimStyle().Render(line)
+		return DimStyle().Render(contentIndent + line)
 	}
-	dots := []string{".", "..", "..."}
-	return DimStyle().Render(line + dots[(m.spinner/3)%3])
+	return contentIndent + m.pulse() + DimStyle().Render(line)
 }

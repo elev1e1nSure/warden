@@ -11,6 +11,38 @@ import (
 // waveSteps is the number of brightness tiers in the flowing wave gradient.
 const waveSteps = 28
 
+// sideMargin is the horizontal inset (each side) of the centered input column.
+func (m model) sideMargin() int {
+	mg := 4
+	if m.width < 40 {
+		mg = 1
+	}
+	if mg*2 >= m.width {
+		mg = 0
+	}
+	return mg
+}
+
+// barWidth is the total visible width of the input box (border + padding +
+// content). The box is centered in the terminal, leaving sideMargin each side.
+func (m model) barWidth() int {
+	w := m.width - 2*m.sideMargin()
+	if w < 1 {
+		w = 1
+	}
+	return w
+}
+
+// inputContentWidth is the textarea render width inside the box:
+// barWidth minus border(1) + padL(2) + padR(1).
+func (m model) inputContentWidth() int {
+	w := m.barWidth() - 4
+	if w < 1 {
+		w = 1
+	}
+	return w
+}
+
 // Precomputed gradient cells: each entry is a single "·"/"•" already rendered
 // at its brightness, so a frame is just a string concat (no per-char styling).
 var (
@@ -89,12 +121,14 @@ func (m model) renderWaveSpinner() string {
 // sum into a moving brightness field — multiple soft crests drifting, not a
 // single bouncing dot. Idle = static faint dots.
 func (m model) renderFullWave() string {
-	n := m.width
+	// a touch narrower than the input bar, centered under it
+	n := m.barWidth() - 4
 	if n < 1 {
 		n = 1
 	}
 	if !m.loading {
-		return FaintStyle().Render(strings.Repeat("·", n))
+		line := FaintStyle().Render(strings.Repeat("·", n))
+		return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, line)
 	}
 	cells := waveCellsGreen
 	if m.autoMode {
@@ -117,84 +151,118 @@ func (m model) renderFullWave() string {
 		}
 		b.WriteString(cells[int(t*maxIdx+0.5)])
 	}
-	return b.String()
+	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, b.String())
 }
 
-// renderStatusBar renders the bottom status bar: mode · model · hint [tokens].
-func (m model) renderStatusBar() string {
-	mode := AccentStyle().Render("Ask")
-	if m.autoMode {
-		mode = lipgloss.NewStyle().Foreground(Blue).Bold(true).Render("Auto")
+// inputBg is the shared background of the input box and its status footer.
+const inputBg = lipgloss.Color("#1e1e1e")
+
+// renderStatusContent builds the status line (mode · model · hint [tokens]) as a
+// string exactly `width` cells wide. Every segment carries bg so the background
+// fills under colored text too; the gap is padded manually (no lipgloss Width,
+// which clips when combined with padding).
+func (m model) renderStatusContent(width int, bg lipgloss.Color) string {
+	fg := func(c lipgloss.Color, bold bool) lipgloss.Style {
+		s := lipgloss.NewStyle().Foreground(c).Background(bg)
+		if bold {
+			s = s.Bold(true)
+		}
+		return s
 	}
-	dot := FaintStyle().Render(" · ")
-	modelPart := lipgloss.NewStyle().Foreground(White).Render(m.modelName)
+	dim := func(s string) string { return fg(Dim, false).Render(s) }
+	bgStyle := lipgloss.NewStyle().Background(bg)
+
+	modeColor, modeLabel := Green, "Ask"
+	if m.autoMode {
+		modeColor, modeLabel = Blue, "Auto"
+	}
+	keyColor := Green
+	if m.autoMode {
+		keyColor = Blue
+	}
+
+	mode := fg(modeColor, true).Render(modeLabel)
+	dot := fg(Faint, false).Render(" · ")
+	modelPart := fg(White, false).Render(m.modelName)
 
 	var hint string
 	switch {
 	case m.escPending:
-		hint = ErrorStyle().Render("Esc") + DimStyle().Render(" cancel · ctrl+c quit")
+		hint = fg(Red, false).Render("Esc") + dim(" cancel · ctrl+c quit")
 	case m.quitPending:
-		hint = ErrorStyle().Render("ctrl+c") + DimStyle().Render(" quit · any key abort")
+		hint = fg(Red, false).Render("ctrl+c") + dim(" quit · any key abort")
 	case m.selectMode:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		hint = DimStyle().Render("select mode · ") + lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" exit")
+		hint = dim("Select mode · ") + fg(keyColor, true).Render("Esc") + dim(" exit")
 	case m.confirming:
-		hint = DimStyle().Render("Y run  N cancel")
+		hint = dim("Y run  N cancel")
 	case m.streaming:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		hint = lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Esc") + DimStyle().Render(" interrupt")
+		hint = fg(keyColor, true).Render("Esc") + dim(" interrupt")
 	default:
-		keyColor := Blue
-		if !m.autoMode {
-			keyColor = Green
-		}
-		key := lipgloss.NewStyle().Foreground(keyColor).Bold(true).Render("Shift Tab")
+		key := fg(keyColor, true).Render("Shift Tab")
 		if m.autoMode {
-			hint = key + DimStyle().Render("  to Ask mode")
+			hint = key + dim("  to Ask mode")
 		} else {
-			hint = key + DimStyle().Render("  to Auto mode")
+			hint = key + dim("  to Auto mode")
 		}
 	}
 
 	left := mode + dot + modelPart + dot + hint
+	leftW := lipgloss.Width(left)
 
-	if m.tokenLimit > 0 && m.tokenCount > 0 {
-		pct := m.tokenCount * 100 / m.tokenLimit
-		k := float64(m.tokenCount) / 1000.0
-		tokenStr := DimStyle().Render(fmt.Sprintf("%.1fK (%d%%)", k, pct))
-		leftWidth := lipgloss.Width(left)
-		tokenWidth := lipgloss.Width(tokenStr)
-		padding := m.width - leftWidth - tokenWidth
-		if padding > 1 {
-			return left + strings.Repeat(" ", padding) + tokenStr
-		}
+	if pad := width - leftW; pad > 0 {
+		return left + bgStyle.Render(strings.Repeat(" ", pad))
 	}
 	return left
 }
 
-// renderInput renders the bordered text input.
+// renderTokenLine renders a right-aligned dim token usage line below the input box.
+func (m model) renderTokenLine() string {
+	if m.tokenLimit <= 0 || m.tokenCount <= 0 {
+		return ""
+	}
+	pct := m.tokenCount * 100 / m.tokenLimit
+	k := float64(m.tokenCount) / 1000.0
+	text := fmt.Sprintf("%.1fK (%d%%)", k, pct)
+	styled := DimStyle().Render(text)
+	padded := lipgloss.PlaceHorizontal(m.barWidth(), lipgloss.Right, styled)
+	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, padded)
+}
+
+// renderInput renders the input box with an integrated status footer, centered in the terminal.
+// Layout: ▌ top-pad / textarea / blank spacer / status / bottom-pad
 func (m model) renderInput() string {
-	borderColor := Green
+	accentColor := Green
 	if m.autoMode {
-		borderColor = Blue
+		accentColor = Blue
 	}
 	if m.streaming || m.confirming {
-		borderColor = Faint
+		accentColor = Faint
 	}
-	innerWidth := m.width - 4
-	if innerWidth < 1 {
-		innerWidth = 1
+	cw := m.inputContentWidth()
+
+	// Single bordered box: top-pad, textarea, blank spacer, status, bottom-pad.
+	// One left border drawn across all lines — no separate footer bar. The
+	// bottom padding gives a full-width strip of bg below the status line.
+	boxStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.Border{Left: "▌"}).
+		BorderLeft(true).
+		BorderForeground(accentColor).
+		Background(inputBg).
+		PaddingLeft(2).
+		PaddingRight(1).
+		PaddingTop(1).
+		PaddingBottom(1).
+		Width(cw)
+
+	// Measure the box's actual content-text width so the status line fills it
+	// exactly (right edge lines up regardless of how lipgloss treats padding).
+	boxWidth := lipgloss.Width(boxStyle.Render(m.textinput.View()))
+	statusW := boxWidth - 4
+	if statusW < 1 {
+		statusW = 1
 	}
-	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		PaddingLeft(1).
-		Width(innerWidth)
-	return style.Render(m.textinput.View())
+
+	content := m.textinput.View() + "\n\n" + m.renderStatusContent(statusW, inputBg)
+	box := boxStyle.Render(content)
+	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, box)
 }

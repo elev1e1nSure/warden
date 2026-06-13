@@ -47,15 +47,13 @@ func TestRenderModelPicker(t *testing.T) {
 	}
 }
 
-func TestRenderThinkEntryHasNoLeadingIndent(t *testing.T) {
+func TestRenderThinkEntryHasLeadingIndent(t *testing.T) {
 	m := initialModel("test-model", true)
 	got := m.renderThinkEntry(messageEntry{duration: 2 * time.Second}, false)
 
-	if strings.Contains(got, "  Thought:") || strings.Contains(got, "  Thinking") {
-		t.Fatalf("expected no leading indent in think line, got %q", got)
-	}
-	if !strings.Contains(got, "Thought:") {
-		t.Fatalf("expected think summary, got %q", got)
+	// think summary is indented to align with assistant text (column 2)
+	if !strings.Contains(got, "  Thought:") {
+		t.Fatalf("expected leading indent in think line, got %q", got)
 	}
 }
 
@@ -64,10 +62,11 @@ func TestRenderChainActionHasNoLeadingIndent(t *testing.T) {
 	m.loading = true
 	got := m.renderChainAction(messageEntry{activity: "Thinking"}, true)
 
-	if strings.Contains(got, "  Thinking") {
-		t.Fatalf("expected no leading indent in chain action, got %q", got)
+	// live line is "<orb> Thinking": orb fills the indent slot, text at column 2
+	if !strings.Contains(got, " Thinking") {
+		t.Fatalf("expected orb + space before chain action text, got %q", got)
 	}
-	if !strings.Contains(got, "Thinking") {
-		t.Fatalf("expected chain action text, got %q", got)
+	if strings.Contains(got, "  Thinking") {
+		t.Fatalf("expected orb in indent slot, not double space, got %q", got)
 	}
 }

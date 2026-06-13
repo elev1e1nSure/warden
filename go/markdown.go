@@ -124,10 +124,16 @@ func (m *model) ensureMarkdownRenderer() {
 		return
 	}
 	m.mdWidth = m.width
+	// wrap width must account for gutter (sideMargin) + contentIndent (2) added
+	// after rendering, so glamour's margin_left:2 + sideMargin columns are offset.
+	wrapWidth := m.width - m.sideMargin()
+	if wrapWidth < 20 {
+		wrapWidth = 20
+	}
 	var err error
 	m.mdRenderer, err = glamour.NewTermRenderer(
 		glamour.WithStylesFromJSONBytes(wardenMarkdownStyle),
-		glamour.WithWordWrap(m.width-2),
+		glamour.WithWordWrap(wrapWidth),
 	)
 	if err != nil {
 		m.mdRenderer = nil

@@ -11,6 +11,7 @@ class LLMChunk:
 	reasoning: str = ""
 	reasoning_details: List[Dict[str, Any]] | None = None
 	tool_calls: List[Dict[str, Any]] | None = None
+	usage_tokens: int = 0
 
 
 class LLMClient(ABC):
@@ -127,6 +128,51 @@ class OpenAIClient(LLMClient):
 				result.append(dict(msg))
 		return result
 
+	async def _create_stream(
+		self,
+		model: str,
+		messages: List[Dict[str, Any]],
+		tools: List[Dict[str, Any]] | None,
+	):
+		"""Create a streaming completion, retrying after stripping unsupported features."""
+		from openai import APIStatusError
+
+		use_tools = bool(tools)
+		use_tool_choice = bool(tools)
+		use_reasoning = self._is_openrouter
+
+		while True:
+			kw: Dict[str, Any] = {}
+			if use_tools and tools:
+				kw["tools"] = tools
+				if use_tool_choice:
+					kw["tool_choice"] = "auto"
+			if use_reasoning:
+				kw["extra_body"] = {"reasoning": {"enabled": True}}
+
+			try:
+				return await self._client.chat.completions.create(
+					model=model,
+					messages=messages,
+					stream=True,
+					stream_options={"include_usage": True},
+					**kw,
+				)
+			except APIStatusError as e:
+				body = str(e.body or "").lower() + str(getattr(e, "message", "") or "").lower()
+				if e.status_code in (400, 404):
+					if "tool_choice" in body and use_tool_choice:
+						use_tool_choice = False
+						continue
+					if ("tool" in body or "function" in body) and use_tools:
+						use_tools = False
+						use_tool_choice = False
+						continue
+					if "reasoning" in body and use_reasoning:
+						use_reasoning = False
+						continue
+				raise
+
 	async def chat(
 		self,
 		model: str,
@@ -134,25 +180,17 @@ class OpenAIClient(LLMClient):
 		tools: List[Dict[str, Any]] | None = None,
 	) -> AsyncIterator[LLMChunk]:
 		openai_messages = self._normalize_messages(messages)
-		kwargs: Dict[str, Any] = {}
-		if tools:
-			kwargs["tools"] = tools
-			kwargs["tool_choice"] = "auto"
-		if self._is_openrouter:
-			kwargs["extra_body"] = {"reasoning": {"enabled": True}}
-
-		stream = await self._client.chat.completions.create(
-			model=model,
-			messages=openai_messages,
-			stream=True,
-			**kwargs,
-		)
+		stream = await self._create_stream(model, openai_messages, tools)
 
 		accumulated_tool_calls: List[Dict[str, Any]] = []
 		accumulated_reasoning: List[str] = []
 		accumulated_reasoning_details: List[Dict[str, Any]] = []
 
 		async for chunk in stream:
+			if not chunk.choices:
+				if chunk.usage:
+					yield LLMChunk(usage_tokens=chunk.usage.total_tokens)
+				continue
 			delta = chunk.choices[0].delta
 			reasoning = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_text", None) or ""
 			if reasoning:

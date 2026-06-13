@@ -21,7 +21,7 @@ var slashCommands = []slashCmd{
 	{"/memory", "Toggle or show memory settings"},
 	{"/models", "Switch model"},
 	{"/update", "Download and install the latest release"},
-	{"/select", "Enable text selection (disables mouse capture)"},
+	{"/select", "Toggle text selection mode"},
 	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
 
@@ -189,9 +189,12 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	switch trimmed {
 	case "/select":
 		m.clearHintState()
-		m.selectMode = true
+		m.selectMode = !m.selectMode
 		m.syncViewport()
-		return true, tea.DisableMouse
+		if m.selectMode {
+			return true, tea.DisableMouse
+		}
+		return true, tea.EnableMouseCellMotion
 	case "/verbose":
 		m.verboseMode = !m.verboseMode
 		m.clearHintState()
@@ -253,8 +256,8 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 		}
 		m.recordHistory("!" + name)
 		m.messages = append(m.messages, messageEntry{kind: messageUser, text: "!" + name})
-		m.appendText(DimStyle().Render("  Using skill: " + name))
 		m.appendText("")
+		m.appendText(DimStyle().Render("  Using skill: " + name))
 		m.syncViewport()
 		return true, m.beginSkillStream(name)
 	}

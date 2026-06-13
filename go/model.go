@@ -136,21 +136,20 @@ func filterModels(models []string, filter string) []string {
 func initialModel(modelName string, connected bool) model {
 	ti := textarea.New()
 	ti.Placeholder = ""
-	ti.Prompt = "> "
+	ti.Prompt = ""
 	ti.ShowLineNumbers = false
 	ti.CharLimit = 0
 	ti.EndOfBufferCharacter = 0
 
 	// strip textarea default styles: no backgrounds, no borders
 	plain := lipgloss.NewStyle()
-	dimPrompt := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 	for _, s := range []*textarea.Style{&ti.FocusedStyle, &ti.BlurredStyle} {
 		s.Base = plain
 		s.CursorLine = plain
 		s.CursorLineNumber = plain
 		s.EndOfBuffer = plain
 		s.LineNumber = plain
-		s.Prompt = dimPrompt
+		s.Prompt = plain
 		s.Text = plain
 	}
 
@@ -201,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport.Width = msg.Width
-		m.textinput.SetWidth(msg.Width - 6)
+		m.textinput.SetWidth(m.inputContentWidth())
 		m.updateViewportHeight()
 		m.syncViewport()
 
@@ -340,6 +339,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case doneMsg:
+		m.interruptStream = false
 		if m.streaming {
 			if cmd := m.finishStream(msg.tokenCount, msg.tokenLimit); cmd != nil {
 				cmds = append(cmds, cmd)

@@ -81,4 +81,5 @@ func (m *model) freezeChain() {
 		return
 	}
 	m.messages[idx].duration = time.Since(m.chainStart)
+	m.messages[idx].text = m.renderChainCounter(m.messages[idx])
 }

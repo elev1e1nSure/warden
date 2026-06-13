@@ -179,7 +179,14 @@ func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
 	if m.messages[0].kind != messageUser || m.messages[0].text != "!demo" {
 		t.Fatalf("expected compact user marker, got %#v", m.messages[0])
 	}
-	if !strings.Contains(m.messages[1].text, "Using skill: demo") {
-		t.Fatalf("expected using-skill marker, got %#v", m.messages[1])
+	foundMarker := false
+	for _, msg := range m.messages {
+		if strings.Contains(msg.text, "Using skill: demo") {
+			foundMarker = true
+			break
+		}
+	}
+	if !foundMarker {
+		t.Fatalf("expected using-skill marker, got %#v", m.messages)
 	}
 }

@@ -8,9 +8,20 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Indentation rule for everything in the chat viewport:
+//   - contentIndent: the text column for assistant/think/chain/tool lines.
+//     Decorators (breathing orb, →, +) sit in this same column, so text after a
+//     decorator lands one space further — that's intentional and consistent.
+//   - The user block matches contentIndent via its accent bar (col 0) + 1 space.
+//   - bodyIndent: hanging indent for wrapped sub-text (think body), one level in.
+const (
+	contentIndent = "  "
+	bodyIndent    = "    "
+)
+
 // wardenLine builds a labeled response line (used for slash command output).
 func (m model) wardenLine(suffix string) string {
-	return "  " + WardenStyleAuto(m.autoMode).Render("warden") + "\n    " + suffix
+	return contentIndent + WardenStyleAuto(m.autoMode).Render("warden") + "\n" + bodyIndent + suffix
 }
 
 func compactThinkText(text string) string {
@@ -72,6 +83,24 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
+// pulseFrames is a breathing orb cycle: dim → bright → dim. Paired with the
+// mode accent it reads as a live "working" heartbeat, not a blinking dot.
+var pulseFrames = []string{"·", "•", "●", "●", "•", "·"}
+
+// pulse returns the breathing accent-colored orb for the current spinner step.
+// Occupies one column + trailing space, so text after it aligns at column 2 —
+// matching the 2-space indent of frozen log lines.
+func (m model) pulse() string {
+	peak, mid, faint := Green, GreenMid, GreenFaint
+	if m.autoMode {
+		peak, mid, faint = Blue, BlueMid, BlueFaint
+	}
+	cols := []lipgloss.Color{faint, mid, peak, peak, mid, faint}
+	i := (m.spinner / 2) % len(pulseFrames)
+	orb := lipgloss.NewStyle().Foreground(cols[i]).Render(pulseFrames[i])
+	return orb + " "
+}
+
 func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 	duration := entry.duration
 	if duration <= 0 && !entry.startedAt.IsZero() {
@@ -82,31 +111,27 @@ func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 
 	if !m.verboseMode {
 		if !animating {
-			return DimStyle().Render("Thought: " + formatThinkDuration(duration))
+			return DimStyle().Render(contentIndent + "Thought: " + formatThinkDuration(duration))
 		}
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + 1) % 3
 		verb := "Thinking"
 		if entry.activity != "" {
 			verb = entry.activity
 		}
-		return DimStyle().Render(verb + dots[dotIdx])
+		return contentIndent + m.pulse() + DimStyle().Render(verb)
 	}
 
 	var summary string
 	if animating {
-		dots := []string{".", "..", "..."}
-		dotIdx := ((m.spinner / 3) + 1) % 3
-		summary = DimStyle().Render("Thinking" + dots[dotIdx])
+		summary = contentIndent + m.pulse() + DimStyle().Render("Thinking")
 	} else {
-		summary = DimStyle().Render("+ Thought: " + formatThinkDuration(duration))
+		summary = DimStyle().Render(contentIndent + "+ Thought: " + formatThinkDuration(duration))
 	}
 	body := compactThinkText(entry.text)
 	if body == "" {
 		return summary
 	}
 
-	prefix := "    "
+	prefix := bodyIndent
 	firstWidth := m.width - lipgloss.Width(prefix)
 	if firstWidth < 1 {
 		firstWidth = 1
@@ -134,35 +159,30 @@ func indentLines(text string, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-var (
-	userMsgBg   = lipgloss.NewStyle().Background(lipgloss.Color("#242424"))
-	assistantBg = lipgloss.NewStyle().Background(lipgloss.Color("#1a1a1a"))
-)
+// userBg is the background of the user message block.
+const userBg = lipgloss.Color("#191919")
 
-// bgLine pads a single pre-rendered string to full terminal width with a background.
-func (m *model) bgLine(style lipgloss.Style, content string) string {
-	return style.Width(m.width).Render(content)
-}
-
-// applyBgLines applies background to each line of a multi-line string.
-func (m *model) applyBgLines(style lipgloss.Style, content string) string {
-	lines := strings.Split(content, "\n")
-	out := make([]string, len(lines))
-	for i, l := range lines {
-		out[i] = style.Width(m.width).Render(l)
-	}
-	return strings.Join(out, "\n")
-}
-
+// renderUserMsg renders a user message as an accent-barred block, the same width
+// as the input box and centered with equal side margins. Inside the block the
+// bar fills column 0, then a single space — so its text lines up with the
+// gutter-indented assistant/think/tool lines (see renderMessages).
 func (m *model) renderUserMsg(text string) string {
-	bgColor := lipgloss.Color("#242424")
-	plainOnBg := lipgloss.NewStyle().Background(bgColor)
+	accentColor := Green
+	if m.autoMode {
+		accentColor = Blue
+	}
+	bar := lipgloss.NewStyle().Foreground(accentColor).Background(userBg).Render("▌")
+	bg := lipgloss.NewStyle().Background(userBg)
+	inner := m.barWidth() - 1 // minus the bar
+	if inner < 1 {
+		inner = 1
+	}
 	lines := strings.Split(text, "\n")
 	out := make([]string, 0, len(lines)+2)
-	out = append(out, plainOnBg.Width(m.width).Render(""))
+	out = append(out, bar+bg.Width(inner).Render(""))
 	for _, l := range lines {
-		out = append(out, plainOnBg.Width(m.width).Render("  "+l))
+		out = append(out, bar+bg.Width(inner).Render(" "+l))
 	}
-	out = append(out, plainOnBg.Width(m.width).Render(""))
-	return strings.Join(out, "\n")
+	out = append(out, bar+bg.Width(inner).Render(""))
+	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, strings.Join(out, "\n"))
 }
