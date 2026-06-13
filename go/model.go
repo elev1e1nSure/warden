@@ -183,6 +183,7 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	var cmd tea.Cmd
 
 	// route key events to wizard when open
 	if key, ok := msg.(tea.KeyMsg); ok && m.cwOpen {
@@ -208,311 +209,80 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case startStreamMsg:
-		cmds = append(cmds, readNext(msg.ch))
+		m, cmd = m.handleStartStreamMsg(msg)
+		cmds = append(cmds, cmd)
 
 	case nextMsg:
-		// drain silently if user interrupted
-		if m.interruptStream {
-			if _, ok := msg.inner.(doneMsg); ok {
-				m.interruptStream = false
-			} else {
-				cmds = append(cmds, readNext(msg.ch))
-			}
-			break
-		}
-		switch inner := msg.inner.(type) {
-		case wardenStartMsg:
-			m.thinkBuf = ""
-			m.thinkDone = false
-			m.toolRunning = false
-			m.lastAssistantRaw = ""
-			m.loading = true
-			if m.verboseMode {
-				m.activityIdx = m.resetOrAppendThink()
-			} else {
-				m.setAction("Thinking", "", true)
-			}
-			m.syncViewport()
-			cmds = append(cmds, readNext(msg.ch))
-
-		case thinkMsg:
-			m.thinkBuf += inner.text
-			if m.verboseMode {
-				m.updateThink(inner.text)
-			} else {
-				m.setAction("Thinking", "", true)
-			}
-			m.syncViewport()
-			cmds = append(cmds, readNext(msg.ch))
-
-		case tokenMsg:
-			if !m.thinkDone {
-				if m.verboseMode {
-					m.finishThink()
-				} else {
-					m.clearAction()
-				}
-				m.appendAssistant("")
-				m.thinkDone = true
-			}
-			m.appendToLastAssistant(inner.text)
-			m.lastAssistantRaw += inner.text
-			m.syncViewport()
-			cmds = append(cmds, readNext(msg.ch))
-
-		case toolStartMsg:
-			m.toolRunning = true
-			if m.verboseMode {
-				m.finishThink()
-				m.appendToolActivity(toolStartLine(inner.name, inner.args))
-				m.runningToolIdx = len(m.messages) - 1
-			} else {
-				display := toolDisplayName(inner.name)
-				m.clearAction()
-				m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
-			}
-			m.syncViewport()
-			cmds = append(cmds, readNext(msg.ch))
-
-		case toolMsg:
-			m.toolRunning = false
-			if m.verboseMode {
-				summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
-				if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
-					m.messages[m.runningToolIdx].text = summary
-				} else {
-					m.appendToolActivity(summary)
-				}
-			}
-			if m.verboseMode && inner.tool.Diff != "" {
-				m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
-			}
-			m.runningToolIdx = -1
-			m.syncViewport()
-			cmds = append(cmds, readNext(msg.ch))
-
-		case confirmMsg:
-			m.confirming = true
-			m.loading = false
-			m.confirmID = inner.id
-			m.confirmCh = msg.ch
-			m.confirmTool = inner.tool
-			m.confirmRisk = inner.risk
-			m.confirmTitle = inner.title
-			m.confirmSummary = inner.summary
-			m.confirmDetails = inner.details
-			m.confirmPreview = inner.preview
-			m.confirmDefault = inner.defaultVal
-			m.updateViewportHeight()
-			m.syncViewport()
-			m.textinput.Placeholder = ""
-			m.resetInput()
-			if inner.defaultVal != "" && inner.defaultVal != "cancel" {
-				m.textinput.SetValue(inner.defaultVal)
-				m.textinput.CursorEnd()
-			}
-
-		case questionMsg:
-			m.questioning = true
-			m.loading = false
-			if m.verboseMode {
-				m.finishThink()
-			} else {
-				m.clearAction()
-			}
-			m.questionID = inner.id
-			m.questionCh = msg.ch
-			m.questionsData = inner.questions
-			m.questionIdx = 0
-			m.questionAnswers = nil
-			m.textinput.Placeholder = ""
-			m.resetInput()
-			m.updateViewportHeight()
-			m.syncViewport()
-
-		case doneMsg:
-			if cmd := m.finishStream(inner.tokenCount, inner.tokenLimit); cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-		}
+		m, cmd = m.handleNextMsg(msg)
+		cmds = append(cmds, cmd)
 
 	case doneMsg:
-		m.interruptStream = false
-		if m.streaming {
-			if cmd := m.finishStream(msg.tokenCount, msg.tokenLimit); cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-		}
+		m, cmd = m.handleDoneMsg(msg)
+		cmds = append(cmds, cmd)
 
 	case shellResultMsg:
-		m.streaming = false
-		m.loading = false
-		m.toolRunning = false
-		m.finishThink()
-		m.thinkBuf = ""
-		m.thinkDone = false
-		m.appendText(DimStyle().Render(strings.TrimRight(msg.output, "\n")))
-		m.appendText("")
-		m.syncViewport()
+		m, cmd = m.handleShellResult(msg)
+		cmds = append(cmds, cmd)
 
 	case tickMsg:
-		if m.loading {
-			m.spinner++
-			if m.streaming && !m.confirming && len(m.messages) > 0 {
-				m.syncViewport()
-			}
-			// Clear quitPending after 3 seconds
-			if m.quitPending && time.Since(m.quitPendingSince) > 3*time.Second {
-				m.quitPending = false
-			}
-			return m, m.tick()
-		}
-		return m, nil
+		m, cmd = m.handleTick(msg)
+		cmds = append(cmds, cmd)
 
 	case modeMsg:
-		m.autoMode = msg.auto
-		m.syncViewport()
+		m, cmd = m.handleModeMsg(msg)
+		cmds = append(cmds, cmd)
 
 	case statusResultMsg:
-		if msg.tokenLimit > 0 {
-			m.tokenCount = msg.tokenCount
-			m.tokenLimit = msg.tokenLimit
-		}
-		if msg.model != "" {
-			m.modelName = msg.model
-		}
-		m.syncViewport()
+		m, cmd = m.handleStatusResult(msg)
+		cmds = append(cmds, cmd)
 
 	case clipboardDoneMsg:
-		m.syncViewport()
+		m, cmd = m.handleClipboardDone(msg)
+		cmds = append(cmds, cmd)
 
 	case compactResultMsg:
-		m.loading = false
-		if msg.err == "" {
-			m.tokenCount = msg.tokensAfter
-		}
-		m.syncViewport()
+		m, cmd = m.handleCompactResult(msg)
+		cmds = append(cmds, cmd)
 
 	case memoryResultMsg:
-		m.loading = false
-		if msg.err != "" {
-			m.appendText(ErrorStyle().Render("  memory error: " + msg.err))
-		} else {
-			m.appendText(DimStyle().Render("  " + msg.text))
-		}
-		m.appendText("")
-		m.syncViewport()
+		m, cmd = m.handleMemoryResult(msg)
+		cmds = append(cmds, cmd)
 
 	case updateResultMsg:
-		m.loading = false
-		if msg.err != nil {
-			m.appendText(ErrorStyle().Render("  update failed: " + msg.err.Error()))
-			m.appendText("")
-			m.syncViewport()
-			return m, nil
-		}
-		m.appendText(DimStyle().Render("  update downloaded, restarting..."))
-		m.syncViewport()
-		return m, tea.Quit
+		m, cmd = m.handleUpdateResult(msg)
+		cmds = append(cmds, cmd)
 
 	case modelsResultMsg:
-		if msg.err != "" || len(msg.models) == 0 {
-			break
-		} else {
-			m.modelList = msg.models
-			m.modelFiltered = msg.models
-			m.modelPickIdx = 0
-			for i, name := range msg.models {
-				if name == msg.current {
-					m.modelPickIdx = i
-					break
-				}
-			}
-			const maxVisible = 8
-			m.modelScrollTop = m.modelPickIdx - maxVisible/2
-			if m.modelScrollTop < 0 {
-				m.modelScrollTop = 0
-			}
-			if m.modelScrollTop+maxVisible > len(msg.models) {
-				m.modelScrollTop = len(msg.models) - maxVisible
-				if m.modelScrollTop < 0 {
-					m.modelScrollTop = 0
-				}
-			}
-			m.resetInput()
-			m.modelPicking = true
-			m.updateViewportHeight()
-			m.syncViewport()
-		}
+		m, cmd = m.handleModelsResult(msg)
+		cmds = append(cmds, cmd)
 
 	case modelSetMsg:
-		if msg.err == "" {
-			m.modelName = msg.model
-			m.messages = []messageEntry{}
-			_ = saveWardenConfigField("model", msg.model)
-		}
+		m, cmd = m.handleModelSet(msg)
+		cmds = append(cmds, cmd)
 
 	case connectResultMsg:
-		if msg.ok {
-			m.connected = true
-			m.modelName = msg.model
-			m.cwOpen = false
-			m.cwLoading = false
-			m.cwErr = ""
-			_ = saveWardenConfigField("model", msg.model)
-			if msg.apiURL != "" {
-				_ = saveWardenConfigField("api_url", msg.apiURL)
-			}
-			if msg.apiKey != "" {
-				_ = saveWardenConfigField("api_key", msg.apiKey)
-			}
-			m.updateViewportHeight()
-			m.syncViewport()
-		} else {
-			m.cwErr = msg.err
-			m.cwLoading = false
-			m.updateViewportHeight()
-			m.syncViewport()
-		}
+		m, cmd = m.handleConnectResult(msg)
+		cmds = append(cmds, cmd)
 
 	case backendReadyMsg:
-		m.loading = false
-		m.tokenCount = 0
-		m.client.ResetSession()
-		m.syncViewport()
-		if m.autoMode {
-			cmds = append(cmds, m.setMode(true))
-		}
+		m, cmd = m.handleBackendReady(msg)
+		cmds = append(cmds, cmd)
 
 	case skillsResultMsg:
-		if msg.err != "" {
-			m.skillsErr = msg.err
-			break
-		}
-		m.skills = msg.skills
-		m.skillsErr = ""
+		m, cmd = m.handleSkillsResult(msg)
+		cmds = append(cmds, cmd)
 
 	case skillLoadedMsg:
-		m.streaming = false
-		m.loading = false
-		if msg.err != "" {
-			m.appendText(ErrorStyle().Render("  " + msg.err))
-			m.appendText("")
-			m.syncViewport()
-			break
-		}
-		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
-		m.appendText(body)
-		cmds = append(cmds, m.beginStream(body))
+		m, cmd = m.handleSkillLoaded(msg)
+		cmds = append(cmds, cmd)
 
 	case backendErrorMsg:
-		m.loading = false
-		m.syncViewport()
+		m, cmd = m.handleBackendError(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	cmds = append(cmds, m.focusInput())
 
-	var cmd tea.Cmd
 	oldVal := m.textinput.Value()
 	m.textinput, cmd = m.textinput.Update(msg)
 	cmds = append(cmds, cmd)
