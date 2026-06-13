@@ -79,4 +79,20 @@ jobs:
 
       - name: Test
         working-directory: go
-        run: go test ./...
+        run: go test ./... -coverprofile=cover.out
+
+      - name: Check coverage threshold
+        working-directory: go
+        run: |
+          coverage=$(go tool cover -func=cover.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Go coverage: ${coverage}%"
+          if (( $(echo "$coverage < 80" | bc -l) )); then
+            echo "Coverage $coverage% is below 80%"
+            exit 1
+          fi
+
+      - name: Upload Go coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: go/cover.out
