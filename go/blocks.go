@@ -61,12 +61,11 @@ func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode 
 		header = fmt.Sprintf("%s (%d/%d)", q.Header, idx+1, total)
 	}
 	b.WriteString(contentIndent + accent.Render("? ") + HeaderStyle().Render(header))
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	b.WriteString(contentIndent + DimStyle().Render(q.Question))
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 
 	if len(q.Options) > 0 {
-		b.WriteString("\n")
 		for i, opt := range q.Options {
 			numStr := fmt.Sprintf("%d", i+1)
 			num := accent.Render(numStr)
@@ -83,12 +82,10 @@ func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode 
 			} else {
 				b.WriteString(contentIndent + num + label)
 			}
-			b.WriteString("\n")
+			b.WriteString("\n\n")
 		}
-		b.WriteString("\n")
 		b.WriteString(contentIndent + DimStyle().Render("press 1–"+fmt.Sprintf("%d", len(q.Options))+" to select"))
 	} else {
-		b.WriteString("\n")
 		b.WriteString(contentIndent + DimStyle().Render("type your answer and press enter"))
 	}
 
