@@ -343,6 +343,43 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
+// renderToolActivityEntry renders a completed tool summary line with optional
+// expanded full result and +/- toggle indicator.
+func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string {
+	if entry.toolResult == "" {
+		return entry.text
+	}
+	// Replace leading "→" with "+/-" indicator on the summary line.
+	arrow := ToolStyle().Render(contentIndent + "→ ")
+	toggle := "+"
+	if entry.expanded {
+		toggle = "-"
+	}
+	indicatorStyle := ToolStyle()
+	if hovered {
+		indicatorStyle = HoverStyle()
+	}
+	indicator := indicatorStyle.Render(contentIndent + toggle + " ")
+
+	// Rebuild summary with indicator replacing arrow.
+	summaryLine := strings.Replace(entry.text, arrow, indicator, 1)
+	if !entry.expanded {
+		return summaryLine
+	}
+	result := strings.TrimSpace(entry.toolResult)
+	resultLines := strings.Split(result, "\n")
+	maxWidth := m.barWidth() - len(bodyIndent)
+	if maxWidth < 10 {
+		maxWidth = 10
+	}
+	out := make([]string, 0, len(resultLines)+1)
+	out = append(out, summaryLine)
+	for _, l := range resultLines {
+		out = append(out, DimStyle().Render(bodyIndent+truncateRunes(l, maxWidth)))
+	}
+	return strings.Join(out, "\n")
+}
+
 // renderChainAction renders the single live "what's happening now" line.
 func (m model) renderChainAction(entry messageEntry, active bool) string {
 	if !m.loading {

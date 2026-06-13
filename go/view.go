@@ -36,31 +36,61 @@ func (m *model) renderMessages() []string {
 	// itself to the same width, so it's exempt.
 	gutter := strings.Repeat(" ", m.sideMargin())
 
+	// lineMap maps each viewport line to the messages index that produced it.
+	lineMap := make([]int, 0, len(m.messages)*3)
+	addLines := func(rendered string, msgIdx int) {
+		n := strings.Count(rendered, "\n") + 1
+		for j := 0; j < n; j++ {
+			lineMap = append(lineMap, msgIdx)
+		}
+	}
+
 	out := make([]string, 0, len(m.messages)+1)
 	out = append(out, "") // top padding
+	lineMap = append(lineMap, -1)
+
+	prevRenderedEmpty := true // top padding counts as empty
 	for i, entry := range m.messages {
 		var rendered string
+		hovered := i == m.hoveredMsgIdx
 		switch entry.kind {
 		case messageUser:
 			rendered = m.renderUserMsg(entry.text)
 		case messageThink:
-			rendered = indentLines(m.renderThinkEntry(entry, i == lastThinkIdx), gutter)
+			rendered = indentLines(m.renderThinkEntry(entry, i == lastThinkIdx, hovered), gutter)
 		case messageAssistant:
 			rendered = indentLines(m.renderMarkdown(entry.text), gutter+contentIndent)
 		case messageToolActivity:
-			rendered = indentLines(entry.text, gutter)
+			rendered = indentLines(m.renderToolActivityEntry(entry, hovered), gutter)
 		case messageChainAction:
 			rendered = indentLines(m.renderChainAction(entry, i == lastActionIdx), gutter)
 		case messageToolDiff:
 			rendered = indentLines(renderUnifiedDiff(entry.text, m.barWidth()), gutter)
+		case messageChainSummary:
+			rendered = indentLines(m.renderChainSummary(entry, hovered), gutter)
 		default:
 			rendered = indentLines(entry.text, gutter)
 		}
+
+		// vertical spacing: blank line above action group start and above assistant text
+		if rendered != "" && !prevRenderedEmpty {
+			switch entry.kind {
+			case messageThink, messageChainSummary:
+				rendered = "\n" + rendered
+			case messageAssistant:
+				rendered = "\n" + rendered
+			}
+		}
+
 		// always keep messageText (blank lines serve as turn separators)
 		if rendered != "" || entry.kind == messageText {
 			out = append(out, rendered)
+			addLines(rendered, i)
+			prevRenderedEmpty = rendered == ""
 		}
 	}
+
+	m.lineMap = lineMap
 	return out
 }
 

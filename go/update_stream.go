@@ -24,9 +24,20 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.toolRunning = false
 		m.lastAssistantRaw = ""
 		m.loading = true
+		m.turnStartedAt = time.Now()
+		m.turnThought = false
+		m.turnTools = nil
 		if m.verboseMode {
 			m.activityIdx = m.resetOrAppendThink()
+			m.chainSummaryIdx = -1
 		} else {
+			// create placeholder summary entry now (before assistant text)
+			// so it appears above the response; finalized in finishStream
+			m.chainSummaryIdx = len(m.messages)
+			m.messages = append(m.messages, messageEntry{
+				kind:      messageChainSummary,
+				startedAt: time.Now(),
+			})
 			m.setAction("Thinking", "", true)
 		}
 		m.syncViewport()
@@ -34,6 +45,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 
 	case thinkMsg:
 		m.thinkBuf += inner.text
+		m.turnThought = true
 		if m.verboseMode {
 			m.updateThink(inner.text)
 		} else {
@@ -77,11 +89,16 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
 			if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
 				m.messages[m.runningToolIdx].text = summary
+				m.messages[m.runningToolIdx].toolResult = inner.tool.Result
 			} else {
-				m.appendToolActivity(summary)
+				m.messages = append(m.messages, messageEntry{
+					kind:       messageToolActivity,
+					text:       summary,
+					toolResult: inner.tool.Result,
+				})
 			}
 		}
-		if m.verboseMode && inner.tool.Diff != "" {
+		if (m.verboseMode || m.diffMode) && inner.tool.Diff != "" {
 			m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
 		}
 		m.runningToolIdx = -1

@@ -15,6 +15,7 @@ var (
 	BlueFaint  = lipgloss.Color("#0C4A6E")
 	Red        = lipgloss.Color("#ff4444")
 	Dim        = lipgloss.Color("#666666")
+	DimHover   = lipgloss.Color("#999999")
 	Faint      = lipgloss.Color("#2a2a2a")
 	White      = lipgloss.Color("#ffffff")
 )
@@ -61,6 +62,10 @@ func HeaderStyle() lipgloss.Style {
 
 func DimStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Dim)
+}
+
+func HoverStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(DimHover)
 }
 
 func FaintStyle() lipgloss.Style {

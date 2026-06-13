@@ -54,6 +54,8 @@ type model struct {
 	verboseMode bool
 	// select mode — mouse capture disabled so terminal can select text
 	selectMode bool
+	// diff mode — show unified diffs for file edits even in non-verbose mode
+	diffMode bool
 	// model picker
 	modelPicking   bool
 	modelList      []string
@@ -76,6 +78,15 @@ type model struct {
 	// token tracking
 	tokenCount int
 	tokenLimit int
+	// viewport line → messages slice index (-1 = no entry)
+	lineMap []int
+	// index of message currently under the mouse cursor (-1 = none)
+	hoveredMsgIdx int
+	// turn action collection (non-verbose): reset on wardenStartMsg
+	turnStartedAt   time.Time
+	turnThought     bool
+	turnTools       []turnAction
+	chainSummaryIdx int // index into messages of the placeholder summary entry (-1 = none)
 	// paste handling: stored payloads referenced by [pasted #N] placeholders
 	pastes     []string
 	lastRuneAt time.Time
@@ -171,8 +182,10 @@ func initialModel(modelName string, connected bool) model {
 		modelName:      modelName,
 		connected:      connected,
 		loading:        true,
-		runningToolIdx: -1,
-		slashIdx:       -1,
+		runningToolIdx:  -1,
+		slashIdx:        -1,
+		chainSummaryIdx: -1,
+		hoveredMsgIdx:   -1,
 		skillsIdx:      -1,
 		activityIdx:    -1,
 	}
@@ -281,6 +294,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case backendErrorMsg:
 		m, cmd = m.handleBackendError(msg)
 		cmds = append(cmds, cmd)
+
+	case tea.MouseMsg:
+		inViewport := msg.Y < m.layoutViewportHeight()
+		if inViewport {
+			line := msg.Y + m.viewport.YOffset
+			newHover := -1
+			if line >= 0 && line < len(m.lineMap) {
+				idx := m.lineMap[line]
+				if idx >= 0 && idx < len(m.messages) && m.isClickable(idx) {
+					newHover = idx
+				}
+			}
+			if newHover != m.hoveredMsgIdx {
+				m.hoveredMsgIdx = newHover
+				m.syncViewport()
+			}
+		} else if m.hoveredMsgIdx >= 0 {
+			m.hoveredMsgIdx = -1
+			m.syncViewport()
+		}
+
+		if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && !m.selectMode && inViewport {
+			line := msg.Y + m.viewport.YOffset
+			if line >= 0 && line < len(m.lineMap) {
+				idx := m.lineMap[line]
+				if idx >= 0 && idx < len(m.messages) && m.isClickable(idx) {
+					m.messages[idx].expanded = !m.messages[idx].expanded
+					m.syncViewport()
+					return m, tea.Batch(cmds...)
+				}
+			}
+		}
 	}
 
 	cmds = append(cmds, m.focusInput())
@@ -321,6 +366,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.refreshHints()
 
 	return m, tea.Batch(cmds...)
+}
+
+// isClickable reports whether the message at idx can be expanded/collapsed.
+func (m model) isClickable(idx int) bool {
+	if idx < 0 || idx >= len(m.messages) {
+		return false
+	}
+	e := m.messages[idx]
+	return (e.kind == messageThink && e.text != "") ||
+		(e.kind == messageToolActivity && e.toolResult != "") ||
+		(e.kind == messageChainSummary && (e.turnDur > 0 || m.thinkBuf != ""))
 }
 
 // resolveConfirm closes the confirm dialog and sends the verdict to the backend.
@@ -396,6 +452,18 @@ func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
 		m.finishThink()
 	} else {
 		m.freezeChain()
+		// finalize the placeholder: only persist thought, tools disappear
+		if m.chainSummaryIdx >= 0 && m.chainSummaryIdx < len(m.messages) {
+			if m.turnThought {
+				e := &m.messages[m.chainSummaryIdx]
+				e.turnDur = time.Since(e.startedAt)
+				e.actions = []turnAction{{display: "Thought", thinkText: m.thinkBuf}}
+			}
+			// if no thinking happened, placeholder stays unfinalized (turnDur=0, doesn't render)
+		}
+		m.chainSummaryIdx = -1
+		m.turnThought = false
+		m.turnTools = nil
 	}
 	m.thinkBuf = ""
 	m.thinkDone = false
