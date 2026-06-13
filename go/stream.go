@@ -62,7 +62,7 @@ func (m model) handleStreamEvent(msg nextMsg) (model, []tea.Cmd) {
 		} else {
 			display := toolDisplayName(inner.name)
 			m.clearAction()
-				m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
+			m.setAction(toolPresentTense(display), actionDetail(display, inner.args), false)
 		}
 		m.syncViewport()
 		cmds = append(cmds, readNext(msg.ch))
