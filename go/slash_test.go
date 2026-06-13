@@ -92,6 +92,38 @@ func TestBangTabCompletesSingleMatch(t *testing.T) {
 	}
 }
 
+func TestSlashTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.textinput.SetValue("/")
+	m.refreshHints()
+	m.slashIdx = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(model)
+
+	if got := m.textinput.Value(); got != "/clear" {
+		t.Fatalf("expected selected slash command, got %q", got)
+	}
+}
+
+func TestBangTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
+	m := initialModel("test-model", true)
+	m.skills = []Skill{
+		{Name: "alpha", Description: "Alpha skill"},
+		{Name: "beta", Description: "Beta skill"},
+	}
+	m.textinput.SetValue("!")
+	m.refreshHints()
+	m.skillsIdx = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(model)
+
+	if got := m.textinput.Value(); got != "!beta" {
+		t.Fatalf("expected selected skill, got %q", got)
+	}
+}
+
 func TestRenderHintScrollsSlashCommandsWithoutMarkers(t *testing.T) {
 	m := initialModel("test-model", true)
 	m.width = 80
@@ -146,7 +178,7 @@ func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
 	if m.messages[0].kind != messageUser || m.messages[0].text != "!demo" {
 		t.Fatalf("expected compact user marker, got %#v", m.messages[0])
 	}
-	if !strings.Contains(m.messages[1].text, "using skill: demo") {
+	if !strings.Contains(m.messages[1].text, "Using skill: demo") {
 		t.Fatalf("expected using-skill marker, got %#v", m.messages[1])
 	}
 }
