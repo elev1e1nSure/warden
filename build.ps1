@@ -27,7 +27,7 @@ function Line($mark, $msg, $color) {
 }
 
 function Ok($msg)   { Line "[ok]" $msg "green" }
-function Info($msg) { Line "  " $msg "dim" }
+function Info($msg) { Line "" $msg "dim" }
 function Run($msg)  { Line "[>>]" $msg "blue" }
 function Err($msg)  { Line "[!!]" $msg "red"; exit 1 }
 
@@ -40,10 +40,10 @@ if ($useAnsi) {
 Info "checking dependencies..."
 
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) { Err "Go is not installed or not in PATH" }
-Ok "Go          $($(& go version).Split(' ')[2])"
+Ok "Go:         $($(& go version).Split(' ')[2])"
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Err "Python is not installed or not in PATH" }
-Ok "Python      $($(& python --version 2>&1))"
+Ok "Python:     $($(& python --version 2>&1))"
 
 Run "building warden.exe..."
 $start = Get-Date
