@@ -2,11 +2,41 @@
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
-function Ok($msg)  { Write-Host "[ OK ] $msg" -ForegroundColor Green }
-function Info($msg){ Write-Host "[ .. ] $msg" -ForegroundColor DarkGray }
-function Err($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red; exit 1 }
+$esc = [char]27
+$useAnsi = -not [Console]::IsOutputRedirected
+$c = @{
+    green = "$esc[38;2;138;184;154m"
+    blue  = "$esc[38;2;56;189;248m"
+    red   = "$esc[38;2;255;68;68m"
+    dim   = "$esc[38;2;102;102;102m"
+    white = "$esc[37m"
+    reset = "$esc[0m"
+}
 
-Write-Host "warden build script" -ForegroundColor Cyan
+function Paint($text, $color) {
+    if ($useAnsi) { return "$($c[$color])$text$($c.reset)" }
+    return $text
+}
+
+function Line($mark, $msg, $color) {
+    if ($useAnsi) {
+        Write-Host "$(Paint $mark $color) $(Paint $msg white)"
+    } else {
+        Write-Host "$mark $msg"
+    }
+}
+
+function Ok($msg)   { Line "[ok]" $msg "green" }
+function Info($msg) { Line "[..]" $msg "dim" }
+function Run($msg)  { Line "[>>]" $msg "blue" }
+function Err($msg)  { Line "[!!]" $msg "red"; exit 1 }
+
+if ($useAnsi) {
+    Write-Host "$(Paint 'warden' green) $(Paint 'build' dim)"
+    Write-Host "$(Paint '................................' dim)"
+} else {
+    Write-Host "warden build"
+}
 
 Info "checking dependencies..."
 
@@ -16,7 +46,7 @@ Ok "Go          $($(& go version).Split(' ')[2])"
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Err "Python is not installed or not in PATH" }
 Ok "Python      $($(& python --version 2>&1))"
 
-Info "building warden.exe..."
+Run "building warden.exe..."
 $start = Get-Date
 
 Push-Location "$root\go\cmd\warden"
@@ -30,5 +60,10 @@ try {
 }
 
 $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 2)
+$exePath = "$root\warden.exe"
 Ok "warden.exe built in ${elapsed}s"
-Write-Host "path: $root\warden.exe" -ForegroundColor DarkGray
+if ($useAnsi) {
+    Write-Host "$(Paint 'path:' dim) $(Paint $exePath white)"
+} else {
+    Write-Host "path: $exePath"
+}
