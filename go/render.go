@@ -160,6 +160,12 @@ func (m model) renderThinkEntry(entry messageEntry, active bool, hovered bool) s
 
 	animating := active && entry.duration == 0 && m.loading
 
+	// in non-verbose mode the think entry is invisible until finalized;
+	// the chain action provides the live "Thinking" indicator instead.
+	if !m.verboseMode && entry.duration == 0 {
+		return ""
+	}
+
 	if animating {
 		verb := "Thinking"
 		if entry.activity != "" {

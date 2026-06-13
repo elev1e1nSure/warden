@@ -440,6 +440,7 @@ func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
 	m.quitPending = false
 	m.userScrolled = false
 	m.finishThink()
+	m.freezeChain() // remove any live chain action line (non-verbose tool/think indicators)
 	m.thinkBuf = ""
 	m.thinkDone = false
 	m.activityIdx = -1

@@ -159,7 +159,7 @@ func (m *model) appendToolFlow(name, args string) {
 }
 
 func (m *model) appendThink() {
-	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now(), expanded: true})
+	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
 }
 
 // resetOrAppendThink reuses the last think entry only if it is still at the
