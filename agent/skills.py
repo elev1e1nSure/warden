@@ -176,15 +176,19 @@ def format_catalog(skills: list[Skill] | None = None) -> str:
 	items = skills if skills is not None else discover_skills()
 	if not items:
 		return ""
-	lines = ["<available_skills>"]
+	lines = [
+		"Skills provide specialized instructions and workflows for specific tasks.",
+		"Use the skill tool to load a skill when a task matches its description.",
+		"<available_skills>",
+	]
 	for s in items:
+		if not s.description:
+			continue
 		lines.append("  <skill>")
 		lines.append(f"    <name>{s.name}</name>")
 		lines.append(f"    <description>{s.description}</description>")
-		lines.append(f"    <location>{s.location}</location>")
 		lines.append("  </skill>")
 	lines.append("</available_skills>")
-	lines.append("Use the skill tool to load a skill when a task matches its description.")
 	return "\n".join(lines)
 
 
@@ -199,6 +203,9 @@ def wrap_skill_content(skill: Skill) -> str:
 		f"{skill.content.rstrip()}\n"
 		f"\n"
 		f"Base directory for this skill: {skill.directory}\n"
+		f"Relative paths in this skill (e.g., scripts/, references/) are relative to this base directory.\n"
+		f"Note: file list is sampled.\n"
+		f"\n"
 		f"<skill_files>\n"
 		f"{files_block}\n"
 		f"</skill_files>\n"

@@ -36,6 +36,13 @@ func (m model) sendMessage(text string) tea.Cmd {
 	}
 }
 
+func (m model) sendSkill(name string) tea.Cmd {
+	ch := m.client.SendSkill(name)
+	return func() tea.Msg {
+		return startStreamMsg{ch: ch}
+	}
+}
+
 func (m model) sendQuestion(id string, answers [][]string) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendQuestion(id, answers)

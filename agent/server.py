@@ -334,6 +334,7 @@ async def chat(request: web.Request) -> web.StreamResponse:
 	backend = _get_backend(request)
 	data = await request.json()
 	text = data.get("text", "")
+	skill_name = data.get("skill")
 	log_request("POST", "/chat")
 	info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
 
@@ -349,7 +350,12 @@ async def chat(request: web.Request) -> web.StreamResponse:
 		return response
 
 	try:
-		async for type_, payload in backend.chat.stream(text, auto_mode=backend.auto_mode):
+		stream = (
+			backend.chat.stream(text, auto_mode=backend.auto_mode, skill_name=skill_name)
+			if skill_name
+			else backend.chat.stream(text, auto_mode=backend.auto_mode)
+		)
+		async for type_, payload in stream:
 			if _client_disconnected(request):
 				backend.confirmation_manager.cancel_all()
 				backend.question_manager.cancel_all()

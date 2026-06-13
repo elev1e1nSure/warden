@@ -5,6 +5,7 @@ import asyncio
 
 import pytest
 
+import agent.skills as skills_mod
 from agent.chat import ChatSession
 from agent.llm_client import LLMClient, LLMChunk
 
@@ -163,3 +164,23 @@ class TestChatSessionStream:
             events.append(ev)
         error_events = [e for e in events if "error" in str(e[1])]
         assert len(error_events) >= 1
+
+    @pytest.mark.asyncio
+    async def test_stream_skill_context_is_turn_scoped(self, monkeypatch, tmp_path) -> None:
+        skill_dir = tmp_path / ".warden" / "skills" / "demo"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: demo\ndescription: Demo skill\n---\n\n# Demo\n\nUse carefully.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(skills_mod.Path, "cwd", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr(skills_mod.Path, "home", classmethod(lambda cls: tmp_path))
+
+        fake = FakeLLMClient(chunks=[LLMChunk(content="response")])
+        session = ChatSession("test", fake)
+        async for _ in session.stream("Use skill: demo", skill_name="demo"):
+            pass
+
+        request_messages = fake.calls[0]
+        assert any("<skill_content name=\"demo\">" in str(msg.get("content", "")) for msg in request_messages)
+        assert all("<skill_content" not in str(msg.get("content", "")) for msg in session.history)

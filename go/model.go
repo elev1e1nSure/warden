@@ -778,6 +778,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streaming = false
 		m.loading = false
 		if msg.err != "" {
+			m.appendText(ErrorStyle().Render("  " + msg.err))
+			m.appendText("")
+			m.syncViewport()
 			break
 		}
 		body := "Use the skill \"" + msg.name + "\". Follow these instructions:\n\n" + msg.content
@@ -871,6 +874,17 @@ func (m *model) beginStream(text string) tea.Cmd {
 	m.spinner = 0
 	m.syncViewport()
 	return tea.Batch(m.sendMessage(text), m.tick())
+}
+
+func (m *model) beginSkillStream(name string) tea.Cmd {
+	m.streamStart = len(m.messages)
+	m.resetInput()
+	m.startChain()
+	m.streaming = true
+	m.loading = true
+	m.spinner = 0
+	m.syncViewport()
+	return tea.Batch(m.sendSkill(name), m.tick())
 }
 
 // finishStream resets streaming state at turn end; returns a compact command

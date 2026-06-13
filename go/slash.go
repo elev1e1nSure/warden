@@ -242,10 +242,21 @@ func (m *model) handleBang(text string) (bool, tea.Cmd) {
 	// `!<name>` (no space) = skill invocation
 	if strings.HasPrefix(text, "!") {
 		name := strings.TrimSpace(strings.TrimPrefix(text, "!"))
-		if name == "" || !m.hasSkill(name) {
+		if name == "" {
 			return true, nil
 		}
-		return true, m.loadSkill(name)
+		if !m.hasSkill(name) {
+			m.appendText(ErrorStyle().Render("  skill not found: " + name))
+			m.appendText("")
+			m.syncViewport()
+			return true, nil
+		}
+		m.recordHistory("!" + name)
+		m.messages = append(m.messages, messageEntry{kind: messageUser, text: "!" + name})
+		m.appendText(DimStyle().Render("  using skill: " + name))
+		m.appendText("")
+		m.syncViewport()
+		return true, m.beginSkillStream(name)
 	}
 
 	return false, nil

@@ -1,5 +1,6 @@
 import re
 import uuid
+import json
 from typing import AsyncIterator, List, Dict, Any
 
 from agent.confirmations import ConfirmationManager, QuestionManager
@@ -8,6 +9,7 @@ from agent.memory.aggregator import MemoryAggregator
 from agent.memory.extractor import MemoryExtractor
 from agent.memory.store import MemoryStore
 from agent.prompt import build_system
+from agent.skills import Skill, find_skill, wrap_skill_content
 from agent.tool_runner import execute_tool_call
 from agent.tools import REGISTRY
 
@@ -45,6 +47,32 @@ def _guess_context_limit(model: str) -> int:
 
 def _clean_visible_text(text: str) -> str:
 	return _EMOJI_RE.sub("", text)
+
+
+def _skill_context_messages(skill: Skill) -> list[dict[str, Any]]:
+	call_id = f"call_skill_{skill.name.replace('-', '_')}"
+	return [
+		{
+			"role": "assistant",
+			"content": "",
+			"tool_calls": [
+				{
+					"id": call_id,
+					"type": "function",
+					"function": {
+						"name": "skill",
+						"arguments": json.dumps({"name": skill.name}),
+					},
+				}
+			],
+		},
+		{
+			"role": "tool",
+			"name": "skill",
+			"tool_call_id": call_id,
+			"content": wrap_skill_content(skill),
+		},
+	]
 
 
 def _reasoning_details_text(details: list[dict[str, Any]] | None) -> str:
@@ -237,7 +265,21 @@ class ChatSession:
 		):
 			yield event
 
-	async def stream(self, text: str, auto_mode: bool = False) -> AsyncIterator[tuple[str, Any]]:
+	async def stream(
+		self,
+		text: str,
+		auto_mode: bool = False,
+		skill_name: str | None = None,
+	) -> AsyncIterator[tuple[str, Any]]:
+		turn_context: list[dict[str, Any]] = []
+		if skill_name:
+			skill = find_skill(skill_name)
+			if skill is None:
+				yield ("token", f"skill not found: {skill_name}")
+				return
+			turn_context = _skill_context_messages(skill)
+
+		history_insert_at = len(self.history) + 1
 		self.add_user(text)
 		iter_count = 0
 
@@ -250,7 +292,11 @@ class ChatSession:
 				mem_ctx = self.memory_store.get_context_text(session_id=self.session_id)
 				if mem_ctx:
 					system = mem_ctx + "\n\n" + system
-			messages = [{"role": "system", "content": system}] + self.history
+			if turn_context:
+				history = self.history[:history_insert_at] + turn_context + self.history[history_insert_at:]
+			else:
+				history = self.history
+			messages = [{"role": "system", "content": system}] + history
 
 			llm_result: dict = {}
 			async for event in self._call_llm(messages, llm_result):

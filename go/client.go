@@ -253,10 +253,17 @@ func (c *Client) LoadSkill(name string) (string, error) {
 }
 
 func (c *Client) SendMessage(text string) <-chan tea.Msg {
+	return c.sendChat(map[string]string{"type": "message", "text": text})
+}
+
+func (c *Client) SendSkill(name string) <-chan tea.Msg {
+	return c.sendChat(map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name})
+}
+
+func (c *Client) sendChat(msg map[string]string) <-chan tea.Msg {
 	ch := make(chan tea.Msg, 64)
 	go func() {
 		defer close(ch)
-		msg := map[string]string{"type": "message", "text": text}
 		body, err := json.Marshal(msg)
 		if err != nil {
 			ch <- tokenMsg{text: "\njson error: " + err.Error()}
