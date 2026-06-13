@@ -50,10 +50,10 @@ func TestRenderModelPicker(t *testing.T) {
 
 func TestRenderThinkEntryHasLeadingIndent(t *testing.T) {
 	m := initialModel("test-model", true)
-	got := m.renderThinkEntry(messageEntry{duration: 2 * time.Second}, false)
+	got := m.renderThinkEntry(messageEntry{duration: 2 * time.Second}, false, false)
 
 	// think summary is indented to align with assistant text (column 2)
-	if !strings.Contains(got, "  Thought:") {
+	if !strings.Contains(got, "  + Thought:") && !strings.Contains(got, "  - Thought:") {
 		t.Fatalf("expected leading indent in think line, got %q", got)
 	}
 }

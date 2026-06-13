@@ -22,6 +22,7 @@ var slashCommands = []slashCmd{
 	{"/memory", "Toggle or show memory settings"},
 	{"/models", "Switch model"},
 	{"/update", "Download and install the latest release"},
+	{"/diff", "Toggle diff display for file edits"},
 	{"/select", "Toggle text selection mode"},
 	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
@@ -188,6 +189,11 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 	}
 
 	switch trimmed {
+	case "/diff":
+		m.diffMode = !m.diffMode
+		m.clearHintState()
+		m.syncViewport()
+		return true, nil
 	case "/select":
 		m.clearHintState()
 		m.selectMode = !m.selectMode
