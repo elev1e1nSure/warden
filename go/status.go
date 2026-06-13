@@ -136,6 +136,8 @@ func (m model) renderFullWave() string {
 	}
 	maxIdx := float64(len(cells) - 1)
 	phase := float64(m.spinner) * 0.20
+	// bright spark travels faster than the wave crests
+	sparkPos := math.Mod(float64(m.spinner)*0.55, float64(n)+6) - 3
 	var b strings.Builder
 	for i := 0; i < n; i++ {
 		x := float64(i)
@@ -149,7 +151,17 @@ func (m model) renderFullWave() string {
 		} else if t > 1 {
 			t = 1
 		}
-		b.WriteString(cells[int(t*maxIdx+0.5)])
+		dist := math.Abs(x - sparkPos)
+		if dist < 1.5 {
+			bright := 1 - dist/1.5
+			if bright > 1 {
+				bright = 1
+			}
+			sparkCol := lerpHex(m.accentFaintRGB(), whiteRGB, bright)
+			b.WriteString(lipgloss.NewStyle().Foreground(sparkCol).Render("•"))
+		} else {
+			b.WriteString(cells[int(t*maxIdx+0.5)])
+		}
 	}
 	return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, b.String())
 }

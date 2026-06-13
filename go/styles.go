@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	Green      = lipgloss.Color("#8AB89A")
@@ -14,6 +18,30 @@ var (
 	Faint      = lipgloss.Color("#2a2a2a")
 	White      = lipgloss.Color("#ffffff")
 )
+
+// RGB triples for smooth color interpolation in animations.
+var (
+	greenRGB      = [3]int{0x8A, 0xB8, 0x9A}
+	greenFaintRGB = [3]int{0x1A, 0x4D, 0x34}
+	blueRGB       = [3]int{0x38, 0xBD, 0xF8}
+	blueFaintRGB  = [3]int{0x0C, 0x4A, 0x6E}
+	dimRGB        = [3]int{0x66, 0x66, 0x66}
+	whiteRGB      = [3]int{0xFF, 0xFF, 0xFF}
+)
+
+// lerpHex linearly interpolates between two RGB triples and returns a
+// lipgloss color. t is clamped to [0, 1].
+func lerpHex(a, b [3]int, t float64) lipgloss.Color {
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	r := int(float64(a[0]) + float64(b[0]-a[0])*t)
+	g := int(float64(a[1]) + float64(b[1]-a[1])*t)
+	bl := int(float64(a[2]) + float64(b[2]-a[2])*t)
+	return lipgloss.Color(fmt.Sprintf("#%02X%02X%02X", r, g, bl))
+}
 
 func AccentStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(Green).Bold(true)

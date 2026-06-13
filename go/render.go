@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -83,22 +84,72 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-// pulseFrames is a breathing orb cycle: dim → bright → dim. Paired with the
-// mode accent it reads as a live "working" heartbeat, not a blinking dot.
-var pulseFrames = []string{"·", "•", "●", "●", "•", "·"}
-
-// pulse returns the breathing accent-colored orb for the current spinner step.
-// Occupies one column + trailing space, so text after it aligns at column 2 —
-// matching the 2-space indent of frozen log lines.
-func (m model) pulse() string {
-	peak, mid, faint := Green, GreenMid, GreenFaint
+// accentRGB returns the mode's accent color as an RGB triple.
+func (m model) accentRGB() [3]int {
 	if m.autoMode {
-		peak, mid, faint = Blue, BlueMid, BlueFaint
+		return blueRGB
 	}
-	cols := []lipgloss.Color{faint, mid, peak, peak, mid, faint}
-	i := (m.spinner / 2) % len(pulseFrames)
-	orb := lipgloss.NewStyle().Foreground(cols[i]).Render(pulseFrames[i])
+	return greenRGB
+}
+
+func (m model) accentFaintRGB() [3]int {
+	if m.autoMode {
+		return blueFaintRGB
+	}
+	return greenFaintRGB
+}
+
+// orbRamp maps breath brightness 0..1 to single-width glyphs.
+var orbRamp = []string{"·", "∘", "•", "●"}
+
+// pulse returns a smoothly breathing accent orb. The brightness rides a slow
+// sine so the glow swells and fades continuously, with a brief white twinkle at
+// the crest. Occupies one column + trailing space so text after it aligns at
+// column 2 — matching the 2-space indent of frozen log lines.
+func (m model) pulse() string {
+	phase := float64(m.spinner) * 0.30
+	level := (math.Sin(phase) + 1) / 2 // 0..1
+
+	var col lipgloss.Color
+	if level < 0.85 {
+		col = lerpHex(m.accentFaintRGB(), m.accentRGB(), level/0.85)
+	} else {
+		col = lerpHex(m.accentRGB(), whiteRGB, (level-0.85)/0.15)
+	}
+	glyph := orbRamp[int(level*float64(len(orbRamp)-1)+0.5)]
+	orb := lipgloss.NewStyle().Foreground(col).Render(glyph)
 	return orb + " "
+}
+
+// shimmer renders text with a bright highlight band sweeping left-to-right and
+// wrapping, leaving the rest at the dim base. Used for live verbs so they read
+// as actively working rather than sitting static. Each rune is colored
+// independently, so the result carries per-rune ANSI codes.
+func (m model) shimmer(text string) string {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return ""
+	}
+	accent := m.accentRGB()
+	span := float64(len(runes) + 6)
+	head := math.Mod(float64(m.spinner)*0.55, span) - 1
+
+	var b strings.Builder
+	for i, r := range runes {
+		d := math.Abs(float64(i) - head)
+		intensity := 1 - d/2.5
+		if intensity < 0 {
+			intensity = 0
+		}
+		var col lipgloss.Color
+		if intensity < 0.7 {
+			col = lerpHex(dimRGB, accent, intensity/0.7)
+		} else {
+			col = lerpHex(accent, whiteRGB, (intensity-0.7)/0.3)
+		}
+		b.WriteString(lipgloss.NewStyle().Foreground(col).Render(string(r)))
+	}
+	return b.String()
 }
 
 func (m model) renderThinkEntry(entry messageEntry, active bool) string {
@@ -117,12 +168,12 @@ func (m model) renderThinkEntry(entry messageEntry, active bool) string {
 		if entry.activity != "" {
 			verb = entry.activity
 		}
-		return contentIndent + m.pulse() + DimStyle().Render(verb)
+		return contentIndent + m.pulse() + m.shimmer(verb)
 	}
 
 	var summary string
 	if animating {
-		summary = contentIndent + m.pulse() + DimStyle().Render("Thinking")
+		summary = contentIndent + m.pulse() + m.shimmer("Thinking")
 	} else {
 		summary = DimStyle().Render(contentIndent + "+ Thought: " + formatThinkDuration(duration))
 	}

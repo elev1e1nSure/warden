@@ -337,9 +337,9 @@ func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
 	if detail != "" {
 		detail = " -> " + detail
 	}
-	// Only the currently running tool gets the live breathing orb
+	// Only the currently running tool gets the live breathing orb and shimmer
 	if idx == m.runningToolIdx {
-		return prefix + m.pulse() + DimStyle().Render(entry.toolName+detail)
+		return prefix + m.pulse() + m.shimmer(entry.toolName+detail)
 	}
 	return DimStyle().Render(prefix + entry.toolName + detail)
 }
@@ -381,5 +381,5 @@ func (m model) renderChainAction(entry messageEntry, active bool) string {
 	if !active {
 		return DimStyle().Render(contentIndent + line)
 	}
-	return contentIndent + m.pulse() + DimStyle().Render(line)
+	return contentIndent + m.pulse() + m.shimmer(line)
 }

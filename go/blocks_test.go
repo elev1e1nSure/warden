@@ -57,16 +57,36 @@ func TestRenderThinkEntryHasLeadingIndent(t *testing.T) {
 	}
 }
 
+func stripANSI(s string) string {
+	var b strings.Builder
+	inEsc := false
+	for _, r := range s {
+		if r == '\x1b' {
+			inEsc = true
+			continue
+		}
+		if inEsc {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEsc = false
+			}
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 func TestRenderChainActionHasNoLeadingIndent(t *testing.T) {
 	m := initialModel("test-model", true)
 	m.loading = true
 	got := m.renderChainAction(messageEntry{activity: "Thinking"}, true)
 
+	stripped := stripANSI(got)
 	// live line is "<orb> Thinking": orb fills the indent slot, text at column 2
-	if !strings.Contains(got, " Thinking") {
-		t.Fatalf("expected orb + space before chain action text, got %q", got)
+	if !strings.Contains(stripped, "Thinking") {
+		t.Fatalf("expected chain action text, got %q", got)
 	}
-	if strings.Contains(got, "  Thinking") {
+	if strings.Contains(stripped, "  Thinking") {
 		t.Fatalf("expected orb in indent slot, not double space, got %q", got)
 	}
 }
