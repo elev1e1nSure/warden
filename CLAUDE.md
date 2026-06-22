@@ -1,72 +1,39 @@
-# warden — agent knowledge base
+# warden
 
-Minimal CLI computer-control agent. Go TUI frontend + Python backend. Drives the screen via vision models (Ollama or OpenRouter).
+Minimal CLI computer-control agent. Go TUI + Python backend. Screenshot → model → action loop via vision models (Ollama/OpenRouter). Windows only.
 
-## agent rules
+## Stack
+- Go 1.25+ — bubbletea, lipgloss, glamour
+- Python 3.11+ — aiohttp
+- Config: `~/.warden-config.json` (API key encrypted via `go/internal/security/`)
 
-- **Language:** English only, informal, no emojis — UI text, logs, comments, everything
-- **Edits:** change only what's needed; never rewrite an entire file unless asked
-- **Dependencies:** don't add without a reason; prefer stdlib
-- **Comments:** English, short, only when logic is non-obvious
-- **Large changes:** ask the user before doing them
-- **Safety:** risk classification lives in `agent/safety/_policy.py` — deterministic code, never the model or prompt
-- **New TUI patterns:** discuss with the user first, then document here
-- **Commits:** commit after every logically complete change — one message per user turn, split into multiple commits only when the diff clearly contains independent concerns. Leave the worktree clean. Exception: if a turn leaves a feature objectively half-done, say so and ask whether to commit anyway or finish first.
+## Commands
+- Build: `just build` (Go), `just release` (Go + PyInstaller backend)
+- Test:  `just test` (pytest), `just test-go`
+- Lint:  `just lint-py` (ruff), `just lint-go` (go vet)
+- Run:   `just run` (backend), `warden.exe` (full app)
 
-## stack
+## Architecture
+- `go/` — TUI. `main.go` = entry; `model.go` = tea.Model; `cmd/warden/` = launcher
+- `go/internal/client/` — HTTP NDJSON backend client
+- `agent/` — backend. `server.py` (aiohttp routes), `chat.py` (session + streaming)
+- `agent/tools/` — tool implementations: shell, files, browser, screen, search, patch, etc.
+- `agent/safety/_policy.py` — ground truth for risk classification. Model/prompt never decides safety.
+- `agent/memory/` — SQLite memory store + aggregation
 
-- **Go 1.25+** — TUI (bubbletea, lipgloss, glamour)
-- **Python 3.11+** — backend (aiohttp, ollama SDK)
-- pyautogui — mouse / keyboard
-- Pillow — screenshots
-- playwright — browser automation
-- duckduckgo-search — web search
-- html2text — HTML to markdown conversion
+## Conventions
+- **Language:** English everywhere — UI, logs, comments. No Russian in code.
+- **Commits:** Conventional Commits with scope, after each complete change. One per turn.
+- Tabs; Go camelCase, Python snake_case.
+- Use `Path.resolve()` for paths, not `os.path.abspath` — abspath misbehaves on symlinks.
 
-## code style
+## Anti-patterns
+- Do NOT move safety logic into prompts — only `agent/safety/_policy.py` decides.
+- Do NOT add a tool to the auto-promotion list in `_policy.py` without workspace checks — patch tools already caused bugs.
+- Do NOT restructure TUI without discussion — visual consistency has no test coverage.
+- Do NOT put API keys in child process env — pass via stdin.
 
-- Tabs for indentation, not spaces
-- Go: camelCase, idiomatic; Python: snake_case
-- Mandatory typing (`typing`, `dataclasses`)
-- No unnecessary abstractions — keep it simple
-- Async only where streaming or I/O concurrency is needed
-- Run `just test` after any change to `agent/safety/`
-
-## TUI visual spec
-
-- **accent colors:**
-  - green `#8AB89A` — primary: mode label, active input border, slash names, wave peak
-  - blue `#38BDF8` — secondary: Auto mode highlights (wave, input border)
-  - neutral `#d0d0d0` — tool names in action log
-  - red `#ff4444` — errors only
-  - dim `#666666` — timestamps, descriptions, metadata
-  - faint `#2a2a2a` — separators, inactive wave dots
-- **layout:** no top header; chat viewport fills screen; bottom has full-width wave, rounded input, single-line status bar
-- **status bar:** `Ask · model · hint [tokens]` — mode colored, model white, hint dim, tokens right-aligned
-- **wave:** full-width bouncing `·` dots under input; green in Ask, blue in Auto, faint when idle
-- **input:** `RoundedBorder`, green idle / blue Auto / faint streaming; prompt `> `
-- **user messages:** `#242424` block, no `>` prompt in history
-- **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, markdown rendered
-- **think line:** `[HH:MM]  + Thought: Xs` dim
-- **tool lines:** `→ name  args` → `+ name  result  +N -N`; name neutral `#d0d0d0`, result dim, stats green/red, errors red; click line to expand diff inline
-- **slash hints:** 2 columns — name (green, 14-char) + description (dim)
-- **controls:** arrows, Enter, Esc, Ctrl+C, Shift+Tab (toggle mode), Tab (complete), Ctrl+W (delete word)
-- **prefix hints:** `/` → slash commands; `!` → skills.
-- `/connect` — interactive provider/model picker; `/select` — text-selection mode (disables mouse capture)
-
-## skills
-
-Markdown instruction sets at `.warden/skills/<name>/SKILL.md` (project) or `~/.warden/skills/<name>/SKILL.md` (global). Fallback `.claude/skills/`.
-
-- **Catalog** — `<available_skills>` XML injected into system prompt each turn
-- **Invocation** — `!<name>` in input sends skill body as user message; LLM may also call the `skill` tool
-- **Discovery** — `agent/skills.py`: project > global; `.warden` > `.claude`
-- **Format** — YAML frontmatter with `name` (kebab-case, 1–64) and `description`; body ≤ 50 KB; imperative voice; no emojis
-
-## safety levels
-
-Deterministic classification in `agent/safety/_policy.py`:
-
-- **safe** — read-only: `Get-ChildItem`, `git status`, `screenshot`, `file_read` inside workspace, `browser_read`
-- **confirm** — writes, installs, mouse/keyboard, process kills, unknown binaries — requires `y/n` in Ask mode
-- **blocked** — recursive delete outside workspace, encoded commands, remote eval, disk format, registry changes
+## References
+- TUI visual spec — `@docs/tui-spec.md` (читать при работе с TUI)
+- Safety levels — `@agent/safety/_policy.py` (safe/confirm/blocked, deterministic, не в промпте)
+- Skills — `@.warden/skills/README.md` (читать при работе со скиллами)
