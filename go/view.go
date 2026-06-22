@@ -149,7 +149,7 @@ func (m *model) updateViewportHeight() {
 	m.viewport.Height = m.layoutViewportHeight()
 }
 
-func (m model) View() string {
+func (m *model) View() string {
 	if m.height == 0 {
 		return ""
 	}

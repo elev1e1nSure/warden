@@ -130,7 +130,7 @@ func filterModels(models []string, filter string) []string {
 	return result
 }
 
-func initialModel(modelName string, connected bool) model {
+func initialModel(modelName string, connected bool) *model {
 	ti := textarea.New()
 	ti.Placeholder = ""
 	ti.Prompt = ""
@@ -175,14 +175,14 @@ func initialModel(modelName string, connected bool) model {
 		hoveredMsgIdx: -1,
 		skillsIdx:     -1,
 	}
-	return m
+	return &m
 }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.checkBackend(), m.tick(), m.fetchSkills())
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
@@ -355,7 +355,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // isClickable reports whether the message at idx can be expanded/collapsed.
-func (m model) isClickable(idx int) bool {
+func (m *model) isClickable(idx int) bool {
 	if idx < 0 || idx >= len(m.messages) {
 		return false
 	}
@@ -365,7 +365,7 @@ func (m model) isClickable(idx int) bool {
 }
 
 // resolveConfirm closes the confirm dialog and sends the verdict to the backend.
-func (m model) resolveConfirm(ok bool) (model, tea.Cmd) {
+func (m *model) resolveConfirm(ok bool) (*model, tea.Cmd) {
 	ch := m.confirmCh
 	id := m.confirmID
 	m.confirming = false
@@ -381,7 +381,7 @@ func (m model) resolveConfirm(ok bool) (model, tea.Cmd) {
 
 // answerQuestion records the answer for the current question and advances;
 // after the last question it sends all answers to the backend.
-func (m model) answerQuestion(answer string) (model, tea.Cmd) {
+func (m *model) answerQuestion(answer string) (*model, tea.Cmd) {
 	m.questionAnswers = append(m.questionAnswers, []string{answer})
 	m.questionIdx++
 	if m.questionIdx < len(m.questionsData) {

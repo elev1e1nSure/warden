@@ -97,7 +97,7 @@ func (m *model) focusInput() tea.Cmd {
 	return m.textinput.Focus()
 }
 
-func (m model) clearQuestionState() model {
+func (m *model) clearQuestionState() *model {
 	m.questioning = false
 	m.questionID = ""
 	m.questionCh = nil

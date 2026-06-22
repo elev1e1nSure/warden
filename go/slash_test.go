@@ -18,7 +18,7 @@ func TestSlashNavigationDoesNotChangeInput(t *testing.T) {
 	m.refreshHints()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "/" {
 		t.Fatalf("slash navigation changed input: got %q", got)
@@ -43,7 +43,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 	m.refreshHints()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "!" {
 		t.Fatalf("bang navigation changed input: got %q", got)
@@ -53,7 +53,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 	}
 
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	m = updated.(model)
+	m = updated.(*model)
 	if m.skillsIdx != 0 {
 		t.Fatalf("bang navigation did not move back: got %d", m.skillsIdx)
 	}
@@ -70,7 +70,7 @@ func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 	m.skillsIdx = 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "!build-worker" {
 		t.Fatalf("expected selected skill, got %q", got)
@@ -87,7 +87,7 @@ func TestBangTabCompletesSingleMatch(t *testing.T) {
 	m.refreshHints()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "!cat-text" {
 		t.Fatalf("expected full skill name, got %q", got)
@@ -101,7 +101,7 @@ func TestSlashTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 	m.slashIdx = 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "/clear" {
 		t.Fatalf("expected selected slash command, got %q", got)
@@ -119,7 +119,7 @@ func TestBangTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
 	m.skillsIdx = 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	m = updated.(model)
+	m = updated.(*model)
 
 	if got := m.textinput.Value(); got != "!beta" {
 		t.Fatalf("expected selected skill, got %q", got)

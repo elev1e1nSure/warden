@@ -2,7 +2,7 @@ package tui
 
 import tea "github.com/charmbracelet/bubbletea"
 
-func (m model) handleModeMsg(msg modeMsg) (model, tea.Cmd) {
+func (m *model) handleModeMsg(msg modeMsg) (*model, tea.Cmd) {
 	m.autoMode = msg.auto
 	if msg.err != nil {
 		m.appendText(ErrorStyle().Render("  failed to save auto mode: " + msg.err.Error()))
@@ -12,7 +12,7 @@ func (m model) handleModeMsg(msg modeMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleStatusResult(msg statusResultMsg) (model, tea.Cmd) {
+func (m *model) handleStatusResult(msg statusResultMsg) (*model, tea.Cmd) {
 	if msg.tokenLimit > 0 {
 		m.tokenCount = msg.tokenCount
 		m.tokenLimit = msg.tokenLimit
@@ -24,12 +24,12 @@ func (m model) handleStatusResult(msg statusResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleClipboardDone(msg clipboardDoneMsg) (model, tea.Cmd) {
+func (m *model) handleClipboardDone(msg clipboardDoneMsg) (*model, tea.Cmd) {
 	m.syncViewport()
 	return m, nil
 }
 
-func (m model) handleCompactResult(msg compactResultMsg) (model, tea.Cmd) {
+func (m *model) handleCompactResult(msg compactResultMsg) (*model, tea.Cmd) {
 	m.loading = false
 	if msg.err == "" {
 		m.tokenCount = msg.tokensAfter
@@ -38,7 +38,7 @@ func (m model) handleCompactResult(msg compactResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleMemoryResult(msg memoryResultMsg) (model, tea.Cmd) {
+func (m *model) handleMemoryResult(msg memoryResultMsg) (*model, tea.Cmd) {
 	m.loading = false
 	if msg.err != "" {
 		m.appendText(ErrorStyle().Render("  memory error: " + msg.err))
@@ -50,7 +50,7 @@ func (m model) handleMemoryResult(msg memoryResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleUpdateResult(msg updateResultMsg) (model, tea.Cmd) {
+func (m *model) handleUpdateResult(msg updateResultMsg) (*model, tea.Cmd) {
 	m.loading = false
 	if msg.err != nil {
 		m.appendText(ErrorStyle().Render("  update failed: " + msg.err.Error()))
@@ -63,7 +63,7 @@ func (m model) handleUpdateResult(msg updateResultMsg) (model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-func (m model) handleBackendReady(msg backendReadyMsg) (model, tea.Cmd) {
+func (m *model) handleBackendReady(msg backendReadyMsg) (*model, tea.Cmd) {
 	m.loading = false
 	m.tokenCount = 0
 	m.client.ResetSession()
@@ -74,13 +74,13 @@ func (m model) handleBackendReady(msg backendReadyMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleBackendError(msg backendErrorMsg) (model, tea.Cmd) {
+func (m *model) handleBackendError(msg backendErrorMsg) (*model, tea.Cmd) {
 	m.loading = false
 	m.syncViewport()
 	return m, nil
 }
 
-func (m model) handleSkillsResult(msg skillsResultMsg) (model, tea.Cmd) {
+func (m *model) handleSkillsResult(msg skillsResultMsg) (*model, tea.Cmd) {
 	if msg.err != "" {
 		m.skillsErr = msg.err
 	} else {
@@ -91,7 +91,7 @@ func (m model) handleSkillsResult(msg skillsResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleSkillLoaded(msg skillLoadedMsg) (model, tea.Cmd) {
+func (m *model) handleSkillLoaded(msg skillLoadedMsg) (*model, tea.Cmd) {
 	m.streaming = false
 	m.loading = false
 	if msg.err != "" {

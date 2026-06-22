@@ -2,7 +2,7 @@ package tui
 
 import tea "github.com/charmbracelet/bubbletea"
 
-func (m model) handleModelsResult(msg modelsResultMsg) (model, tea.Cmd) {
+func (m *model) handleModelsResult(msg modelsResultMsg) (*model, tea.Cmd) {
 	if msg.err != "" || len(msg.models) == 0 {
 		return m, nil
 	}
@@ -33,7 +33,7 @@ func (m model) handleModelsResult(msg modelsResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleModelSet(msg modelSetMsg) (model, tea.Cmd) {
+func (m *model) handleModelSet(msg modelSetMsg) (*model, tea.Cmd) {
 	if msg.err == "" {
 		m.modelName = msg.model
 		m.messages = []messageEntry{}
@@ -42,7 +42,7 @@ func (m model) handleModelSet(msg modelSetMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleConnectResult(msg connectResultMsg) (model, tea.Cmd) {
+func (m *model) handleConnectResult(msg connectResultMsg) (*model, tea.Cmd) {
 	if msg.ok {
 		m.connected = true
 		m.modelName = msg.model

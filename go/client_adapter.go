@@ -55,14 +55,14 @@ func readNext(ch <-chan client.Event, gen int) tea.Cmd {
 	}
 }
 
-func (m model) sendMessage(text string, gen int) tea.Cmd {
+func (m *model) sendMessage(text string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		ch := m.client.StreamChat(map[string]string{"type": "message", "text": text})
 		return startStreamMsg{ch: ch, gen: gen}
 	}
 }
 
-func (m model) sendSkill(name, args string, gen int) tea.Cmd {
+func (m *model) sendSkill(name, args string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		payload := map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name}
 		if args != "" {
@@ -73,7 +73,7 @@ func (m model) sendSkill(name, args string, gen int) tea.Cmd {
 	}
 }
 
-func (m model) sendInterrupt() tea.Cmd {
+func (m *model) sendInterrupt() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.Interrupt(); err != nil {
 			return statusResultMsg{brief: true}

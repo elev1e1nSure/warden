@@ -12,7 +12,7 @@ import (
 const waveSteps = 28
 
 // sideMargin is the horizontal inset (each side) of the centered input column.
-func (m model) sideMargin() int {
+func (m *model) sideMargin() int {
 	mg := 4
 	if m.width < 40 {
 		mg = 1
@@ -25,7 +25,7 @@ func (m model) sideMargin() int {
 
 // barWidth is the total visible width of the input box (border + padding +
 // content). The box is centered in the terminal, leaving sideMargin each side.
-func (m model) barWidth() int {
+func (m *model) barWidth() int {
 	w := m.width - 2*m.sideMargin()
 	if w < 1 {
 		w = 1
@@ -35,7 +35,7 @@ func (m model) barWidth() int {
 
 // inputContentWidth is the textarea render width inside the box:
 // barWidth minus border(1) + padL(2) + padR(1).
-func (m model) inputContentWidth() int {
+func (m *model) inputContentWidth() int {
 	w := m.barWidth() - 4
 	if w < 1 {
 		w = 1
@@ -72,7 +72,7 @@ func buildWaveCells(pr, pg, pb int) []string {
 }
 
 // renderWaveSpinner renders a 7-char bouncing wave for the status bar.
-func (m model) renderWaveSpinner() string {
+func (m *model) renderWaveSpinner() string {
 	const n = 7
 	const lo = -2
 	const hi = n + 1
@@ -120,7 +120,7 @@ func (m model) renderWaveSpinner() string {
 // Three sine waves of different speeds/frequencies travel across the bar and
 // sum into a moving brightness field — multiple soft crests drifting, not a
 // single bouncing dot. Idle = static faint dots.
-func (m model) renderFullWave() string {
+func (m *model) renderFullWave() string {
 	// a touch narrower than the input bar, centered under it
 	n := m.barWidth() - 4
 	if n < 1 {
@@ -173,7 +173,7 @@ const inputBg = lipgloss.Color("#1e1e1e")
 // string exactly `width` cells wide. Every segment carries bg so the background
 // fills under colored text too; the gap is padded manually (no lipgloss Width,
 // which clips when combined with padding).
-func (m model) renderStatusContent(width int, bg lipgloss.Color) string {
+func (m *model) renderStatusContent(width int, bg lipgloss.Color) string {
 	fg := func(c lipgloss.Color, bold bool) lipgloss.Style {
 		s := lipgloss.NewStyle().Foreground(c).Background(bg)
 		if bold {
@@ -229,7 +229,7 @@ func (m model) renderStatusContent(width int, bg lipgloss.Color) string {
 
 // renderInput renders the input box with an integrated status footer, centered in the terminal.
 // Layout: ▌ top-pad / textarea / blank spacer / status / bottom-pad
-func (m model) renderInput() string {
+func (m *model) renderInput() string {
 	accentColor := Green
 	if m.autoMode {
 		accentColor = Blue

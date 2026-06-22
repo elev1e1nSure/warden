@@ -311,7 +311,7 @@ func pathBase(p string) string {
 // renderToolActivityEntry renders a tool line.
 // While pending (toolDone=false): animated pulse+shimmer.
 // When done: static summary with optional +/- expand toggle.
-func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string {
+func (m *model) renderToolActivityEntry(entry messageEntry, hovered bool) string {
 	if !entry.toolDone {
 		// pending: animate only while loading
 		line := entry.toolName
@@ -373,7 +373,7 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 }
 
 // renderChainAction renders the single live "what's happening now" line.
-func (m model) renderChainAction(entry messageEntry, active bool) string {
+func (m *model) renderChainAction(entry messageEntry, active bool) string {
 	if !m.loading {
 		return ""
 	}

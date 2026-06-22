@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m model) handleKeyCtrlC(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyCtrlC(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if m.streaming {
 		if m.quitPending {
 			return m, tea.Quit, true
@@ -19,7 +19,7 @@ func (m model) handleKeyCtrlC(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, tea.Quit, true
 }
 
-func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyEsc(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	m.quitPending = false
 	if m.selectMode {
 		m.selectMode = false
@@ -69,7 +69,7 @@ func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-func (m model) handleKeyRunes(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyRunes(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if m.confirming {
 		switch strings.ToLower(string(msg.Runes)) {
 		case "y", "н":
@@ -95,7 +95,7 @@ func (m model) handleKeyRunes(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m model) handleKeyEnter(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyEnter(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	m.quitPending = false
 	if m.modelPicking {
 		if m.modelPickIdx < len(m.modelFiltered) {

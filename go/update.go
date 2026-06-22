@@ -30,7 +30,7 @@ type updateRelease struct {
 	} `json:"assets"`
 }
 
-func (m model) runUpdate() tea.Cmd {
+func (m *model) runUpdate() tea.Cmd {
 	return func() tea.Msg {
 		err := prepareUpdate()
 		return updateResultMsg{err: err}

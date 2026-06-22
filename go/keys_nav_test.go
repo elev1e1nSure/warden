@@ -21,6 +21,7 @@ func TestHandleKeyUpDown(t *testing.T) {
 	}
 
 	// Down key
+	m.modelPickIdx = 1
 	m3, _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyDown})
 	if !handled || m3.modelPickIdx != 2 {
 		t.Errorf("expected Down arrow to navigate model list down, got idx=%d", m3.modelPickIdx)

@@ -15,7 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m model) checkBackend() tea.Cmd {
+func (m *model) checkBackend() tea.Cmd {
 	return func() tea.Msg {
 		resp, err := http.Get(m.client.BaseURL + "/health")
 		if err != nil || resp.StatusCode != 200 {
@@ -29,21 +29,21 @@ func (m model) checkBackend() tea.Cmd {
 	}
 }
 
-func (m model) sendQuestion(id string, answers [][]string) tea.Cmd {
+func (m *model) sendQuestion(id string, answers [][]string) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendQuestion(id, answers)
 		return nil
 	}
 }
 
-func (m model) sendConfirm(id string, ok bool) tea.Cmd {
+func (m *model) sendConfirm(id string, ok bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendConfirm(id, ok)
 		return nil
 	}
 }
 
-func (m model) setMode(auto bool) tea.Cmd {
+func (m *model) setMode(auto bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SetMode(auto)
 		err := saveAutoMode(auto)
@@ -89,7 +89,7 @@ func saveAutoMode(auto bool) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (m model) fetchStatus(brief bool) tea.Cmd {
+func (m *model) fetchStatus(brief bool) tea.Cmd {
 	return func() tea.Msg {
 		s, err := m.client.GetStatus()
 		if err != nil {
@@ -106,7 +106,7 @@ func (m model) fetchStatus(brief bool) tea.Cmd {
 	}
 }
 
-func (m model) runCompact() tea.Cmd {
+func (m *model) runCompact() tea.Cmd {
 	return func() tea.Msg {
 		result, err := m.client.Compact()
 		if err != nil {
@@ -119,7 +119,7 @@ func (m model) runCompact() tea.Cmd {
 	}
 }
 
-func (m model) runMemoryOn() tea.Cmd {
+func (m *model) runMemoryOn() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.SetMemoryState(true); err != nil {
 			return memoryResultMsg{err: err.Error()}
@@ -128,7 +128,7 @@ func (m model) runMemoryOn() tea.Cmd {
 	}
 }
 
-func (m model) runMemoryOff() tea.Cmd {
+func (m *model) runMemoryOff() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.SetMemoryState(false); err != nil {
 			return memoryResultMsg{err: err.Error()}
@@ -137,7 +137,7 @@ func (m model) runMemoryOff() tea.Cmd {
 	}
 }
 
-func (m model) runMemoryClear() tea.Cmd {
+func (m *model) runMemoryClear() tea.Cmd {
 	return func() tea.Msg {
 		count, err := m.client.ClearMemory()
 		if err != nil {
@@ -147,7 +147,7 @@ func (m model) runMemoryClear() tea.Cmd {
 	}
 }
 
-func (m model) runMemoryStatus() tea.Cmd {
+func (m *model) runMemoryStatus() tea.Cmd {
 	return func() tea.Msg {
 		state, err := m.client.GetMemoryState()
 		if err != nil {
@@ -164,7 +164,7 @@ func (m model) runMemoryStatus() tea.Cmd {
 	}
 }
 
-func (m model) copyToClipboard(text string) tea.Cmd {
+func (m *model) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", "$env:WARDEN_CLIP | Set-Clipboard")
 		cmd.Env = append(os.Environ(), "WARDEN_CLIP="+text)
@@ -181,7 +181,7 @@ func setContent(vp viewport.Model, lines []string) viewport.Model {
 	return vp
 }
 
-func (m model) execShell(cmdText string) tea.Cmd {
+func (m *model) execShell(cmdText string) tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("powershell", "-NonInteractive", "-NoProfile", "-Command", cmdText)
 		out, err := cmd.CombinedOutput()
@@ -192,13 +192,13 @@ func (m model) execShell(cmdText string) tea.Cmd {
 	}
 }
 
-func (m model) tick() tea.Cmd {
+func (m *model) tick() tea.Cmd {
 	return tea.Tick(70*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
 
-func (m model) fetchModels() tea.Cmd {
+func (m *model) fetchModels() tea.Cmd {
 	return func() tea.Msg {
 		models, current, err := m.client.ListModels()
 		if err != nil {
@@ -208,7 +208,7 @@ func (m model) fetchModels() tea.Cmd {
 	}
 }
 
-func (m model) applyModel(name string) tea.Cmd {
+func (m *model) applyModel(name string) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.SetModel(name); err != nil {
 			return modelSetMsg{err: err.Error()}
@@ -217,7 +217,7 @@ func (m model) applyModel(name string) tea.Cmd {
 	}
 }
 
-func (m model) fetchSkills() tea.Cmd {
+func (m *model) fetchSkills() tea.Cmd {
 	return func() tea.Msg {
 		skills, err := m.client.ListSkills()
 		if err != nil {
@@ -227,7 +227,7 @@ func (m model) fetchSkills() tea.Cmd {
 	}
 }
 
-func (m model) loadSkill(name string) tea.Cmd {
+func (m *model) loadSkill(name string) tea.Cmd {
 	return func() tea.Msg {
 		content, err := m.client.LoadSkill(name)
 		if err != nil {

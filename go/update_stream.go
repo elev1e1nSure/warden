@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
+func (m *model) handleNextMsg(msg nextMsg) (*model, tea.Cmd) {
 	if msg.gen != m.streamGen {
 		return m, nil
 	}
@@ -118,14 +118,14 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleStartStreamMsg(msg startStreamMsg) (model, tea.Cmd) {
+func (m *model) handleStartStreamMsg(msg startStreamMsg) (*model, tea.Cmd) {
 	if msg.gen != m.streamGen {
 		return m, nil
 	}
 	return m, readNext(msg.ch, m.streamGen)
 }
 
-func (m model) handleDoneMsg(msg doneMsg) (model, tea.Cmd) {
+func (m *model) handleDoneMsg(msg doneMsg) (*model, tea.Cmd) {
 	if msg.gen != m.streamGen {
 		return m, nil
 	}
@@ -137,7 +137,7 @@ func (m model) handleDoneMsg(msg doneMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleShellResult(msg shellResultMsg) (model, tea.Cmd) {
+func (m *model) handleShellResult(msg shellResultMsg) (*model, tea.Cmd) {
 	m.streaming = false
 	m.loading = false
 	m.toolRunning = false
@@ -150,7 +150,7 @@ func (m model) handleShellResult(msg shellResultMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleTick(msg tickMsg) (model, tea.Cmd) {
+func (m *model) handleTick(msg tickMsg) (*model, tea.Cmd) {
 	if m.loading {
 		m.spinner++
 		if m.streaming && !m.confirming && len(m.messages) > 0 {

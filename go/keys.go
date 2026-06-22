@@ -9,7 +9,7 @@ import (
 // handleKey processes a keyboard event.
 // Returns (model, cmd, true) when Update should return immediately,
 // or (model, nil, false) to continue with the normal Update tail.
-func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKey(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	modal := m.confirming || m.questioning || m.modelPicking
 
 	// Native bracketed paste (or multi-rune burst): collapse big/multiline

@@ -6,7 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m model) handleKeyUp(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyUp(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if m.handleSlashNavigation(msg) {
 		return m, nil, true
 	}
@@ -37,7 +37,7 @@ func (m model) handleKeyUp(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m model) handleKeyDown(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyDown(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if m.handleSlashNavigation(msg) {
 		return m, nil, true
 	}
@@ -72,7 +72,7 @@ func (m model) handleKeyDown(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m model) handleKeyTab(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyTab(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	val := m.textinput.Value()
 	if len(val) > 0 && val[0] == '!' {
 		matches := matchBang(val, m.skills)
@@ -104,7 +104,7 @@ func (m model) handleKeyTab(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-func (m model) handleKeyShiftTab(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyShiftTab(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if !m.streaming {
 		m.autoMode = !m.autoMode
 		return m, m.setMode(m.autoMode), true
@@ -112,7 +112,7 @@ func (m model) handleKeyShiftTab(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m model) handleKeyCtrlW(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+func (m *model) handleKeyCtrlW(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 	if !m.questioning && !m.confirming {
 		val := m.textinput.Value()
 		runes := []rune(val)

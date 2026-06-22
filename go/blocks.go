@@ -125,7 +125,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	return strings.Join(lines, "\n")
 }
 
-func (m model) renderHint() string {
+func (m *model) renderHint() string {
 	val := m.textinput.Value()
 	accent := WardenStyleAuto(m.autoMode)
 	if strings.HasPrefix(val, "/") {
@@ -231,7 +231,7 @@ func (m model) renderHint() string {
 	return ""
 }
 
-func (m model) renderConnectWizard() string {
+func (m *model) renderConnectWizard() string {
 	acc := WardenStyleAuto(m.autoMode)
 	dim := DimStyle()
 	errStyle := ErrorStyle()

@@ -21,7 +21,7 @@ const (
 )
 
 // wardenLine builds a labeled response line (used for slash command output).
-func (m model) wardenLine(suffix string) string {
+func (m *model) wardenLine(suffix string) string {
 	return contentIndent + WardenStyleAuto(m.autoMode).Render("warden") + "\n" + bodyIndent + suffix
 }
 
@@ -85,14 +85,14 @@ func wrapWords(text string, width int) []string {
 }
 
 // accentRGB returns the mode's accent color as an RGB triple.
-func (m model) accentRGB() [3]int {
+func (m *model) accentRGB() [3]int {
 	if m.autoMode {
 		return blueRGB
 	}
 	return greenRGB
 }
 
-func (m model) accentFaintRGB() [3]int {
+func (m *model) accentFaintRGB() [3]int {
 	if m.autoMode {
 		return blueFaintRGB
 	}
@@ -106,7 +106,7 @@ var orbRamp = []string{"·", "∘", "•", "●"}
 // sine so the glow swells and fades continuously, with a brief white twinkle at
 // the crest. Occupies one column + trailing space so text after it aligns at
 // column 2 — matching the 2-space indent of frozen log lines.
-func (m model) pulse() string {
+func (m *model) pulse() string {
 	phase := float64(m.spinner) * 0.30
 	level := (math.Sin(phase) + 1) / 2 // 0..1
 
@@ -125,7 +125,7 @@ func (m model) pulse() string {
 // wrapping, leaving the rest at the dim base. Used for live verbs so they read
 // as actively working rather than sitting static. Each rune is colored
 // independently, so the result carries per-rune ANSI codes.
-func (m model) shimmer(text string) string {
+func (m *model) shimmer(text string) string {
 	runes := []rune(text)
 	if len(runes) == 0 {
 		return ""
@@ -152,7 +152,7 @@ func (m model) shimmer(text string) string {
 	return b.String()
 }
 
-func (m model) renderThinkEntry(entry messageEntry, active bool, hovered bool) string {
+func (m *model) renderThinkEntry(entry messageEntry, active bool, hovered bool) string {
 	duration := entry.duration
 	if duration <= 0 && !entry.startedAt.IsZero() {
 		duration = time.Since(entry.startedAt)
