@@ -217,7 +217,7 @@ async def test_lsp_client_definition_roundtrip(tmp_path, monkeypatch):
         "    elif method == 'exit':\n"
         "        break\n"
         "    elif 'id' in msg:\n"
-        "        idx = msg['id'] - 1\n"
+        "        idx = msg['id'] - 2\n"
         "        if 0 <= idx < len(REPLACEMENT):\n"
         "            send({'jsonrpc': '2.0', 'id': msg['id'], 'result': REPLACEMENT[idx]})\n"
         "        else:\n"

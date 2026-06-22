@@ -416,6 +416,9 @@ class ApplyPatchTool(Tool):
         if not path.exists():
             return f"patch: {f['path']} — not found (skipped)", 0, 0
         content = path.read_text(encoding="utf-8")
+        has_trailing = content.endswith("\n")
+        if has_trailing:
+            content = content[:-1]
         lines = content.split("\n")
 
         for h in f["hunks"]:
@@ -426,6 +429,8 @@ class ApplyPatchTool(Tool):
                 return f"patch: {f['path']} — hunk failed to match", 0, 0
 
         new_content = "\n".join(lines)
+        if has_trailing:
+            new_content += "\n"
         d = os.path.dirname(abspath)
         if d:
             os.makedirs(d, exist_ok=True)
