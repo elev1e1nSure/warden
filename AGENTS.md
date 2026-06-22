@@ -1,3 +1,1 @@
-﻿# warden
-
-See [CLAUDE.md](CLAUDE.md) — canonical instructions for agents and project style.
+﻿Necessarily see [CLAUDE.md](CLAUDE.md) — canonical instructions for agents and project style.
