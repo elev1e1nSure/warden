@@ -54,8 +54,6 @@ type model struct {
 	verboseMode bool
 	// select mode — mouse capture disabled so terminal can select text
 	selectMode bool
-	// diff mode — show unified diffs for file edits even in non-verbose mode
-	diffMode bool
 	// model picker
 	modelPicking   bool
 	modelList      []string
@@ -369,7 +367,7 @@ func (m model) isClickable(idx int) bool {
 	}
 	e := m.messages[idx]
 	return (e.kind == messageThink && e.text != "") ||
-		(e.kind == messageToolActivity && e.toolDone && e.toolResult != "")
+		(e.kind == messageToolActivity && e.toolDone && (e.toolResult != "" || e.toolDiff != ""))
 }
 
 // resolveConfirm closes the confirm dialog and sends the verdict to the backend.

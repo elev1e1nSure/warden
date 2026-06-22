@@ -71,23 +71,32 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 
 	case toolMsg:
 		m.toolRunning = false
+		summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
 		if m.verboseMode {
-			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
 			if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
 				m.messages[m.runningToolIdx].text = summary
 				m.messages[m.runningToolIdx].toolResult = inner.tool.Result
+				m.messages[m.runningToolIdx].toolDiff = inner.tool.Diff
 				m.messages[m.runningToolIdx].toolDone = true
 			} else {
 				m.messages = append(m.messages, messageEntry{
 					kind:       messageToolActivity,
 					text:       summary,
 					toolResult: inner.tool.Result,
+					toolDiff:   inner.tool.Diff,
 					toolDone:   true,
 				})
 			}
-		}
-		if inner.tool.Diff != "" {
-			m.messages = append(m.messages, messageEntry{kind: messageToolDiff, text: inner.tool.Diff})
+		} else if inner.tool.Diff != "" {
+			// Non-verbose: still show a compact tool line when there's a diff to expand.
+			m.clearAction()
+			m.messages = append(m.messages, messageEntry{
+				kind:       messageToolActivity,
+				text:       summary,
+				toolResult: inner.tool.Result,
+				toolDiff:   inner.tool.Diff,
+				toolDone:   true,
+			})
 		}
 		m.runningToolIdx = -1
 		m.syncViewport()

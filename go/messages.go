@@ -108,7 +108,6 @@ const (
 	messageThink
 	messageAssistant
 	messageToolActivity // persistent tool line: pending while running, summary when done
-	messageToolDiff     // diff block
 	messageToolFlow     // live tool activity shown as flowing lines (verbose)
 	messageChainAction  // single live "what's happening now" line (skill streams / compat)
 )
@@ -124,6 +123,7 @@ type messageEntry struct {
 	toolDone   bool   // true when the tool has finished
 	expanded   bool   // user toggled expanded detail view
 	toolResult string // raw tool result for expanded view (messageToolActivity)
+	toolDiff   string // unified diff for expanded view (overrides toolResult when set)
 }
 
 func (m *model) appendText(text string) {

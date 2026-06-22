@@ -380,6 +380,11 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 	if !entry.expanded {
 		return summaryLine
 	}
+	if entry.toolDiff != "" {
+		diffBlock := renderUnifiedDiff(entry.toolDiff, m.barWidth()-len(bodyIndent))
+		indented := indentLines(diffBlock, bodyIndent)
+		return summaryLine + "\n" + indented
+	}
 	result := strings.TrimSpace(entry.toolResult)
 	resultLines := strings.Split(result, "\n")
 	maxWidth := m.barWidth() - len(bodyIndent)

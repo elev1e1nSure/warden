@@ -64,8 +64,6 @@ func (m *model) renderMessages() []string {
 			rendered = indentLines(m.renderToolActivityEntry(entry, hovered), gutter)
 		case messageChainAction:
 			rendered = indentLines(m.renderChainAction(entry, i == lastActionIdx), gutter)
-		case messageToolDiff:
-			rendered = indentLines(renderUnifiedDiff(entry.text, m.barWidth()), gutter)
 		default:
 			rendered = indentLines(entry.text, gutter)
 		}
