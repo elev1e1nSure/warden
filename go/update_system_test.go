@@ -21,6 +21,26 @@ func TestHandleModeMsg(t *testing.T) {
 	}
 }
 
+func TestHandleModeMsgError(t *testing.T) {
+	m := newTestModel()
+	m.autoMode = false
+
+	m2, _ := m.handleModeMsg(modeMsg{auto: true, err: errors.New("write failed")})
+	if !m2.autoMode {
+		t.Errorf("expected autoMode to be true")
+	}
+	foundErr := false
+	for _, msg := range m2.messages {
+		if strings.Contains(msg.text, "failed to save auto mode: write failed") {
+			foundErr = true
+			break
+		}
+	}
+	if !foundErr {
+		t.Errorf("expected error message in viewport messages")
+	}
+}
+
 func TestHandleStatusResult(t *testing.T) {
 	m := newTestModel()
 	m2, _ := m.handleStatusResult(statusResultMsg{

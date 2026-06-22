@@ -4,6 +4,10 @@ import tea "github.com/charmbracelet/bubbletea"
 
 func (m model) handleModeMsg(msg modeMsg) (model, tea.Cmd) {
 	m.autoMode = msg.auto
+	if msg.err != nil {
+		m.appendText(ErrorStyle().Render("  failed to save auto mode: " + msg.err.Error()))
+		m.appendText("")
+	}
 	m.syncViewport()
 	return m, nil
 }

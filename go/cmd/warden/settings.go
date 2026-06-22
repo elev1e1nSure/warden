@@ -26,23 +26,23 @@ func defaultConfig() WardenConfig {
 	}
 }
 
-func loadConfig() (WardenConfig, bool) {
+func loadConfig() (WardenConfig, error) {
 	path, err := configPath()
 	if err != nil {
-		return defaultConfig(), false
+		return defaultConfig(), err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return defaultConfig(), false
+		return defaultConfig(), err
 	}
 	var cfg WardenConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return defaultConfig(), false
+		return defaultConfig(), err
 	}
 	if cfg.APIURL == "" {
 		cfg.APIURL = "https://openrouter.ai/api/v1"
 	}
-	return cfg, true
+	return cfg, nil
 }
 
 func saveConfig(cfg WardenConfig) error {

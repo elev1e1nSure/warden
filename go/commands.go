@@ -46,8 +46,8 @@ func (m model) sendConfirm(id string, ok bool) tea.Cmd {
 func (m model) setMode(auto bool) tea.Cmd {
 	return func() tea.Msg {
 		m.client.SetMode(auto)
-		saveAutoMode(auto)
-		return modeMsg{auto: auto}
+		err := saveAutoMode(auto)
+		return modeMsg{auto: auto, err: err}
 	}
 }
 
@@ -77,13 +77,16 @@ func loadAutoMode() bool {
 	return s.AutoMode
 }
 
-func saveAutoMode(auto bool) {
+func saveAutoMode(auto bool) error {
 	path, err := settingsPath()
 	if err != nil {
-		return
+		return err
 	}
-	data, _ := json.Marshal(map[string]bool{"auto_mode": auto})
-	os.WriteFile(path, data, 0644)
+	data, err := json.Marshal(map[string]bool{"auto_mode": auto})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
 func (m model) fetchStatus(brief bool) tea.Cmd {

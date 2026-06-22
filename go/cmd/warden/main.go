@@ -269,7 +269,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg, _ := loadConfig()
+	cfg, err := loadConfig()
+	if err != nil && !os.IsNotExist(err) {
+		fmt.Fprintln(os.Stderr, "failed to load config:", err)
+	}
 	connected := cfg.Model != "" && cfg.APIKey != ""
 
 	alreadyRunning, err := preCheck()
