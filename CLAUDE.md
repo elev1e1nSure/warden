@@ -25,31 +25,37 @@ Minimal CLI computer-control agent. Go TUI frontend + Python backend. Drives the
 
 ```
 go/                      — bubbletea TUI
-  cmd/warden/            — entry point
-  blocks.go              — message rendering
-  chain.go               — update chaining
-  client.go              — HTTP client to backend
-  commands.go            — slash command handlers
+  cmd/warden/            — entry point & launcher
+  blocks.go              — connect wizard & block rendering
+  chain.go               — action chain (animations)
+  client_adapter.go      — backend message adapter
+  commands.go            — slash command handlers & tick
   diff.go                — diff viewer
   input.go               — input model & history
-  keys.go                — key bindings
-  markdown.go            — markdown parser
-  messages.go            — message types
+  keys.go                — top-level key routing
+  keys_action.go         — Esc / Ctrl+C handlers
+  keys_nav.go            — arrow navigation & tab
+  markdown.go            — glamour markdown renderer
+  messages.go            — message entry types
   model.go               — main tea.Model
-  render.go              — render helpers
+  render.go              — pulse, shimmer, think duration
   slash.go               — slash command autocomplete
-  status.go              — status bar
-  stream.go              — streaming state
-  styles.go              — lipgloss styles
+  status.go              — status bar & wave
+  styles.go              — lipgloss colors & helpers
   tools.go               — tool line rendering
   update.go              — self-updater
-  view.go                — layout glue
+  update_modal.go        — modal state handlers
+  update_stream.go       — streaming token handlers
+  update_system.go       — backend lifecycle handlers
+  view.go                — layout & message rendering
   viewport*.go           — scrollable viewport
+
+justfile                 — task runner
 
 agent/                   — Python backend
   server.py              — aiohttp server, routes
-  chat.py                — chat session & message history
-  llm_client.py          — OpenRouter / Ollama client
+  chat.py                — chat session & streaming
+  llm_client.py          — Ollama / OpenAI client
   prompt.py              — system prompt builder
   tool_runner.py         — tool dispatch & execution
   confirmations.py       — user confirmation flow
