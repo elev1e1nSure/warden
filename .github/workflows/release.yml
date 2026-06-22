@@ -83,21 +83,10 @@ jobs:
         shell: python
         env:
           CURRENT_TAG: ${{ github.ref_name }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          import os, re, subprocess
-
-          EMOJI_MAP = {
-              "feat":     ("✨", "New Features"),
-              "fix":      ("\U0001f41b", "Bug Fixes"),
-              "perf":     ("⚡", "Performance"),
-              "refactor": ("♻️", "Refactoring"),
-              "test":     ("\U0001f9ea", "Tests"),
-              "docs":     ("\U0001f4da", "Documentation"),
-              "ci":       ("\U0001f477", "CI/CD"),
-              "build":    ("\U0001f4e6", "Build"),
-              "style":    ("\U0001f3a8", "Style"),
-              "chore":    ("\U0001f527", "Chores"),
-          }
+          import os, subprocess, json
+          from urllib.request import Request, urlopen
 
           def run(cmd):
               return subprocess.run(cmd, capture_output=True, text=True, shell=True).stdout.strip()
@@ -106,37 +95,65 @@ jobs:
           tags = [t for t in run("git tag --sort=-version:refname").splitlines() if t and t != current]
           prev = tags[0] if tags else ""
           range_ = f"{prev}..{current}" if prev else current
-          commits = [l for l in run(f"git log {range_} --pretty=format:%s --no-merges").splitlines() if l.strip()]
 
-          groups, breaking, other = {}, [], []
-          for msg in commits:
-              m = re.match(r"^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$", msg)
-              if m:
-                  type_, scope, bang, desc = m.groups()
-                  label = f"**{scope}:** {desc}" if scope else desc
-                  if bang:
-                      breaking.append(label)
-                  if type_.lower() in EMOJI_MAP:
-                      groups.setdefault(type_.lower(), []).append(label)
-                  else:
-                      other.append(desc)
-              else:
-                  other.append(msg)
+          raw = run(f"git log {range_} --pretty=format:'%s' --no-merges")
+          commits = "\n".join(raw.splitlines()[:200])
 
-          lines = []
-          if breaking:
-              lines += [f"### \U0001f4a5 Breaking Changes", *[f"- {b}" for b in breaking], ""]
-          for type_, (emoji, title) in EMOJI_MAP.items():
-              if type_ in groups:
-                  lines += [f"### {emoji} {title}", *[f"- {m}" for m in groups[type_]], ""]
-          if other:
-              lines += [f"### \U0001f4cc Other", *[f"- {m}" for m in other], ""]
-          while lines and not lines[-1]:
-              lines.pop()
+          def fallback(text):
+              with open("release_notes.md", "w", encoding="utf-8") as f:
+                  f.write(text if text.strip() else "No changes.")
 
-          notes = "\n".join(lines) if lines else "No changes."
-          with open("release_notes.md", "w", encoding="utf-8") as f:
-              f.write(notes)
+          api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+          if not api_key or not commits.strip():
+              fallback(commits)
+              print("No API key or no commits — wrote raw commit list.")
+          else:
+              system = (
+                  "You write release notes. Turn git commits into a brief, human-readable changelog.\n"
+                  "\n"
+                  "RULES:\n"
+                  "- NO emojis, icons, or unicode decorations.\n"
+                  "- Group related changes under short markdown headings (## ...). "
+                  "Do not group by commit type.\n"
+                  "- Each bullet: one sentence about what changed for the user. "
+                  "No implementation details, no file names, no code references.\n"
+                  "- Skip: CI/CD, tests, style, docs, dependency bumps, internal refactoring.\n"
+                  "- Skip minor or cosmetic changes.\n"
+                  "- Max 3-4 bullets per heading. Merge similar changes into one bullet.\n"
+                  "- If nothing is user-facing, output exactly: No user-facing changes.\n"
+                  "- Output ONLY the changelog. No preamble, no greeting, no sign-off."
+              )
+
+              user_msg = "Commits since " + (prev or "the first tag") + ":\n\n" + commits
+
+              payload = json.dumps({
+                  "model": "google/gemini-2.5-flash",
+                  "messages": [
+                      {"role": "system", "content": system},
+                      {"role": "user", "content": user_msg}
+                  ],
+                  "temperature": 0.2,
+                  "max_tokens": 800
+              }).encode()
+
+              req = Request("https://openrouter.ai/api/v1/chat/completions", data=payload, headers={
+                  "Authorization": f"Bearer {api_key}",
+                  "Content-Type": "application/json",
+              })
+
+              try:
+                  with urlopen(req, timeout=30) as resp:
+                      body = json.loads(resp.read())
+                  notes = body["choices"][0]["message"]["content"].strip()
+                  if notes.startswith("```"):
+                      lines = notes.split("\n")
+                      notes = "\n".join(lines[1:]).rstrip("`").strip()
+                  with open("release_notes.md", "w", encoding="utf-8") as f:
+                      f.write(notes)
+                  print("AI release notes generated.")
+              except Exception as e:
+                  print(f"AI generation failed: {e}")
+                  fallback(commits)
 
       - name: Package release zip
         shell: pwsh
