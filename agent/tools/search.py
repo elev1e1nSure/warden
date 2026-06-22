@@ -60,12 +60,14 @@ class WebFetchTool(Tool):
             "description": "Return format: text, markdown, or html (default: markdown)",
         },
         "timeout": {"type": "integer", "description": "Timeout in seconds (max 120, default 30)"},
+        "verify_ssl": {"type": "boolean", "description": "Verify TLS certificate (default: true)"},
     }
 
     async def execute(self, args: dict[str, Any]) -> str:
         url = args.get("url", "")
         fmt = args.get("format", "markdown")
         timeout = min(int(args.get("timeout", 30)), 120)
+        verify = args.get("verify_ssl", True)
 
         if not url.startswith("http://") and not url.startswith("https://"):
             return "error: URL must start with http:// or https://"
@@ -98,19 +100,16 @@ class WebFetchTool(Tool):
             import ssl
 
             req = urllib.request.Request(url, headers=headers)
-            # Verify TLS by default; fall back to unverified only if the cert
-            # can't be validated (self-signed/expired), so a bad cert doesn't
-            # silently expose every fetch to MITM.
-            try:
-                ctx = ssl.create_default_context()
-                resp_cm = await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout)
-            except urllib.error.URLError as e:
-                if not isinstance(getattr(e, "reason", None), ssl.SSLCertVerificationError):
-                    raise
-                ctx = ssl.create_default_context()
+            ctx = ssl.create_default_context()
+            if not verify:
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
+            try:
                 resp_cm = await asyncio.to_thread(urllib.request.urlopen, req, context=ctx, timeout=timeout)
+            except urllib.error.URLError as e:
+                if isinstance(getattr(e, "reason", None), ssl.SSLCertVerificationError):
+                    return "error: SSL certificate verification failed (set verify_ssl=false to bypass)"
+                raise
             with resp_cm as resp:
                 content_type = resp.headers.get("Content-Type", "text/plain")
                 raw = resp.read()
