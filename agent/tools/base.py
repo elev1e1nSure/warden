@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*[mGKHFJABCDsu]|\x1b\][^\x07]*\x07|\x1b=|\x1b>")
@@ -69,13 +71,11 @@ def _clean(text: str) -> str:
 
 def _in_cwd(path: str) -> bool:
     try:
-        if os.name != "nt" and isinstance(path, str):
-            path = path.replace("\\", "/")
-        cwd = os.getcwd()
-        if not cwd.endswith(os.sep):
-            cwd += os.sep
-        return os.path.abspath(path).startswith(cwd)
-    except Exception:
+        target = Path(path).resolve()
+        cwd = Path(os.getcwd()).resolve()
+        target.relative_to(cwd)
+        return True
+    except (OSError, ValueError):
         return False
 
 
@@ -114,6 +114,7 @@ def parse_args(arguments: Any) -> dict:
             return result
         return {}
     except Exception:
+        logging.warning("parse_args: failed to parse arguments: %s", arguments)
         return {}
 
 

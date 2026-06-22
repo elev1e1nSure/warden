@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tarfile
 import zipfile
+from pathlib import Path
 from typing import Any
 
 from agent.tools.base import Tool, _in_cwd
@@ -116,7 +117,7 @@ class ArchiveTool(Tool):
     async def _extract(self, path: str, fmt: str, dest: str) -> str:
         # Refuse path traversal in members (zip slip / tar slip).
         # Both extract and create must land inside the workspace.
-        dest = dest or os.path.dirname(os.path.abspath(path)) or "."
+        dest = dest or str(Path(path).resolve().parent) or "."
         if not _in_cwd(dest):
             return "error: dest is outside current directory"
 
@@ -153,7 +154,7 @@ class ArchiveTool(Tool):
         if not _in_cwd(path):
             return "error: archive path is outside current directory"
 
-        parent = os.path.dirname(os.path.abspath(path))
+        parent = str(Path(path).resolve().parent)
         if parent:
             os.makedirs(parent, exist_ok=True)
 

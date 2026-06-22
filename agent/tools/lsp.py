@@ -380,7 +380,7 @@ class LspTool(Tool):
         if not file_path:
             return "error: filePath is required"
         if not os.path.isabs(file_path):
-            file_path = os.path.abspath(file_path)
+            file_path = str(Path(file_path).resolve())
 
         cmd, server_args, lang, ext = _file_to_lang(file_path)
         if cmd is None:

@@ -22,7 +22,7 @@ It sees your screen, runs shell commands, edits files, drives the browser. No ID
 Unzip anywhere. Two binaries, one folder, zero setup. Run `warden.exe` and pick your LLM provider on first launch.
 
 ```powershell
-# Or build from source (Go 1.24+, Python 3.11+)
+# Or build from source (Go 1.25+, Python 3.11+)
 just release
 ```
 
@@ -115,14 +115,15 @@ Pre-configure with `~/.warden-config.json` to skip the setup wizard:
 
 ```json
 {
-  "provider": "openrouter",
+  "model": "poolside/laguna-m.1:free",
   "api_url": "https://openrouter.ai/api/v1",
-  "api_key": "sk-or-v1-...",
-  "model": "poolside/laguna-m.1:free"
+  "api_key": "sk-or-v1-..."
 }
 ```
 
-Or set `WARDEN_MODEL` as an environment variable. Works with Ollama (local) or any OpenAI-compatible API.
+The API key is encrypted on disk (DPAPI on Windows). Key and auth token are passed to the backend via stdin — never in environment variables. Every backend request is authenticated with a shared secret generated at startup.
+
+Use `WARDEN_MODEL` to override the model via environment variable. Works with Ollama (local) or any OpenAI-compatible API.
 
 ---
 

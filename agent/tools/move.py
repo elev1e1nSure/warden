@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 from typing import Any
 
 from agent.tools.base import Tool, _in_cwd
@@ -30,8 +31,8 @@ class FileMoveTool(Tool):
             return "error: src and dest are required"
         if not _in_cwd(src) or not _in_cwd(dest):
             return "error: path is outside current directory"
-        abs_src = os.path.abspath(src)
-        abs_dest = os.path.abspath(dest)
+        abs_src = str(Path(src).resolve())
+        abs_dest = str(Path(dest).resolve())
         if not os.path.exists(abs_src):
             return f"error: source not found: {src}"
         # Refuse moves that would land inside themselves (mv a a/b is undefined).
@@ -70,8 +71,8 @@ class FileCopyTool(Tool):
             return "error: src and dest are required"
         if not _in_cwd(src) or not _in_cwd(dest):
             return "error: path is outside current directory"
-        abs_src = os.path.abspath(src)
-        abs_dest = os.path.abspath(dest)
+        abs_src = str(Path(src).resolve())
+        abs_dest = str(Path(dest).resolve())
         if not os.path.exists(abs_src):
             return f"error: source not found: {src}"
         if os.path.isdir(abs_src):

@@ -67,9 +67,11 @@ class TestInCwd:
     def test_exception_returns_false(self):
         import unittest.mock as _um
 
+        from pathlib import Path
+
         from agent.tools import _in_cwd
 
-        with _um.patch("os.path.abspath", side_effect=ValueError("bad path")):
+        with _um.patch.object(Path, "resolve", side_effect=OSError("bad path")):
             result = _in_cwd("whatever")
         assert result is False
 

@@ -267,9 +267,9 @@ class TestToolAssessment:
             d = assess_tool_call(tool, args, cwd=case_cwd)
             assert all(not detail.startswith("path:") for detail in d.details)
 
-    def test_file_write_outside_confirm(self) -> None:
+    def test_file_write_outside_blocked(self) -> None:
         d = _decision("file_write", {"path": "D:/outside.txt", "content": "hello"})
-        assert d.risk == "confirm"
+        assert d.risk == "blocked"
 
     def test_file_delete_inside_confirm(self) -> None:
         cwd = os.getcwd()

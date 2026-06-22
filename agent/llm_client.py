@@ -48,6 +48,8 @@ class OllamaClient(LLMClient):
 
     async def list_models(self) -> list[str]:
         result = await self._client.list()
+        if result is None:
+            return []
         models = result.models if hasattr(result, "models") else result.get("models", [])
         names: list[str] = []
         for m in models:
@@ -145,7 +147,7 @@ class OpenAIClient(LLMClient):
         use_tool_choice = bool(tools)
         use_reasoning = self._is_openrouter
 
-        while True:
+        for _ in range(3):
             kw: dict[str, Any] = {}
             if use_tools and tools:
                 kw["tools"] = tools
@@ -176,6 +178,7 @@ class OpenAIClient(LLMClient):
                         use_reasoning = False
                         continue
                 raise
+        raise RuntimeError("_create_stream: exceeded 3 retry attempts")
 
     async def chat(
         self,
