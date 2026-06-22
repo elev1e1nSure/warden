@@ -26,12 +26,13 @@ def _diff_stats(old: str, new: str) -> str:
 def _diff_full(old: str, new: str, path: str) -> str:
 	import difflib
 	lines = list(difflib.unified_diff(
-		old.splitlines(keepends=True),
-		new.splitlines(keepends=True),
+		old.splitlines(),
+		new.splitlines(),
 		fromfile=f"a/{path}",
 		tofile=f"b/{path}",
+		lineterm="",
 	))
-	return "".join(lines)
+	return "\n".join(lines)
 
 
 class ToolResult:
