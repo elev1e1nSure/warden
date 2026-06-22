@@ -5,160 +5,113 @@
 [![Latest Release](https://img.shields.io/github/v/release/elev1e1nSure/warden?label=latest)](https://github.com/elev1e1nSure/warden/releases/latest)
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)](https://github.com/elev1e1nSure/warden/releases/latest)
 
-**AI agent that sits in your terminal and controls your Windows machine.** Warden sees your screen, runs commands, edits files, drives the browser, and does it all through a keyboard-first TUI — no IDE plugins, no Electron bloat, no cloud lock-in.
+> **Describe the task. Skip the script.**
+
+Warden is an AI agent that lives in your terminal and controls your Windows machine. You tell it what to do in plain English — it figures out the steps, runs them, and shows you what's happening in real time.
+
+It sees your screen, runs shell commands, edits files, drives the browser. No IDE plugin. No Electron wrapper. No cloud account required.
 
 ![demo](assets/warden-gif.gif)
 
 ---
 
-## Install
+## Get it
 
-[⬇️ Download latest release for Windows x64](https://github.com/elev1e1nSure/warden/releases/latest)
+[**⬇ Download for Windows x64**](https://github.com/elev1e1nSure/warden/releases/latest)
 
-Unzip anywhere — two binaries, one folder, zero setup. Run `warden.exe` and pick your LLM provider on first launch.
+Unzip anywhere. Two binaries, one folder, zero setup. Run `warden.exe` and pick your LLM provider on first launch.
 
 ```powershell
-# Or build from source (requires Go 1.24+, Python 3.11+)
+# Or build from source (Go 1.24+, Python 3.11+)
 just release
 ```
 
 ---
 
-## What it does
+## What it's for
 
-Warden is a general-purpose desktop agent. You give it natural-language instructions, it figures out the steps and executes them on your machine.
+You have a task that's annoying enough to think about but not worth writing a script for. Warden handles those.
 
-**Common use cases:**
+```
+> find the five largest files on my desktop and zip them into archive.zip
+> go through my Downloads, delete anything older than 30 days, keep PDFs
+> open Chrome, go to GitHub, close any PR that's been sitting for 90 days
+> check why the last CI run failed and show me the relevant logs
+> rename all the screenshots in this folder to match the date they were taken
+```
 
-- **Dev ops** — deploy, build, debug, grep through logs, restart services, check git status across repos
-- **File & code work** — batch rename, search-and-replace, generate reports, format and lint multiple files
-- **Browser automation** — scrape data, fill forms, navigate multi-step flows, take screenshots
-- **System management** — read event logs, check disk usage, kill stuck processes, manage windows
-- **Research** — search the web, read documentation, fetch APIs, summarize results back to you
-- **Anything you'd script but don't want to write a script for**
-
-Every action is visible in the chat stream. You stay in control — **Ask mode** pauses for confirmation on writes and mouse clicks, **Auto mode** lets the agent run freely.
+It works across your whole machine — shell, browser, file system, running processes — and streams every action back to you as it goes.
 
 ---
 
-## Quick tour
+## How it works
 
 ```
-$ .\warden.exe
-
-> find the largest 5 files on my desktop and zip them into archive.zip
-
-  ✓ Screenshot taken
-  ✓ Running: Get-ChildItem "$env:USERPROFILE\Desktop" -Recurse -File | sort Length -Descending | select -First 5
-  ✓ Compress-Archive ...
-  Done. Created C:\Users\you\Desktop\archive.zip (142 MB)
-
-> /connect          # set up provider and model
-> /models           # switch models on the fly
-> Tab               # autocomplete slash commands and skills
-> Shift+Tab         # toggle Ask / Auto mode
-> Esc               # interrupt the agent mid-stream
+You type a task
+      │
+      ▼
+  Screenshot → model reasons over what it sees
+      │
+      ▼
+  Runs a command / clicks / types / scrolls
+      │
+      ▼
+  Screenshot again → confirm it worked
+      │
+      ▼
+  Next step (or done)
 ```
 
----
+Every action is visible in the chat stream. **Ask mode** pauses before writes and mouse clicks so you stay in control. **Auto mode** lets the agent run freely when you trust the task.
 
-## Stack
-
-| Layer | Technology |
-|---|---|
-| TUI | Go 1.24+, [bubbletea](https://github.com/charmbracelet/bubbletea), lipgloss, glamour |
-| Backend | Python 3.11+, aiohttp |
-| LLM | Ollama (local) or any OpenAI-compatible API (OpenRouter, etc.) |
-| Screen & input | pyautogui, Pillow |
-| Browser | Playwright (headless or visible) |
-| Search | duckduckgo-search |
-
----
-
-## Architecture
-
-```
-┌────────────────────────────────────────────────┐
-│  Go TUI (bubbletea)                            │
-│  Keyboard-first chat, streaming output, diffs  │
-└──────────────┬─────────────────────────────────┘
-               │ HTTP NDJSON :8765
-┌──────────────▼─────────────────────────────────┐
-│  Python backend (aiohttp)                      │
-│  Session management, tool orchestration,       │
-│  risk classification, memory                   │
-└──────────────┬─────────────────────────────────┘
-               │ SDK calls
-┌──────────────▼─────────────────────────────────┐
-│  LLM (Ollama / OpenRouter / any OpenAI API)    │
-│  Vision, tool calling, structured output       │
-└────────────────────────────────────────────────┘
-```
-
-Frontend and backend are fully decoupled — the TUI has no idea what LLM is running, the backend doesn't know about the UI. Either can be swapped independently.
-
----
-
-## Computer use
-
-Warden sees what's on your screen through screenshots, reasons about the pixels, and drives the mouse and keyboard like a human would.
-
-- **Vision** — every screenshot is fed to the model as an image. Use any vision-capable model (Qwen2.5VL, LLaVA, GPT-4o, Claude, etc.)
-- **Smart coordinates** — the model points at pixels in the image it was shown; Warden maps them to real screen coordinates automatically
-- **Mouse** — move, click, right-click, double-click, scroll, drag
-- **Keyboard** — type text (non-ASCII and emoji go through clipboard for reliability), press combos (`Ctrl+C`, `Alt+F4`, `Win+D`)
-- **Fail-safe** — slam the mouse into the top-left corner to abort any automated action
-
-The loop is simple: screenshot → model decides → mouse/keyboard → screenshot again to confirm.
+Toggle between them with `Shift+Tab` at any time.
 
 ---
 
 ## Safety
 
-Warden classifies every action before execution — by code, not by the model.
+Actions are classified by code — not by the model — before anything runs.
 
-| Risk | What it covers | Behaviour |
+| Level | What | Behaviour |
 |---|---|---|
-| 🟢 Safe | Read-only ops: file reads, git status, screenshots, process listing, browser reads, search | Runs without confirmation |
-| 🟡 Confirm | File writes, installs, mouse/keyboard, process kills, external URLs | Pauses in Ask mode; runs immediately in Auto mode |
-| 🔴 Blocked | Recursive deletes, encoded commands, registry changes, writes outside workspace | Always rejected |
+| Safe | Read-only: file reads, screenshots, `git status`, browser reads | Runs immediately |
+| Confirm | Writes, installs, mouse/keyboard, process kills | Pauses in Ask mode |
+| Blocked | Recursive deletes outside workspace, encoded payloads, registry changes | Always rejected |
 
-Path traversal, UNC paths, and device paths are blocked at the resolver level.
+Fail-safe: slam the mouse into the top-left corner to abort any automated action mid-run.
 
 ---
 
 ## Memory
 
-Persistent SQLite-backed memory that survives between sessions. Warden automatically stores facts about your workflow, preferences, and projects.
+Warden remembers facts about your projects and workflow between sessions — stored locally in SQLite, injected into context each turn.
 
 ```
 /memory on          # enable
 /memory off         # disable
-/memory status      # inspect stored facts
+/memory status      # inspect what's stored
 /memory clear       # wipe everything
 ```
-
-Memory is injected into the system prompt each turn. At session end, short-term entries are aggregated into long-term snapshots.
 
 ---
 
 ## Skills
 
-Extend Warden with reusable Markdown instruction sets. Drop a `SKILL.md` into `.warden/skills/<name>/` and invoke it with `! <name>`.
+Reusable instruction sets in plain Markdown. Drop a `SKILL.md` into `.warden/skills/<name>/` and invoke it with `!`:
 
 ```
-! <skill-name>      # run a skill
-! <cmd>             # run any PowerShell command directly
+!<skill-name>       # run a skill
+!<cmd>              # run a PowerShell command directly
 !                   # list all available skills
 ```
 
-Skills live in `.warden/skills/` (project) or `~/.warden/skills/` (global), with fallback to `.claude/skills/`.
+Skills live in `.warden/skills/` (project) or `~/.warden/skills/` (global).
 
 ---
 
 ## Configuration
 
-Pre-configure via `~/.warden-config.json`. Skip the setup wizard entirely:
+Pre-configure with `~/.warden-config.json` to skip the setup wizard:
 
 ```json
 {
@@ -169,7 +122,7 @@ Pre-configure via `~/.warden-config.json`. Skip the setup wizard entirely:
 }
 ```
 
-Or set `WARDEN_MODEL` as an environment variable and skip `/connect`.
+Or set `WARDEN_MODEL` as an environment variable. Works with Ollama (local) or any OpenAI-compatible API.
 
 ---
 
@@ -179,54 +132,57 @@ Or set `WARDEN_MODEL` as an environment variable and skip `/connect`.
 |---|---|
 | `Enter` | Send message |
 | `Esc` | Interrupt agent |
-| `Esc` × 2 | Force-stop |
-| `Shift+Tab` | Toggle Ask / Auto |
+| `Esc × 2` | Force-stop |
+| `Shift+Tab` | Toggle Ask / Auto mode |
 | `Tab` | Complete slash command or skill |
-| `↑` / `↓` | Navigate input history (disabled in `/select` mode) |
+| `↑` / `↓` | Navigate input history |
 | `Scroll` | Scroll chat output |
 | `Ctrl+W` | Delete last word |
-| `Ctrl+C` | Exit (force-quits during streaming) |
-
-### `/select` mode
-
-`/select` disables mouse capture so you can select text with the terminal. While active:
-- `↑`/`↓` navigate input history is disabled (prevents wheel-to-history in some terminals)
-- Left-click message expand is disabled
-- `Esc` exits back to normal mode
+| `Ctrl+C` | Exit |
 
 ## Slash commands
 
 | Command | Action |
 |---|---|
 | `/connect` | Set up provider and model |
+| `/models` | Switch model on the fly |
 | `/clear` | Clear chat, reset session |
 | `/compact` | Summarize context to free tokens |
 | `/memory` | Manage memory |
-| `/models` | Switch model (interactive picker) |
-| `/select` | Enable text selection (disables mouse capture) |
+| `/select` | Enable text selection mode |
 | `/update` | Download and install latest release |
-| `/verbose` | Toggle verbose mode (show tool calls and diffs) |
+| `/verbose` | Show tool calls and diffs |
 
 ---
 
-## Build from source
+## Stack
+
+| Layer | Technology |
+|---|---|
+| TUI | Go 1.24+, bubbletea, lipgloss, glamour |
+| Backend | Python 3.11+, aiohttp |
+| LLM | Ollama or any OpenAI-compatible API |
+| Screen & input | pyautogui, Pillow |
+| Browser | Playwright |
+| Search | duckduckgo-search |
+
+Frontend and backend are fully decoupled over HTTP NDJSON. Either can be swapped independently.
+
+---
+
+## Build & test
 
 ```powershell
 just build              # Go TUI only
 just build-backend      # Python backend (requires PyInstaller)
 just release            # Both
-```
 
-## Tests
-
-```powershell
-just install             # Python deps
-just test                # pytest with coverage
-just test --no-cov -q    # Quick run
-just test-go             # Go tests
-just lint-go             # Go vet
-just fmt-go              # Go format diff
-just fmt-go-check        # Go format check (CI)
+just install            # Python deps
+just test               # pytest with coverage
+just test --no-cov -q   # Quick run
+just test-go            # Go tests
+just lint-go            # Go vet
+just fmt-go             # Go format diff
 ```
 
 ---
@@ -235,9 +191,8 @@ just fmt-go-check        # Go format check (CI)
 
 | Symptom | Fix |
 |---|---|
-| `port 8765 is busy` | Another instance is running. `taskkill /F /IM warden.exe` |
+| `port 8765 is busy` | Another instance running — `taskkill /F /IM warden.exe` |
 | `ollama is not responding` | Install [Ollama](https://ollama.com) and start it |
-| `pip install failed` | `pip install -r requirements.txt` |
 | Backend exits immediately | Check `.warden/backend.err.log` |
 
 ---
