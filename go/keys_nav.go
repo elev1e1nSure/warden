@@ -24,7 +24,7 @@ func (m model) handleKeyUp(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	}
-	if !m.confirming && !m.questioning && m.textinput.Line() == 0 && len(m.history) > 0 {
+	if !m.selectMode && !m.confirming && !m.questioning && m.textinput.Line() == 0 && len(m.history) > 0 {
 		if m.historyIdx > 0 {
 			m.historyIdx--
 		}
@@ -56,7 +56,7 @@ func (m model) handleKeyDown(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	}
-	if !m.confirming && !m.questioning && m.textinput.Line() == m.textinput.LineCount()-1 && len(m.history) > 0 {
+	if !m.selectMode && !m.confirming && !m.questioning && m.textinput.Line() == m.textinput.LineCount()-1 && len(m.history) > 0 {
 		if m.historyIdx < len(m.history)-1 {
 			m.historyIdx++
 			m.textinput.SetValue(m.history[m.historyIdx])
