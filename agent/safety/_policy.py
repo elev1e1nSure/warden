@@ -26,7 +26,7 @@ def _decide(risk, reason, summary, details=None, args=None, tool=None, mode="ask
 
 
 def _apply_mode(decision: SafetyDecision, tool_name: str, mode: str) -> SafetyDecision:
-    if mode == "auto" and decision.risk == "confirm" and tool_name not in ("file_delete", "delete"):
+    if mode == "auto" and decision.risk == "confirm" and tool_name not in ("file_delete", "delete", "apply_patch"):
         return SafetyDecision(
             risk="safe",
             reason=decision.reason,
@@ -57,7 +57,7 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
                 ["UNC path, device path, or traversal detected"],
             )
         if not is_path_within_workspace(path, workspace):
-            return _d("confirm", "writes outside workspace", "Writing file outside workspace")
+            return _d("blocked", "writes outside workspace", "Writing file outside workspace is blocked")
         return _d("confirm", "modifies files", "Writing file inside workspace")
 
     # file_delete

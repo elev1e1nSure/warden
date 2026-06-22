@@ -4,6 +4,7 @@ import os
 import re
 from typing import Any
 
+from agent.safety._filesystem import is_path_within_workspace
 from agent.tools.base import Tool, ToolResult
 
 _PATCH_HEADER = re.compile(r"^--- (?:\S+)")
@@ -148,6 +149,8 @@ class ApplyPatchTool(Tool):
         import pathlib
 
         path = pathlib.Path(f["path"]).resolve()
+        if not is_path_within_workspace(path):
+            return f"blocked: {f['path']} — outside workspace"
         abspath = str(path)
 
         if f["is_delete"]:
@@ -384,6 +387,8 @@ class ApplyPatchTool(Tool):
         import pathlib
 
         path = pathlib.Path(f["path"]).resolve()
+        if not is_path_within_workspace(path):
+            return f"blocked: {f['path']} — outside workspace", 0, 0
         abspath = str(path)
 
         added = removed = 0
@@ -438,6 +443,8 @@ class ApplyPatchTool(Tool):
 
         if f.get("move_to"):
             new_path = pathlib.Path(f["move_to"]).resolve()
+            if not is_path_within_workspace(new_path):
+                return f"blocked: move to {f['move_to']} — outside workspace", 0, 0
             nd = os.path.dirname(str(new_path))
             if nd:
                 os.makedirs(nd, exist_ok=True)
