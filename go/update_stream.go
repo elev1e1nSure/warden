@@ -24,30 +24,22 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.toolRunning = false
 		m.lastAssistantRaw = ""
 		m.loading = true
-		m.activityIdx = m.resetOrAppendThink() // think entry created, invisible until finalized in non-verbose
-		if m.verboseMode {
-			// verbose: think entry animates itself
-		} else {
-			m.setAction("Thinking", "") // live chain action indicator
-		}
+		m.resetOrAppendThink()
+		m.setAction("Thinking", "")
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case thinkMsg:
 		m.thinkBuf += inner.text
 		m.updateThink(inner.text)
-		if !m.verboseMode {
-			m.setAction("Thinking", "")
-		}
+		m.setAction("Thinking", "")
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case tokenMsg:
 		if !m.thinkDone {
 			m.finishThink()
-			if !m.verboseMode {
-				m.clearAction()
-			}
+			m.clearAction()
 			m.appendAssistant("")
 			m.thinkDone = true
 		}
@@ -57,39 +49,18 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 
 	case toolStartMsg:
 		m.toolRunning = true
-		if m.verboseMode {
-			m.finishThink()
-			m.startToolActivity(inner.name, inner.args)
-			m.runningToolIdx = len(m.messages) - 1
-		} else {
-			m.finishThink() // finalize pre-tool think so it renders before the tool line
-			display := toolDisplayName(inner.name)
-			m.clearAction()
-			m.setAction(toolPresentTense(display), actionDetail(display, inner.args))
-		}
+		m.finishThink()
+		display := toolDisplayName(inner.name)
+		m.clearAction()
+		m.setAction(toolPresentTense(display), actionDetail(display, inner.args))
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case toolMsg:
 		m.toolRunning = false
-		summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
-		if m.verboseMode {
-			if m.runningToolIdx >= 0 && m.runningToolIdx < len(m.messages) {
-				m.messages[m.runningToolIdx].text = summary
-				m.messages[m.runningToolIdx].toolResult = inner.tool.Result
-				m.messages[m.runningToolIdx].toolDiff = inner.tool.Diff
-				m.messages[m.runningToolIdx].toolDone = true
-			} else {
-				m.messages = append(m.messages, messageEntry{
-					kind:       messageToolActivity,
-					text:       summary,
-					toolResult: inner.tool.Result,
-					toolDiff:   inner.tool.Diff,
-					toolDone:   true,
-				})
-			}
-		} else if inner.tool.Diff != "" {
-			// Non-verbose: still show a compact tool line when there's a diff to expand.
+		if inner.tool.Diff != "" {
+			// show a compact tool line only when there's a diff to expand
+			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
 			m.clearAction()
 			m.messages = append(m.messages, messageEntry{
 				kind:       messageToolActivity,
@@ -99,11 +70,8 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 				toolDone:   true,
 			})
 		} else {
-			// Non-verbose, no diff: clear the live action line so it doesn't
-			// get stranded as a static entry when the next think cycle appends.
 			m.clearAction()
 		}
-		m.runningToolIdx = -1
 		m.syncViewport()
 		return m, readNext(msg.ch)
 
@@ -133,9 +101,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.questioning = true
 		m.loading = false
 		m.finishThink()
-		if !m.verboseMode {
-			m.clearAction()
-		}
+		m.clearAction()
 		m.questionID = inner.id
 		m.questionCh = msg.ch
 		m.questionsData = inner.questions

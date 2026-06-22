@@ -43,7 +43,6 @@ func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.interruptStream = true
 		m.streaming = false
 		m.loading = false
-		m.runningToolIdx = -1
 		m.thinkBuf = ""
 		m.thinkDone = false
 		m.toolRunning = false

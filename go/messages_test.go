@@ -28,17 +28,6 @@ func TestAppendToolActivity(t *testing.T) {
 	}
 }
 
-func TestAppendToolFlowCollapse(t *testing.T) {
-	m := newTestModel()
-	m.appendToolFlow("grep", "pattern")
-	m.appendToolFlow("grep", "pattern2")
-	if len(m.messages) != 1 {
-		t.Errorf("expected collapsed to 1 message, got %d", len(m.messages))
-	}
-	if m.messages[0].toolArgs != "pattern2" {
-		t.Errorf("expected updated args, got %s", m.messages[0].toolArgs)
-	}
-}
 
 func TestAppendThink(t *testing.T) {
 	m := newTestModel()

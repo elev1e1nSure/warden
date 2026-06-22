@@ -23,7 +23,6 @@ var slashCommands = []slashCmd{
 	{"/models", "Switch model"},
 	{"/update", "Download and install the latest release"},
 	{"/select", "Toggle text selection mode"},
-	{"/verbose", "Toggle verbose mode (show tool lines and errors)"},
 }
 
 func matchSlash(prefix string) []slashCmd {
@@ -196,12 +195,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			return true, tea.DisableMouse
 		}
 		return true, tea.EnableMouseCellMotion
-	case "/verbose":
-		m.verboseMode = !m.verboseMode
-		m.clearHintState()
-		m.syncViewport()
-		return true, nil
-	}
+}
 
 	// /memory subcommands
 	if strings.HasPrefix(trimmed, "/memory ") {

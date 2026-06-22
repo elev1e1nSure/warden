@@ -137,48 +137,6 @@ func toolSummaryLine(name, args, result string) string {
 	return arrow + nameRender + " " + DimStyle().Render(head)
 }
 
-var toolActivityVerbs = map[string]string{
-	"google_search":      "searching",
-	"youtube_search":     "searching",
-	"grep":               "searching",
-	"glob":               "searching files",
-	"file_read":          "reading",
-	"browser_read":       "reading",
-	"webfetch":           "fetching",
-	"browser_open":       "opening",
-	"browser_screenshot": "screenshotting",
-	"screenshot":         "screenshotting",
-	"file_write":         "writing",
-	"edit":               "editing",
-	"apply_patch":        "patching",
-	"powershell":         "running",
-	"bash":               "running",
-	"mouse":              "clicking",
-	"keyboard":           "typing",
-	"clipboard":          "clipboard",
-	"file_delete":        "deleting",
-	"file_list":          "listing",
-	"browser_click":      "clicking",
-	"browser_fill":       "filling",
-	"http_request":       "requesting",
-	"window_list":        "listing windows",
-	"window_focus":       "focusing",
-	"window_manage":      "managing window",
-	"image_locate":       "locating",
-	"ocr":                "reading text",
-	"wait_for":           "waiting",
-	"system_info":        "reading system",
-	"notify":             "notifying",
-	"memory":             "remembering",
-}
-
-func toolActivityLine(name string) string {
-	verb, ok := toolActivityVerbs[name]
-	if !ok {
-		verb = "working"
-	}
-	return DimStyle().Render(contentIndent + verb + "...")
-}
 
 func toolStartLine(name, args string) string {
 	arrow := ToolStyle().Render(contentIndent + "→ ")
@@ -349,26 +307,6 @@ func pathBase(p string) string {
 		return p[i+1:]
 	}
 	return p
-}
-
-func (m model) renderToolFlowEntry(idx int, entry messageEntry) string {
-	prefix := contentIndent
-	detail := extractToolDetail(entry.toolName, entry.toolArgs)
-	if entry.toolDone {
-		past := toolPastTense(entry.toolName)
-		if detail != "" {
-			past += " " + detail
-		}
-		return DimStyle().Render(prefix + past)
-	}
-	if detail != "" {
-		detail = " -> " + detail
-	}
-	// Only the currently running tool gets the live breathing orb and shimmer
-	if idx == m.runningToolIdx {
-		return prefix + m.pulse() + m.shimmer(entry.toolName+detail)
-	}
-	return DimStyle().Render(prefix + entry.toolName + detail)
 }
 
 // renderToolActivityEntry renders a tool line.

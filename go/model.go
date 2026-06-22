@@ -48,10 +48,6 @@ type model struct {
 	hintCount   int
 	// path
 	cwd string
-	// index of the in-progress tool line in messages (-1 = none)
-	runningToolIdx int
-	// verbose mode — shows tool lines, errors, think duration
-	verboseMode bool
 	// select mode — mouse capture disabled so terminal can select text
 	selectMode bool
 	// model picker
@@ -60,8 +56,6 @@ type model struct {
 	modelFiltered  []string
 	modelPickIdx   int
 	modelScrollTop int
-	// activity tracking (index of current think/activity entry)
-	activityIdx int
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
 	// interrupt state
@@ -175,11 +169,11 @@ func initialModel(modelName string, connected bool) model {
 		modelName:      modelName,
 		connected:      connected,
 		loading:        true,
-		runningToolIdx: -1,
+
 		slashIdx:       -1,
 		hoveredMsgIdx:  -1,
 		skillsIdx:      -1,
-		activityIdx:    -1,
+
 	}
 	return m
 }
@@ -441,7 +435,7 @@ func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
 	m.freezeChain() // remove any live chain action line (non-verbose tool/think indicators)
 	m.thinkBuf = ""
 	m.thinkDone = false
-	m.activityIdx = -1
+
 	m.appendText("")
 	if tokenLimit > 0 {
 		m.tokenCount = tokenCount

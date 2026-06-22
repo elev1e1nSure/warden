@@ -138,7 +138,7 @@ func TestRenderHintScrollsSlashCommandsWithoutMarkers(t *testing.T) {
 	if strings.Contains(hint, "...") {
 		t.Fatalf("did not expect scroll markers in hint:\n%s", hint)
 	}
-	if !strings.Contains(hint, "/verbose") {
+	if !strings.Contains(hint, "/select") {
 		t.Fatalf("expected selected command in hint:\n%s", hint)
 	}
 	if strings.Contains(hint, "/connect") {

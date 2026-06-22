@@ -108,8 +108,7 @@ const (
 	messageThink
 	messageAssistant
 	messageToolActivity // persistent tool line: pending while running, summary when done
-	messageToolFlow     // live tool activity shown as flowing lines (verbose)
-	messageChainAction  // single live "what's happening now" line (skill streams / compat)
+	messageChainAction  // single live "what's happening now" line
 )
 
 type messageEntry struct {
@@ -145,18 +144,6 @@ func (m *model) startToolActivity(name, args string) {
 	})
 }
 
-func (m *model) appendToolFlow(name, args string) {
-	// collapse: if the last message is the same tool, reuse it
-	if len(m.messages) > 0 {
-		last := &m.messages[len(m.messages)-1]
-		if last.kind == messageToolFlow && last.toolName == name {
-			last.toolArgs = args
-			last.toolDone = false
-			return
-		}
-	}
-	m.messages = append(m.messages, messageEntry{kind: messageToolFlow, toolName: name, toolArgs: args})
-}
 
 func (m *model) appendThink() {
 	m.messages = append(m.messages, messageEntry{kind: messageThink, startedAt: time.Now()})
