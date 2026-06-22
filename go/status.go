@@ -204,7 +204,7 @@ func (m model) renderStatusContent(width int, bg lipgloss.Color) string {
 	case m.quitPending:
 		hint = fg(Red, false).Render("ctrl+c") + dim(" quit · any key abort")
 	case m.selectMode:
-		hint = dim("Select mode · ") + fg(keyColor, true).Render("Esc") + dim(" exit")
+		hint = dim("Select mode · ") + fg(keyColor, true).Render("Esc") + dim(" exit") + dim(" | no ↑↓ history, no click expand")
 	case m.confirming:
 		hint = dim("Y run  N cancel")
 	case m.streaming:
