@@ -69,6 +69,8 @@ def _clean(text: str) -> str:
 
 def _in_cwd(path: str) -> bool:
     try:
+        if os.name != "nt" and isinstance(path, str):
+            path = path.replace("\\", "/")
         cwd = os.getcwd()
         if not cwd.endswith(os.sep):
             cwd += os.sep

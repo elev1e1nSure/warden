@@ -218,18 +218,25 @@ class _LspClient:
 
     async def _read_loop(self) -> None:
         assert self._proc is not None and self._proc.stdout is not None
-        loop = asyncio.get_event_loop()
         reader = self._proc.stdout
         while True:
             try:
-                headers = await loop.run_in_executor(None, _read_headers_sync, reader)
-                if headers is None:
-                    return
+                headers = {}
+                while True:
+                    line_bytes = await reader.readline()
+                    if not line_bytes:
+                        return
+                    line = line_bytes.decode("ascii", errors="replace").rstrip("\r\n")
+                    if line == "":
+                        break
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        headers[k.strip()] = v.strip()
                 length = int(headers.get("Content-Length", "0"))
                 if length <= 0:
                     continue
-                raw = await loop.run_in_executor(None, _read_exact_sync, reader, length)
-                if raw is None:
+                raw = await reader.readexactly(length)
+                if not raw:
                     return
             except Exception:
                 return
@@ -279,30 +286,6 @@ class _LspClient:
         assert self._proc is not None and self._proc.stdin is not None
         self._proc.stdin.write(header + body)
         await self._proc.stdin.drain()
-
-
-def _read_headers_sync(stream) -> dict[str, str] | None:
-    headers: dict[str, str] = {}
-    while True:
-        line = stream.readline()
-        if not line:
-            return None
-        line = line.decode("ascii", errors="replace").rstrip("\r\n")
-        if line == "":
-            return headers
-        if ":" in line:
-            k, v = line.split(":", 1)
-            headers[k.strip()] = v.strip()
-
-
-def _read_exact_sync(stream, n: int) -> bytes | None:
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = stream.read(n - len(buf))
-        if not chunk:
-            return None
-        buf.extend(chunk)
-    return bytes(buf)
 
 
 def _uri_to_path(uri: str) -> str:

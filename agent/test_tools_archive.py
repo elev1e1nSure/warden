@@ -126,6 +126,7 @@ class TestArchive:
 
 class TestProcessList:
     async def test_returns_table(self, tmp_workspace, monkeypatch):
+        import agent.tools.process as process_mod
         from agent.tools import ProcessListTool
 
         # Stub out the platform-specific list fn so the test is OS-agnostic.
@@ -135,12 +136,14 @@ class TestProcessList:
         async def fake_list(_f):
             return [("1234", "python.exe"), ("5678", "node.exe")]
 
+        monkeypatch.setattr(process_mod, "_is_windows", lambda: True)
         monkeypatch.setattr(t, "_list_windows", fake_list)
         r = await t.execute({})
         assert "1234" in r and "python.exe" in r
         assert "5678" in r and "node.exe" in r
 
     async def test_filter(self, tmp_workspace, monkeypatch):
+        import agent.tools.process as process_mod
         from agent.tools import ProcessListTool
 
         t = ProcessListTool()
@@ -149,12 +152,14 @@ class TestProcessList:
             rows = [("1", "python.exe"), ("2", "chrome.exe")]
             return [(p, n) for p, n in rows if not f or f in n.lower()]
 
+        monkeypatch.setattr(process_mod, "_is_windows", lambda: True)
         monkeypatch.setattr(t, "_list_windows", fake_list)
         r = await t.execute({"filter": "python"})
         assert "python.exe" in r
         assert "chrome.exe" not in r
 
     async def test_empty_filter(self, tmp_workspace, monkeypatch):
+        import agent.tools.process as process_mod
         from agent.tools import ProcessListTool
 
         t = ProcessListTool()
@@ -162,6 +167,7 @@ class TestProcessList:
         async def fake_list(_f):
             return []
 
+        monkeypatch.setattr(process_mod, "_is_windows", lambda: True)
         monkeypatch.setattr(t, "_list_windows", fake_list)
         r = await t.execute({})
         assert "no processes" in r

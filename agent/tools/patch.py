@@ -43,7 +43,7 @@ class ApplyPatchTool(Tool):
         patch = patch.replace("\r\n", "\n").replace("\r", "\n")
 
         # Detect format: opencode `*** Begin Patch` wins when present
-        if _OC_BEGIN.search(patch):
+        if "*** Begin Patch" in patch:
             return await self._execute_opencode(patch)
 
         files = self._parse_patch(patch)
