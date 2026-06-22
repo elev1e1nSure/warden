@@ -1,1 +1,0 @@
-Cats have a specialized collarbone that allows them to fit through any opening the size of their head. Their whiskers are roughly as wide as their body, serving as a built-in measuring tool. A cat's purr vibrates at a frequency between 25 and 150 Hz — the same range that promotes bone density and tissue regeneration in mammals.

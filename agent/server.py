@@ -16,7 +16,7 @@ from agent.logger import request as log_request
 from agent.memory.aggregator import MemoryAggregator
 from agent.memory.store import MemoryStore
 from agent.ollama_process import OllamaProcessManager
-from agent.tools import _cleanup_old_screenshots, _get_screenshot_dir
+from agent.tools.input import _cleanup_old_screenshots, _get_screenshot_dir
 
 
 class Backend:

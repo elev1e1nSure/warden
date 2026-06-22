@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+from pathlib import Path
+
 from agent.tools.archive import ArchiveTool
 from agent.tools.base import (
     Tool,
@@ -31,7 +35,7 @@ from agent.tools.http import HttpRequestTool
 from agent.tools.input import ClipboardTool, KeyboardTool, MouseTool, ScreenshotTool
 from agent.tools.lsp import LspTool
 from agent.tools.memory import MemoryTool
-from agent.tools.misc import QuestionTool, SkillTool, TodoWriteTool
+from agent.tools.misc import _TODO_STORE, QuestionTool, SkillTool, TodoWriteTool
 from agent.tools.move import FileCopyTool, FileMoveTool
 from agent.tools.patch import ApplyPatchTool
 from agent.tools.process import ProcessKillTool, ProcessListTool

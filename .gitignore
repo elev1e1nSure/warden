@@ -1,40 +1,56 @@
-# Python
+# --- Python ---
 __pycache__/
 *.pyc
 *.pyo
+*.egg
+*.egg-info/
 .pytest_cache/
-*.log
-.env
-.venv/
-venv/
+.mypy_cache/
+.ruff_cache/
 .coverage
 cover
 htmlcov/
 coverage.json
+dist/
+build/
+*.spec
+*.whl
 
-# Go
+# --- Python venv ---
+.env
+.venv/
+venv/
+
+# --- Go ---
 *.exe
 *.exe~
-go/*.exe
-go/main.exe
-go/warden.exe
+go/cover.out
+go/vendor/
 
-# Project runtime
-.warden/*
+# --- Logs ---
+*.log
+log.txt
+
+# --- OS junk ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+*~
+
+# --- Project runtime ---
+.warden/
 !.warden/skills/
 .tmp/
+tmp/
 
-# Scratch files
-
-# Config
-quill.toml
-
-# External references
-opencode/
-.opencode/
-opencode-reference/
-
-# IDE
+# --- Config / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .claude/
-log.txt
-go/cover.out
+
+# --- Scratch ---
+scratch/
+scratchpad.*
