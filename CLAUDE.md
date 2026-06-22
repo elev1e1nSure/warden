@@ -84,7 +84,8 @@ agent/                   — Python backend
 
 - **accent colors:**
   - green `#8AB89A` — primary: mode label, active input border, slash names, wave peak
-  - blue `#38BDF8` — secondary: tool names, Auto mode highlights
+  - blue `#38BDF8` — secondary: Auto mode highlights (wave, input border)
+  - neutral `#d0d0d0` — tool names in action log
   - red `#ff4444` — errors only
   - dim `#666666` — timestamps, descriptions, metadata
   - faint `#2a2a2a` — separators, inactive wave dots

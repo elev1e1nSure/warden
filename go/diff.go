@@ -56,10 +56,9 @@ func renderUnifiedDiff(diff string, width int) string {
 	if contentW < 8 {
 		contentW = 8
 	}
+	// Truncate only — no full-width padding. Full-width background fills can
+	// cause adjacent colored lines to merge visually in Windows Terminal.
 	pad := func(s string) string {
-		if w := lipgloss.Width(s); w < contentW {
-			return s + strings.Repeat(" ", contentW-w)
-		}
 		return truncateRunes(s, contentW)
 	}
 	rail := func(style lipgloss.Style) string { return "  " + style.Render("│") + " " }

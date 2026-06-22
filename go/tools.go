@@ -118,6 +118,15 @@ func toolSummaryLine(name, args, result string) string {
 		return arrow + ErrorStyle().Render(display) + "  " + ErrorStyle().Render(head)
 	}
 
+	// Strip past-tense verb prefix the backend includes in the label (e.g. "edited", "wrote")
+	// — the display name already conveys the action type.
+	headLower := strings.ToLower(head)
+	for _, v := range []string{"edited ", "wrote ", "patched ", "deleted ", "applied ", "created "} {
+		if strings.HasPrefix(headLower, v) {
+			head = head[len(v):]
+			break
+		}
+	}
 	text, diff := renderDiffStats(head)
 	nameRender := ToolStyle().Render(display)
 	if diff != "" {
