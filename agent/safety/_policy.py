@@ -63,6 +63,8 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     # file_delete
     if tool_name in ("file_delete", "delete"):
         path = str(norm.get("path", ""))
+        recursive = norm.get("recursive", False)
+        details = []
         if is_dangerous_path(path):
             return _d(
                 "blocked",
@@ -72,7 +74,9 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
             )
         if not is_path_within_workspace(path, workspace):
             return _d("blocked", "deletes outside workspace", "Deleting file outside workspace is blocked")
-        return _d("confirm", "destructive file operation", "Deleting file inside workspace")
+        if recursive:
+            details.append("recursive directory deletion")
+        return _d("confirm", "destructive file operation", "Deleting file inside workspace", details)
 
     # file_read
     if tool_name in ("file_read", "read"):

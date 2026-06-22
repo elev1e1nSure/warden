@@ -296,22 +296,43 @@ class FileWriteTool(Tool):
 
 class FileDeleteTool(Tool):
     name = "file_delete"
-    description = "Delete a file. Only works inside the current directory."
-    params = {"path": {"type": "string", "description": "File path"}}
+    description = "Delete a file or directory. Only works inside the current directory. Use recursive=true for directories."
+    params = {
+        "path": {"type": "string", "description": "File or directory path"},
+        "recursive": {"type": "boolean", "description": "Delete directory recursively (default: false)"},
+    }
+
+    def tool_definition(self) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": self.params,
+                    "required": ["path"],
+                },
+            },
+        }
 
     def is_dangerous(self, args: dict[str, Any]) -> bool:
         return True
 
     async def execute(self, args: dict[str, Any]) -> str:
         path = args.get("path", "")
+        recursive = args.get("recursive", False)
         try:
             abs_path = os.path.abspath(path)
             if not _in_cwd(path):
-                return "error: cannot delete files outside current directory"
+                return "error: cannot delete outside current directory"
             if not os.path.exists(abs_path):
                 return f"error: not found: {path}"
             if os.path.isdir(abs_path):
-                return "error: this is a directory — use bash rmdir"
+                if not recursive:
+                    return "error: is a directory — set recursive=true to delete"
+                shutil.rmtree(abs_path)
+                return f"deleted directory: {path}"
             os.remove(abs_path)
             return f"deleted: {path}"
         except Exception as e:
