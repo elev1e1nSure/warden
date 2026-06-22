@@ -127,7 +127,7 @@ jobs:
               user_msg = "Commits since " + (prev or "the first tag") + ":\n\n" + commits
 
               payload = json.dumps({
-                  "model": "google/gemini-2.5-flash",
+                  "model": "deepseek/deepseek-v4-flash",
                   "messages": [
                       {"role": "system", "content": system},
                       {"role": "user", "content": user_msg}
