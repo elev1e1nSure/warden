@@ -15,7 +15,6 @@ import (
 	tui "warden"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -25,13 +24,7 @@ const (
 	spinnerPeriod     = 16 * time.Millisecond
 )
 
-var (
-	green  = lipgloss.Color("#00D47A")
-	blue   = lipgloss.Color("#38BDF8")
-	faint  = lipgloss.Color("#555555")
-	subtle = lipgloss.Color("#888888")
-	danger = lipgloss.Color("#cc5555")
-)
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 type state int
 
@@ -56,8 +49,6 @@ type tickMsg struct{}
 type readyMsg struct{}
 
 type backendExitMsg struct{ err error }
-
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(spinnerPeriod, func(time.Time) tea.Msg {
@@ -114,42 +105,27 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m launchModel) View() string {
-	title := lipgloss.NewStyle().Foreground(blue).Bold(true).Render("warden")
 	elapsed := time.Since(m.startedAt).Round(time.Millisecond)
 	if elapsed < 0 {
 		elapsed = 0
 	}
-
-	keyStyle := lipgloss.NewStyle().Foreground(blue).Bold(true)
-	dimStyle := lipgloss.NewStyle().Foreground(faint)
+	frame := spinnerFrames[m.spinner%len(spinnerFrames)]
 
 	var status string
 	switch m.state {
-	case stateBoot, stateWaiting:
-		frame := spinnerFrames[m.spinner%len(spinnerFrames)]
-		if m.attaching {
-			status = "attaching to running warden"
-		} else {
-			status = "starting warden"
-		}
-		status = frame + "  " + status
 	case stateReady:
-		status = lipgloss.NewStyle().Foreground(green).Render("ready")
+		status = "ready"
 	case stateFailed:
-		status = lipgloss.NewStyle().Foreground(danger).Render("startup failed")
+		status = "startup failed"
+		if m.errMsg != "" {
+			status += ": " + m.errMsg
+		}
+		return status
+	default:
+		status = frame + " Warden loading..."
 	}
 
-	lines := []string{
-		title,
-		"",
-		keyStyle.Render(status),
-		dimStyle.Render("  " + elapsed.String()),
-	}
-	if m.state == stateFailed && m.errMsg != "" {
-		lines = append(lines, "", lipgloss.NewStyle().Foreground(danger).Render(m.errMsg))
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return status + "\n" + fmt.Sprintf("%dms", elapsed.Milliseconds())
 }
 
 func findProjectRoot() (string, error) {
