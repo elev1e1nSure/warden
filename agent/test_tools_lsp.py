@@ -191,10 +191,10 @@ async def test_lsp_client_definition_roundtrip(tmp_path, monkeypatch):
     # we rewrite the script to inline the replacement
     script.write_text(
         "import json, sys\n"
-        "REPLACEMENT = [{\n"
+        "REPLACEMENT = [[{\n"
         "  'uri': 'file:///tmp/foo.py',\n"
         "  'range': {'start': {'line': 9, 'character': 0}, 'end': {'line': 9, 'character': 4}}\n"
-        "}]\n" + "def send(msg):\n"
+        "}]]\n" + "def send(msg):\n"
         "    body = json.dumps(msg).encode()\n"
         "    sys.stdout.buffer.write(f'Content-Length: {len(body)}\\r\\n\\r\\n'.encode() + body)\n"
         "    sys.stdout.buffer.flush()\n"
