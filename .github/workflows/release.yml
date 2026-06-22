@@ -39,7 +39,7 @@ jobs:
           cache: pip
 
       - name: Install Python deps
-        run: pip install -r requirements.txt just
+        run: pip install -r requirements.txt
 
       - name: Run Python tests
         run: just test --no-header -q
