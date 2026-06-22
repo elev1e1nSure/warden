@@ -62,6 +62,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 			m.startToolActivity(inner.name, inner.args)
 			m.runningToolIdx = len(m.messages) - 1
 		} else {
+			m.finishThink() // finalize pre-tool think so it renders before the tool line
 			display := toolDisplayName(inner.name)
 			m.clearAction()
 			m.setAction(toolPresentTense(display), actionDetail(display, inner.args))
