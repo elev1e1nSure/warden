@@ -12,37 +12,20 @@ import (
 var hunkRe = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
 var diffStatsRe = regexp.MustCompile(`(\+\d+)\s+(-\d+)$`)
 
-var (
-	diffAddStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0"))
-	diffRemoveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F"))
-	diffCtxStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6E6E6E"))
-	diffFileStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#CFCFCF")).Bold(true)
-	diffFrameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A"))
-	diffAddGutter  = lipgloss.NewStyle().Foreground(lipgloss.Color("#2D8A5A"))
-	diffDelGutter  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9A4343"))
-	diffAddStat    = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0"))
-	diffDelStat    = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F"))
-)
-
 type diffBodyLine struct {
 	sign    byte // '+', '-', or ' '
 	content string
 	num     int
 }
 
-// renderUnifiedDiff renders a unified diff with line numbers and a framed header.
-// filenameHint overrides the filename extracted from the diff header (optional).
+// renderUnifiedDiff renders a unified diff body with line numbers.
+// The filename is NOT shown here — it's already visible in the tool summary line.
+// The variadic filenameHint is accepted for call-site compatibility but ignored.
 func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
-	hint := ""
-	if len(filenameHint) > 0 {
-		hint = filenameHint[0]
-	}
-
+	_ = filenameHint
 	raw := strings.Split(strings.TrimRight(diff, "\n"), "\n")
 
 	var body []diffBodyLine
-	adds, dels := 0, 0
-	file := hint
 	maxNum := 1
 	oldLine, newLine := 1, 1
 
@@ -50,22 +33,9 @@ func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
 		l = strings.TrimSuffix(l, "\r")
 		switch {
 		case strings.HasPrefix(l, "diff --git"), strings.HasPrefix(l, "index "),
-			strings.HasPrefix(l, "new file mode"), strings.HasPrefix(l, "deleted file mode"):
-			// skip git metadata
-
-		case strings.HasPrefix(l, "+++"):
-			if file == "" {
-				if p := strings.TrimSpace(strings.TrimPrefix(l, "+++")); p != "" && p != "/dev/null" {
-					file = pathBase(strings.TrimPrefix(p, "b/"))
-				}
-			}
-
-		case strings.HasPrefix(l, "---"):
-			if file == "" {
-				if p := strings.TrimSpace(strings.TrimPrefix(l, "---")); p != "" && p != "/dev/null" {
-					file = pathBase(strings.TrimPrefix(p, "a/"))
-				}
-			}
+			strings.HasPrefix(l, "new file mode"), strings.HasPrefix(l, "deleted file mode"),
+			strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"):
+			// skip git/diff metadata
 
 		case strings.HasPrefix(l, "@@"):
 			if m := hunkRe.FindStringSubmatch(l); m != nil {
@@ -76,7 +46,6 @@ func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
 			}
 
 		case strings.HasPrefix(l, "+"):
-			adds++
 			if newLine > maxNum {
 				maxNum = newLine
 			}
@@ -84,7 +53,6 @@ func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
 			newLine++
 
 		case strings.HasPrefix(l, "-"):
-			dels++
 			if oldLine > maxNum {
 				maxNum = oldLine
 			}
@@ -92,7 +60,6 @@ func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
 			oldLine++
 
 		default:
-			// context line (starts with space in unified diff)
 			content := ""
 			if len(l) > 0 {
 				content = l[1:]
@@ -106,70 +73,43 @@ func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
 		}
 	}
 
-	if file == "" {
-		file = "diff"
-	}
-
 	numWidth := len(fmt.Sprintf("%d", maxNum))
+	// per-line visible layout: numWidth + " " + sign(1) + "    "(4) + content
+	contentW := width - numWidth - 6
+	contentW = max(contentW, 4)
 
-	// Visible layout per body line:
-	//   rail "  │ " = 4 chars
-	//   linenum = numWidth chars (right-aligned, dim)
-	//   " " = 1 char
-	//   sign = 1 char (colored)
-	//   "    " = 4 chars (colored with content)
-	//   content = remaining
-	overhead := 4 + numWidth + 1 + 1 + 4
-	contentW := width - overhead
-	if contentW < 4 {
-		contentW = 4
-	}
-
-	rail := "  " + diffFrameStyle.Render("│") + " "
-
-	out := make([]string, 0, len(body)+3)
-
-	// Header
-	stats := ""
-	if adds > 0 {
-		stats += diffAddStat.Render(fmt.Sprintf("+%d", adds))
-	}
-	if dels > 0 {
-		if stats != "" {
-			stats += " "
+	var sb strings.Builder
+	for i, bl := range body {
+		if i > 0 {
+			sb.WriteByte('\n')
 		}
-		stats += diffDelStat.Render(fmt.Sprintf("-%d", dels))
-	}
-	header := "  " + diffFrameStyle.Render("╭ ") + diffFileStyle.Render(file)
-	if stats != "" {
-		header += "  " + stats
-	}
-	out = append(out, header)
 
-	// Body
-	for _, bl := range body {
-		numStr := DimStyle().Render(fmt.Sprintf("%*d", numWidth, bl.num))
+		// line number — dim grey
+		numStr := fmt.Sprintf("%*d", numWidth, bl.num)
+		sb.WriteString("\x1b[38;2;102;102;102m")
+		sb.WriteString(numStr)
+		sb.WriteString("\x1b[0m ")
+
 		content := truncateRunes(bl.content, contentW)
 
-		var signStr string
-		var lineStyle lipgloss.Style
 		switch bl.sign {
 		case '+':
-			signStr = diffAddGutter.Render("+")
-			lineStyle = diffAddStyle
+			sb.WriteString("\x1b[38;2;45;138;90m+\x1b[0m")
+			sb.WriteString("\x1b[38;2;138;224;160m    ")
+			sb.WriteString(content)
+			sb.WriteString("\x1b[0m")
 		case '-':
-			signStr = diffDelGutter.Render("-")
-			lineStyle = diffRemoveStyle
+			sb.WriteString("\x1b[38;2;154;67;67m-\x1b[0m")
+			sb.WriteString("\x1b[38;2;240;144;143m    ")
+			sb.WriteString(content)
+			sb.WriteString("\x1b[0m")
 		default:
-			signStr = " "
-			lineStyle = diffCtxStyle
+			sb.WriteString(" \x1b[38;2;110;110;110m    ")
+			sb.WriteString(content)
+			sb.WriteString("\x1b[0m")
 		}
-
-		out = append(out, rail+numStr+" "+signStr+lineStyle.Render("    "+content))
 	}
-
-	out = append(out, "  "+diffFrameStyle.Render("╰"))
-	return strings.Join(out, "\n")
+	return sb.String()
 }
 
 // renderDiffStats finds "+N -N" at the end of s, returns (prefix, colored stats).

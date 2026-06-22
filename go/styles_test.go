@@ -54,8 +54,8 @@ func TestErrorStyle(t *testing.T) {
 
 func TestToolStyle(t *testing.T) {
 	s := ToolStyle()
-	if s.GetForeground() != lipgloss.Color("#d0d0d0") {
-		t.Errorf("expected #d0d0d0")
+	if s.GetForeground() != lipgloss.Color("#888888") {
+		t.Errorf("expected #888888")
 	}
 }
 

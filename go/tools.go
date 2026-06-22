@@ -410,7 +410,7 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 		hint := extractFilenameFromResult(entry.toolResult)
 		diffBlock := renderUnifiedDiff(entry.toolDiff, m.barWidth()-len(bodyIndent), hint)
 		indented := indentLines(diffBlock, bodyIndent)
-		return summaryLine + "\n" + indented
+		return summaryLine + "\n\n" + indented
 	}
 	result := strings.TrimSpace(entry.toolResult)
 	resultLines := strings.Split(result, "\n")

@@ -14,18 +14,31 @@ func TestRenderUnifiedDiff(t *testing.T) {
 +line2 modified
  line3`
 	result := renderUnifiedDiff(diff, 80)
-	if !strings.Contains(result, "file.txt") {
-		t.Errorf("expected header with file name, got: %s", result)
-	}
 	if !strings.Contains(result, "line2 modified") {
 		t.Errorf("expected modified line, got: %s", result)
+	}
+	// each body line must be separated by a real newline
+	lines := strings.Split(result, "\n")
+	if len(lines) < 3 {
+		t.Errorf("expected at least 3 body lines, got %d: %q", len(lines), result)
 	}
 }
 
 func TestRenderUnifiedDiffEmpty(t *testing.T) {
 	result := renderUnifiedDiff("", 80)
-	if !strings.Contains(result, "diff") {
-		t.Errorf("expected default header, got: %s", result)
+	// empty diff yields an empty body — just don't panic
+	_ = result
+}
+
+func TestRenderUnifiedDiffLineNumbers(t *testing.T) {
+	diff := `--- a/f.go
++++ b/f.go
+@@ -5,1 +5,1 @@
+-old
++new`
+	result := renderUnifiedDiff(diff, 80)
+	if !strings.Contains(result, "5") {
+		t.Errorf("expected line number 5, got: %s", result)
 	}
 }
 
