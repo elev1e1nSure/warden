@@ -46,14 +46,18 @@ def _has_images(messages: list) -> bool:
 
 
 def _strip_images(messages: list) -> list:
+	note = " [note: attached image not sent — model cannot view images]"
 	result = []
 	for msg in messages:
 		if msg.get("images"):
-			result.append({k: v for k, v in msg.items() if k != "images"})
+			m = {k: v for k, v in msg.items() if k != "images"}
+			m["content"] = str(msg.get("content", "")) + note
+			result.append(m)
 		elif isinstance(msg.get("content"), list):
 			filtered = [p for p in msg["content"] if not (isinstance(p, dict) and p.get("type") == "image_url")]
+			text_parts = " ".join(p.get("text", "") for p in filtered if isinstance(p, dict) and p.get("type") == "text").strip()
 			m = dict(msg)
-			m["content"] = filtered if filtered else ""
+			m["content"] = (text_parts or str(msg.get("content", ""))) + note
 			result.append(m)
 		else:
 			result.append(msg)
