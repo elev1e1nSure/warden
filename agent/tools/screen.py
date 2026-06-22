@@ -5,6 +5,7 @@ import datetime
 import os
 import subprocess
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -139,7 +140,7 @@ def _capture_region(region: tuple[int, int, int, int] | None) -> str:
 
     screenshot_dir = _get_screenshot_dir()
     _cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
-    name = screenshot_dir / f"ocr_{datetime.datetime.now():%Y%m%d_%H%M%S_%f}.png"
+    name = screenshot_dir / f"ocr_{datetime.datetime.now():%Y%m%d_%H%M%S_%f}_{uuid.uuid4().hex[:8]}.png"
     img = ImageGrab.grab()
     if region is not None:
         x, y, w, h = region

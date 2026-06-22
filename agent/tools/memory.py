@@ -25,6 +25,7 @@ class MemoryTool(Tool):
 
     def __init__(self) -> None:
         self._store = MemoryStore()
+        self.current_session_id: str = ""
 
     def tool_definition(self) -> dict:
         d = super().tool_definition()
@@ -65,7 +66,7 @@ class MemoryTool(Tool):
                 return "error: value is required for set"
             val = value if isinstance(value, str) else str(value)
             self._store.upsert_entry(
-                session_id="tool",
+                session_id=self.current_session_id or "tool",
                 category="memory",
                 key=key,
                 value=val,

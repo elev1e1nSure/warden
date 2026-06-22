@@ -29,7 +29,7 @@ def _cleanup_old_screenshots(dir_path: Path, max_age_seconds: float = 300) -> No
             try:
                 if now - f.stat().st_mtime > max_age_seconds:
                     f.unlink()
-            except OSError:
+            except FileNotFoundError:
                 pass
 
 

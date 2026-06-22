@@ -14,6 +14,7 @@ from agent.prompt import build_system
 from agent.skills import Skill, find_skill, wrap_skill_content
 from agent.tool_runner import execute_tool_call
 from agent.tools import REGISTRY
+from agent.tools.misc import _TODO_STORE
 
 _EMOJI_RE = re.compile(
     "[\U0001f1e6-\U0001f1ff\U0001f300-\U0001faff\U00002700-\U000027bf\U00002600-\U000026ff]+",
@@ -79,18 +80,68 @@ def _is_vision_error(e: Exception) -> bool:
     )
 
 
+_CONTEXT_LIMITS: dict[str, int] = {
+    # Anthropic
+    "claude-3.5": 200000,
+    "claude-3.7": 200000,
+    "claude-4": 200000,
+    "claude-opus": 200000,
+    "claude-sonnet": 200000,
+    "claude-haiku": 200000,
+    # OpenAI
+    "gpt-4o": 128000,
+    "gpt-4.1": 1000000,
+    "gpt-4.5": 128000,
+    "gpt-4-turbo": 128000,
+    "gpt-4": 8192,
+    "gpt-3.5-turbo": 16385,
+    "o1": 200000,
+    "o3": 200000,
+    "o4-mini": 200000,
+    # Google
+    "gemini-2.5": 1048576,
+    "gemini-2.0": 1048576,
+    "gemini-1.5": 2097152,
+    # DeepSeek
+    "deepseek-v3": 65536,
+    "deepseek-r1": 65536,
+    "deepseek-chat": 65536,
+    "deepseek-reasoner": 65536,
+    # Meta
+    "llama-3.1-405b": 131072,
+    "llama-3.2": 131072,
+    "llama-3": 8192,
+    # Mistral
+    "mistral-large": 131072,
+    "mistral-medium": 32768,
+    "mistral-small": 32768,
+    "mixtral": 32768,
+    # Qwen
+    "qwen-2.5": 131072,
+    "qwen-2": 131072,
+    "qwen-max": 131072,
+    "qwq": 131072,
+}
+
+_CONTEXT_LIMIT_FALLBACK = 65536
+
+
 def _guess_context_limit(model: str) -> int:
     lower = model.lower()
-    # rough heuristics without hardcoded lists
+    for prefix, limit in _CONTEXT_LIMITS.items():
+        if prefix in lower:
+            return limit
     if "128k" in lower or "128000" in lower:
         return 128000
+    if "64k" in lower or "65536" in lower:
+        return 65536
     if "32k" in lower or "32768" in lower:
         return 32768
     if "8k" in lower or "8192" in lower:
         return 8192
     if "4k" in lower or "4096" in lower:
         return 4096
-    return 128000
+    return _CONTEXT_LIMIT_FALLBACK
 
 
 def _clean_visible_text(text: str) -> str:
@@ -177,6 +228,7 @@ class ChatSession:
     def reset(self) -> None:
         if self.memory_store is not None:
             MemoryAggregator.finalize(self.memory_store, self.session_id)
+        _TODO_STORE.pop(self.session_id, None)
         self.history = []
         self.token_count = 0
         self.session_id = str(uuid.uuid4())
@@ -219,10 +271,26 @@ class ChatSession:
                 "tokens_after": tokens_before,
             }
 
+        tail = []
+        for msg in reversed(self.history):
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                pending_ids = {tc.get("id", "") for tc in msg["tool_calls"]}
+                resolved_ids = set()
+                for later in self.history[self.history.index(msg) + 1:]:
+                    if later.get("role") == "tool" and later.get("tool_call_id") in pending_ids:
+                        resolved_ids.add(later.get("tool_call_id"))
+                unresolved = pending_ids - resolved_ids
+                if unresolved:
+                    tail = self.history[self.history.index(msg):]
+                break
+            if msg.get("role") == "tool":
+                continue
+            break
+
         self.history = [
             {"role": "user", "content": "[Conversation summary]"},
             {"role": "assistant", "content": summary},
-        ]
+        ] + tail
         self.token_count = self._estimate_tokens()
         return {
             "summary": summary,
@@ -391,6 +459,10 @@ class ChatSession:
         self.add_user(text)
         self.reset_cancellation()
         iter_count = 0
+
+        memory_tool = REGISTRY.get("memory")
+        if memory_tool is not None:
+            memory_tool.current_session_id = self.session_id
 
         while iter_count < MAX_ITER:
             iter_count += 1

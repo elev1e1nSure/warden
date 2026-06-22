@@ -47,6 +47,8 @@ class FileReadTool(Tool):
             offset = 1
         try:
             try:
+                if os.path.isdir(path):
+                    return f"error: is a directory, not a file: {path}"
                 if os.path.getsize(path) > 50 * 1024 * 1024:
                     return f"error: file too large (>50MB) — use offset/limit or grep: {path}"
             except OSError:
@@ -275,7 +277,7 @@ class FileWriteTool(Tool):
         path = args.get("path", "")
         content = args.get("content", "")
         try:
-            d = os.path.dirname(os.path.abspath(path))
+            d = str(Path(path).resolve().parent)
             if d:
                 os.makedirs(d, exist_ok=True)
             old_content = ""
@@ -323,7 +325,7 @@ class FileDeleteTool(Tool):
         path = args.get("path", "")
         recursive = args.get("recursive", False)
         try:
-            abs_path = os.path.abspath(path)
+            abs_path = str(Path(path).resolve())
             if not _in_cwd(path):
                 return "error: cannot delete outside current directory"
             if not os.path.exists(abs_path):

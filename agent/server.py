@@ -18,6 +18,7 @@ from agent.logger import request as log_request
 from agent.memory.aggregator import MemoryAggregator
 from agent.memory.store import MemoryStore
 from agent.ollama_process import OllamaProcessManager
+from agent.tools.browser import _close_session
 from agent.tools.input import _cleanup_old_screenshots, _get_screenshot_dir
 
 
@@ -91,7 +92,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
     auth = request.headers.get("Authorization", "")
     if auth != f"Bearer {backend.auth_token}":
-        return web.json_response({"error": "unauthorized"}, status=401)
+        return web.json_response({"error": "unauthorized", "code": "auth/unauthorized"}, status=401)
     return await handler(request)
 
 
@@ -108,6 +109,7 @@ async def reset(request: web.Request) -> web.Response:
     backend = _get_backend(request)
     backend.confirmation_manager.cancel_all()
     backend.question_manager.cancel_all()
+    await _close_session()
     if backend.chat is not None:
         backend.chat.reset()
     with contextlib.suppress(Exception):
@@ -158,7 +160,7 @@ async def shutdown_handler(request: web.Request) -> web.Response:
 async def compact_handler(request: web.Request) -> web.Response:
     backend = _get_backend(request)
     if backend.chat is None:
-        return web.json_response({"error": "not connected"}, status=400)
+        return web.json_response({"error": "not connected", "code": "session/not_connected"}, status=400)
     log_request("POST", "/compact")
     result = await backend.chat.compact()
     info(f"compacted: {result['tokens_before']} → {result['tokens_after']} tokens")
@@ -229,7 +231,7 @@ async def model_set(request: web.Request) -> web.Response:
     data = await request.json()
     model = data.get("model", "").strip()
     if not model:
-        return web.Response(status=400, text="model required")
+        return web.json_response({"error": "model required", "code": "model/required"}, status=400)
     backend.model = model
     if backend.llm is not None:
         backend._new_chat()
@@ -246,17 +248,17 @@ async def connect_handler(request: web.Request) -> web.Response:
     model = data.get("model", "").strip()
 
     if not model:
-        return web.json_response({"ok": False, "error": "model name is required"})
+        return web.json_response({"ok": False, "error": "model name is required", "code": "connect/model_required"})
 
     if provider == "openrouter":
         if not api_key:
-            return web.json_response({"ok": False, "error": "api key is required"})
+            return web.json_response({"ok": False, "error": "api key is required", "code": "connect/api_key_required"})
         api_url = "https://openrouter.ai/api/v1"
         try:
             test_client = OpenAIClient(api_url, api_key=api_key)
             await asyncio.wait_for(test_client.list_models(), timeout=10.0)
         except TimeoutError:
-            return web.json_response({"ok": False, "error": "connection timed out — check your internet"})
+            return web.json_response({"ok": False, "error": "connection timed out — check your internet", "code": "connect/timeout"})
         except Exception as e:
             msg = str(e).lower()
             if any(
@@ -270,8 +272,8 @@ async def connect_handler(request: web.Request) -> web.Response:
                     "forbidden",
                 )
             ):
-                return web.json_response({"ok": False, "error": "invalid api key — check it at openrouter.ai/keys"})
-            return web.json_response({"ok": False, "error": "could not reach openrouter — check your internet"})
+                return web.json_response({"ok": False, "error": "invalid api key — check it at openrouter.ai/keys", "code": "connect/invalid_key"})
+            return web.json_response({"ok": False, "error": "could not reach openrouter — check your internet", "code": "connect/unreachable"})
         backend._init_openrouter(api_url, api_key, model)
 
     elif provider == "ollama":
@@ -279,12 +281,13 @@ async def connect_handler(request: web.Request) -> web.Response:
             test_client = OllamaClient()
             await asyncio.wait_for(test_client.list_models(), timeout=5.0)
         except TimeoutError:
-            return web.json_response({"ok": False, "error": "ollama is not responding — is it running?"})
+            return web.json_response({"ok": False, "error": "ollama is not responding — is it running?", "code": "connect/ollama_not_running"})
         except Exception:
             return web.json_response(
                 {
                     "ok": False,
                     "error": "cannot reach ollama — install it from ollama.com and run it",
+                    "code": "connect/ollama_not_installed",
                 }
             )
         backend._init_ollama(model)
@@ -292,9 +295,9 @@ async def connect_handler(request: web.Request) -> web.Response:
             try:
                 await asyncio.wait_for(backend.setup(), timeout=120.0)
             except Exception as e:
-                return web.json_response({"ok": False, "error": f"ollama setup failed: {str(e)[:100]}"})
+                return web.json_response({"ok": False, "error": f"ollama setup failed: {str(e)[:100]}", "code": "connect/ollama_setup_failed"})
     else:
-        return web.json_response({"ok": False, "error": f"unknown provider: {provider}"})
+        return web.json_response({"ok": False, "error": f"unknown provider: {provider}", "code": "connect/unknown_provider"})
 
     log_request("POST", "/connect", 200)
     info(f"connected: {provider} / {model}")
@@ -333,11 +336,11 @@ async def skill_get(request: web.Request) -> web.Response:
     name = request.match_info.get("name", "")
     if not _validate_name(name):
         log_request("GET", f"/skill/{name}", 400)
-        return web.json_response({"error": "invalid skill name"}, status=400)
+        return web.json_response({"error": "invalid skill name", "code": "skill/invalid_name"}, status=400)
     skill = find_skill(name)
     if skill is None:
         log_request("GET", f"/skill/{name}", 404)
-        return web.json_response({"error": "skill not found"}, status=404)
+        return web.json_response({"error": "skill not found", "code": "skill/not_found"}, status=404)
     log_request("GET", f"/skill/{name}", 200)
     return web.json_response(
         {
