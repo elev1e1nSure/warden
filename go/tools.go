@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 var toolDisplayNames = map[string]string{
@@ -90,18 +92,18 @@ func toolSummaryLine(name, args, result string) string {
 		} else {
 			nameRender = ToolStyle().Render(display)
 		}
-		line := arrow + nameRender + "  " + DimStyle().Render(cmd)
+		line := arrow + nameRender + " " + DimStyle().Render(cmd)
 		if result != "(no output)" && result != "(empty)" {
 			rlines := strings.Split(result, "\n")
 			head := strings.TrimSpace(rlines[0])
 			if len(rlines) > 1 {
-				head += fmt.Sprintf("  +%d", len(rlines)-1)
+				head += fmt.Sprintf(" +%d", len(rlines)-1)
 			}
 			head = truncateRunes(head, 60)
 			if isErr {
-				line += "  " + ErrorStyle().Render(head)
+				line += " " + ErrorStyle().Render(head)
 			} else {
-				line += "  " + DimStyle().Render(head)
+				line += " " + DimStyle().Render(head)
 			}
 		}
 		return line
@@ -110,12 +112,12 @@ func toolSummaryLine(name, args, result string) string {
 	lines := strings.Split(result, "\n")
 	head := strings.TrimSpace(lines[0])
 	if len(lines) > 1 {
-		head += fmt.Sprintf("  +%d lines", len(lines)-1)
+		head += fmt.Sprintf(" +%d lines", len(lines)-1)
 	}
 	head = truncateRunes(head, 100)
 
 	if isErr {
-		return arrow + ErrorStyle().Render(display) + "  " + ErrorStyle().Render(head)
+		return arrow + ErrorStyle().Render(display) + " " + ErrorStyle().Render(head)
 	}
 
 	// Strip past-tense verb prefix the backend includes in the label (e.g. "edited", "wrote")
@@ -130,9 +132,9 @@ func toolSummaryLine(name, args, result string) string {
 	text, diff := renderDiffStats(head)
 	nameRender := ToolStyle().Render(display)
 	if diff != "" {
-		return arrow + nameRender + "  " + DimStyle().Render(text) + "  " + diff
+		return arrow + nameRender + " " + DimStyle().Render(text) + "  " + diff
 	}
-	return arrow + nameRender + "  " + DimStyle().Render(head)
+	return arrow + nameRender + " " + DimStyle().Render(head)
 }
 
 var toolActivityVerbs = map[string]string{
@@ -184,7 +186,7 @@ func toolStartLine(name, args string) string {
 	if args == "" {
 		return arrow + display
 	}
-	return arrow + display + "  " + DimStyle().Render(truncateRunes(args, 140))
+	return arrow + display + " " + DimStyle().Render(truncateRunes(args, 140))
 }
 
 func toolPastTense(name string) string {
@@ -377,7 +379,7 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 		// pending: animate only while loading
 		line := entry.toolName
 		if entry.toolArgs != "" {
-			line += "  " + entry.toolArgs
+			line += " " + entry.toolArgs
 		}
 		if m.loading {
 			return contentIndent + m.pulse() + m.shimmer(line)
@@ -391,17 +393,21 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 	}
 
 	// Replace leading "→" with "+/-" indicator when result is expandable.
-	arrow := ToolStyle().Render(contentIndent + "→ ")
 	toggle := "+"
 	if entry.expanded {
 		toggle = "-"
 	}
-	indicatorStyle := ToolStyle()
+	var summaryLine string
 	if hovered {
-		indicatorStyle = HoverStyle()
+		// Strip embedded ANSI and re-render the whole line in hover color so
+		// the highlight covers "Edit README.md +1 -1", not just the indicator.
+		plain := strings.Replace(ansi.Strip(entry.text), contentIndent+"→ ", contentIndent+toggle+" ", 1)
+		summaryLine = HoverStyle().Render(plain)
+	} else {
+		arrow := ToolStyle().Render(contentIndent + "→ ")
+		indicator := ToolStyle().Render(contentIndent + toggle + " ")
+		summaryLine = strings.Replace(entry.text, arrow, indicator, 1)
 	}
-	indicator := indicatorStyle.Render(contentIndent + toggle + " ")
-	summaryLine := strings.Replace(entry.text, arrow, indicator, 1)
 
 	if !entry.expanded {
 		return summaryLine
