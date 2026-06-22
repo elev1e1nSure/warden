@@ -97,6 +97,10 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 				toolDiff:   inner.tool.Diff,
 				toolDone:   true,
 			})
+		} else {
+			// Non-verbose, no diff: clear the live action line so it doesn't
+			// get stranded as a static entry when the next think cycle appends.
+			m.clearAction()
 		}
 		m.runningToolIdx = -1
 		m.syncViewport()
