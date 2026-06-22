@@ -21,8 +21,10 @@ test-cov:
 
 # ── go ──
 
+VERSION := env_var_or_default("TAG", "dev")
+
 build:
-    cd go && go build -ldflags="-s -w" -o ../warden.exe ./cmd/warden
+    cd go && go build -ldflags="-s -w -X 'warden.wardenVersion={{VERSION}}'" -o ../warden.exe ./cmd/warden
 
 build-check:
     cd go && go build ./...

@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const wardenVersion = "v1.3.1"
+var wardenVersion = "dev"
 
 // animDots returns the animated ellipsis frame for the given spinner step.
 func animDots(step int) string {

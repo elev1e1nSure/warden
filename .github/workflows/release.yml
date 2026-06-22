@@ -64,6 +64,8 @@ jobs:
           tool: just
 
       - name: Build warden.exe
+        env:
+          TAG: ${{ github.ref_name }}
         run: just build
 
       - name: Set up Python
