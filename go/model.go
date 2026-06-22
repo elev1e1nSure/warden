@@ -58,9 +58,10 @@ type model struct {
 	modelScrollTop int
 	// last raw assistant response (for /copy-last)
 	lastAssistantRaw string
-	// interrupt state
-	interruptStream bool
-	streamStart     int
+	// stream generation: incremented on every new stream and on interrupt,
+	// so events from a stale HTTP connection are ignored.
+	streamGen   int
+	streamStart int
 	// pending double-press confirmations (during streaming)
 	escPending       bool
 	quitPending      bool
@@ -375,7 +376,7 @@ func (m model) resolveConfirm(ok bool) (model, tea.Cmd) {
 	m.resetInput()
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch))
+	return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch, m.streamGen))
 }
 
 // answerQuestion records the answer for the current question and advances;
@@ -395,30 +396,36 @@ func (m model) answerQuestion(answer string) (model, tea.Cmd) {
 	m.appendQuizHistory(saved, answers)
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch), m.tick())
+	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch, m.streamGen), m.tick())
 }
 
 // beginStream marks the start of a streaming turn and sends text to the backend.
 func (m *model) beginStream(text string) tea.Cmd {
+	m.streamGen++
 	m.streamStart = len(m.messages)
 	m.resetInput()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
 	m.userScrolled = false
+	m.escPending = false
+	m.quitPending = false
 	m.syncViewport()
-	return tea.Batch(m.sendMessage(text), m.tick())
+	return tea.Batch(m.sendMessage(text, m.streamGen), m.tick())
 }
 
 func (m *model) beginSkillStream(name, args string) tea.Cmd {
+	m.streamGen++
 	m.streamStart = len(m.messages)
 	m.resetInput()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
 	m.userScrolled = false
+	m.escPending = false
+	m.quitPending = false
 	m.syncViewport()
-	return tea.Batch(m.sendSkill(name, args), m.tick())
+	return tea.Batch(m.sendSkill(name, args, m.streamGen), m.tick())
 }
 
 // finishStream resets streaming state at turn end; returns a compact command

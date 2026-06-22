@@ -149,6 +149,64 @@ func TestHandleNextMsg_ConfirmAndQuestion(t *testing.T) {
 	}
 }
 
+func TestHandleNextMsg_StaleGenIgnored(t *testing.T) {
+	m := newTestModel()
+	m.streamGen = 2
+	msg := nextMsg{
+		inner: wardenStartMsg{},
+		ch:    make(chan client.Event),
+		gen:   1, // stale
+	}
+	m2, cmd := m.handleNextMsg(msg)
+	if cmd != nil {
+		t.Errorf("expected no follow-up command for stale event")
+	}
+	if len(m2.messages) != 0 {
+		t.Errorf("expected no messages appended for stale event, got %+v", m2.messages)
+	}
+}
+
+func TestHandleStartStreamMsg_StaleGenIgnored(t *testing.T) {
+	m := newTestModel()
+	m.streamGen = 2
+	msg := startStreamMsg{ch: make(chan client.Event), gen: 1}
+	_, cmd := m.handleStartStreamMsg(msg)
+	if cmd != nil {
+		t.Errorf("expected no command for stale startStreamMsg")
+	}
+}
+
+func TestHandleDoneMsg_StaleGenIgnored(t *testing.T) {
+	m := newTestModel()
+	m.streaming = true
+	m.loading = true
+	m.streamGen = 2
+	msg := doneMsg{tokenCount: 10, tokenLimit: 100, gen: 1}
+	m2, _ := m.handleDoneMsg(msg)
+	if !m2.streaming || !m2.loading {
+		t.Errorf("expected streaming/loading to remain for stale doneMsg")
+	}
+}
+
+func TestBeginStream_ResetsInterruptState(t *testing.T) {
+	m := newTestModel()
+	m.streaming = true
+	m.escPending = true
+	m.quitPending = true
+	m.streamGen = 3
+
+	cmd := m.beginStream("hello")
+	if cmd == nil {
+		t.Fatalf("expected command")
+	}
+	if m.streamGen != 4 {
+		t.Errorf("expected streamGen to increment, got %d", m.streamGen)
+	}
+	if !m.streaming || !m.loading || m.escPending || m.quitPending {
+		t.Errorf("expected streaming/loading true and pending flags reset, got streaming=%v loading=%v escPending=%v quitPending=%v", m.streaming, m.loading, m.escPending, m.quitPending)
+	}
+}
+
 func TestHandleShellResult(t *testing.T) {
 	m := newTestModel()
 	m.streaming = true

@@ -45,30 +45,39 @@ func toTeaMsg(ev client.Event) tea.Msg {
 	}
 }
 
-func readNext(ch <-chan client.Event) tea.Cmd {
+func readNext(ch <-chan client.Event, gen int) tea.Cmd {
 	return func() tea.Msg {
 		inner, ok := <-ch
 		if !ok {
-			return doneMsg{}
+			return doneMsg{gen: gen}
 		}
-		return nextMsg{inner: toTeaMsg(inner), ch: ch}
+		return nextMsg{inner: toTeaMsg(inner), ch: ch, gen: gen}
 	}
 }
 
-func (m model) sendMessage(text string) tea.Cmd {
-	ch := m.client.StreamChat(map[string]string{"type": "message", "text": text})
+func (m model) sendMessage(text string, gen int) tea.Cmd {
 	return func() tea.Msg {
-		return startStreamMsg{ch: ch}
+		ch := m.client.StreamChat(map[string]string{"type": "message", "text": text})
+		return startStreamMsg{ch: ch, gen: gen}
 	}
 }
 
-func (m model) sendSkill(name, args string) tea.Cmd {
-	payload := map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name}
-	if args != "" {
-		payload["args"] = args
-	}
-	ch := m.client.StreamChat(payload)
+func (m model) sendSkill(name, args string, gen int) tea.Cmd {
 	return func() tea.Msg {
-		return startStreamMsg{ch: ch}
+		payload := map[string]string{"type": "message", "text": "Use skill: " + name, "skill": name}
+		if args != "" {
+			payload["args"] = args
+		}
+		ch := m.client.StreamChat(payload)
+		return startStreamMsg{ch: ch, gen: gen}
+	}
+}
+
+func (m model) sendInterrupt() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.Interrupt(); err != nil {
+			return statusResultMsg{brief: true}
+		}
+		return statusResultMsg{brief: true}
 	}
 }

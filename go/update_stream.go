@@ -8,12 +8,7 @@ import (
 )
 
 func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
-	if m.interruptStream {
-		if _, ok := msg.inner.(doneMsg); ok {
-			m.interruptStream = false
-		} else {
-			return m, readNext(msg.ch)
-		}
+	if msg.gen != m.streamGen {
 		return m, nil
 	}
 
@@ -27,14 +22,14 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.resetOrAppendThink()
 		m.setAction("Thinking", "")
 		m.syncViewport()
-		return m, readNext(msg.ch)
+		return m, readNext(msg.ch, m.streamGen)
 
 	case thinkMsg:
 		m.thinkBuf += inner.text
 		m.updateThink(inner.text)
 		m.setAction("Thinking", "")
 		m.syncViewport()
-		return m, readNext(msg.ch)
+		return m, readNext(msg.ch, m.streamGen)
 
 	case tokenMsg:
 		if !m.thinkDone {
@@ -45,7 +40,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		}
 		m.appendToLastAssistant(inner.text)
 		m.lastAssistantRaw += inner.text
-		return m, readNext(msg.ch)
+		return m, readNext(msg.ch, m.streamGen)
 
 	case toolStartMsg:
 		m.toolRunning = true
@@ -54,7 +49,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		m.clearAction()
 		m.setAction(toolPresentTense(display), actionDetail(display, inner.args))
 		m.syncViewport()
-		return m, readNext(msg.ch)
+		return m, readNext(msg.ch, m.streamGen)
 
 	case toolMsg:
 		m.toolRunning = false
@@ -73,7 +68,7 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 			m.clearAction()
 		}
 		m.syncViewport()
-		return m, readNext(msg.ch)
+		return m, readNext(msg.ch, m.streamGen)
 
 	case confirmMsg:
 		m.confirming = true
@@ -124,11 +119,16 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 }
 
 func (m model) handleStartStreamMsg(msg startStreamMsg) (model, tea.Cmd) {
-	return m, readNext(msg.ch)
+	if msg.gen != m.streamGen {
+		return m, nil
+	}
+	return m, readNext(msg.ch, m.streamGen)
 }
 
 func (m model) handleDoneMsg(msg doneMsg) (model, tea.Cmd) {
-	m.interruptStream = false
+	if msg.gen != m.streamGen {
+		return m, nil
+	}
 	if m.streaming {
 		if cmd := m.finishStream(msg.tokenCount, msg.tokenLimit); cmd != nil {
 			return m, cmd

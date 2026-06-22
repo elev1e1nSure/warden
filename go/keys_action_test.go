@@ -86,8 +86,8 @@ func TestHandleKeyEsc(t *testing.T) {
 
 	// 4. Esc in streaming: second press interrupts
 	m2, _, handled = m2.handleKey(tea.KeyMsg{Type: tea.KeyEsc})
-	if !handled || !m2.interruptStream || m2.streaming {
-		t.Errorf("expected stream to be interrupted")
+	if !handled || m2.streaming || m2.streamGen != 1 {
+		t.Errorf("expected stream to be interrupted and streamGen incremented, got streaming=%v streamGen=%d", m2.streaming, m2.streamGen)
 	}
 
 	// 5. Esc in questioning

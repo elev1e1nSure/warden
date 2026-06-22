@@ -30,6 +30,7 @@ class Backend:
         self.ollama: OllamaProcessManager | None = None
         self.chat: ChatSession | None = None
         self.auto_mode: bool = False
+        self.chat_lock = asyncio.Lock()
         self.confirmation_manager = ConfirmationManager()
         self.question_manager = QuestionManager()
         self.memory_store = MemoryStore()
@@ -351,94 +352,103 @@ def _client_disconnected(request: web.Request) -> bool:
     return transport is not None and transport.is_closing()
 
 
+async def interrupt(request: web.Request) -> web.Response:
+    backend = _get_backend(request)
+    if backend.chat is not None:
+        backend.chat.cancel()
+    log_request("POST", "/interrupt", 200)
+    return web.Response(text="ok")
+
+
 async def chat(request: web.Request) -> web.StreamResponse:
     backend = _get_backend(request)
-    data = await request.json()
-    text = data.get("text", "")
-    skill_name = data.get("skill")
-    skill_args = data.get("args")
-    log_request("POST", "/chat")
-    info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
-
     response = web.StreamResponse(
         status=200,
         headers={"Content-Type": "application/x-ndjson"},
     )
     await response.prepare(request)
 
-    if backend.chat is None:
-        await response.write(
-            json.dumps({"type": "token", "text": "not connected — run /connect to get started"}).encode() + b"\n"
-        )
-        await response.write(json.dumps({"type": "done", "token_count": 0, "token_limit": 0}).encode() + b"\n")
-        return response
+    async with backend.chat_lock:
+        data = await request.json()
+        text = data.get("text", "")
+        skill_name = data.get("skill")
+        skill_args = data.get("args")
+        log_request("POST", "/chat")
+        info(f"user: {text[:50]}..." if len(text) > 50 else f"user: {text}")
 
-    try:
-        stream = (
-            backend.chat.stream(text, auto_mode=backend.auto_mode, skill_name=skill_name, skill_args=skill_args)
-            if skill_name
-            else backend.chat.stream(text, auto_mode=backend.auto_mode)
-        )
-        async for type_, payload in stream:
-            if _client_disconnected(request):
-                backend.confirmation_manager.cancel_all()
-                backend.question_manager.cancel_all()
-                break
-            if type_ == "warden_start":
-                msg: dict = {"type": "warden_start"}
-            elif type_ in ("token", "think"):
-                msg = {"type": type_, "text": payload}
-            elif type_ == "tool_start":
-                msg = {"type": "tool_start", "name": payload["name"], "args": payload["args"]}
-            elif type_ == "tool":
-                msg = {
-                    "type": "tool",
-                    "name": payload["name"],
-                    "args": payload["args"],
-                    "result": payload["result"],
+        if backend.chat is None:
+            await response.write(
+                json.dumps({"type": "token", "text": "not connected — run /connect to get started"}).encode() + b"\n"
+            )
+            await response.write(json.dumps({"type": "done", "token_count": 0, "token_limit": 0}).encode() + b"\n")
+            return response
+
+        try:
+            stream = (
+                backend.chat.stream(text, auto_mode=backend.auto_mode, skill_name=skill_name, skill_args=skill_args)
+                if skill_name
+                else backend.chat.stream(text, auto_mode=backend.auto_mode)
+            )
+            async for type_, payload in stream:
+                if _client_disconnected(request):
+                    backend.confirmation_manager.cancel_all()
+                    backend.question_manager.cancel_all()
+                    break
+                if type_ == "warden_start":
+                    msg: dict = {"type": "warden_start"}
+                elif type_ in ("token", "think"):
+                    msg = {"type": type_, "text": payload}
+                elif type_ == "tool_start":
+                    msg = {"type": "tool_start", "name": payload["name"], "args": payload["args"]}
+                elif type_ == "tool":
+                    msg = {
+                        "type": "tool",
+                        "name": payload["name"],
+                        "args": payload["args"],
+                        "result": payload["result"],
+                    }
+                    if payload.get("diff"):
+                        msg["diff"] = payload["diff"]
+                elif type_ == "confirm":
+                    msg = {
+                        "type": "confirm",
+                        "id": payload["id"],
+                        "tool": payload["tool"],
+                        "risk": payload.get("risk", "confirm"),
+                        "title": payload.get("title", "Dangerous action"),
+                        "summary": payload.get("summary", ""),
+                        "details": payload.get("details", []),
+                        "args": payload["args"],
+                        "preview": payload.get("preview", ""),
+                        "default": payload.get("default", "cancel"),
+                    }
+                elif type_ == "question":
+                    msg = {
+                        "type": "question",
+                        "id": payload["id"],
+                        "questions": payload["questions"],
+                    }
+                else:
+                    continue
+                try:
+                    await response.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
+                except (ConnectionResetError, ClientConnectionResetError):
+                    break
+            if not _client_disconnected(request):
+                done_msg = {
+                    "type": "done",
+                    "token_count": backend.chat.token_count,
+                    "token_limit": backend.chat.token_limit,
                 }
-                if payload.get("diff"):
-                    msg["diff"] = payload["diff"]
-            elif type_ == "confirm":
-                msg = {
-                    "type": "confirm",
-                    "id": payload["id"],
-                    "tool": payload["tool"],
-                    "risk": payload.get("risk", "confirm"),
-                    "title": payload.get("title", "Dangerous action"),
-                    "summary": payload.get("summary", ""),
-                    "details": payload.get("details", []),
-                    "args": payload["args"],
-                    "preview": payload.get("preview", ""),
-                    "default": payload.get("default", "cancel"),
-                }
-            elif type_ == "question":
-                msg = {
-                    "type": "question",
-                    "id": payload["id"],
-                    "questions": payload["questions"],
-                }
-            else:
-                continue
-            try:
-                await response.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
-            except (ConnectionResetError, ClientConnectionResetError):
-                break
-        if not _client_disconnected(request):
-            done_msg = {
-                "type": "done",
-                "token_count": backend.chat.token_count,
-                "token_limit": backend.chat.token_limit,
-            }
-            await response.write((json.dumps(done_msg) + "\n").encode())
-    except (ConnectionResetError, ClientConnectionResetError):
-        pass
-    except Exception as e:
-        if not _client_disconnected(request):
-            with contextlib.suppress(ConnectionResetError, ClientConnectionResetError):
-                await response.write(
-                    (json.dumps({"type": "error", "text": str(e)}, ensure_ascii=False) + "\n").encode()
-                )
+                await response.write((json.dumps(done_msg) + "\n").encode())
+        except (ConnectionResetError, ClientConnectionResetError):
+            pass
+        except Exception as e:
+            if not _client_disconnected(request):
+                with contextlib.suppress(ConnectionResetError, ClientConnectionResetError):
+                    await response.write(
+                        (json.dumps({"type": "error", "text": str(e)}, ensure_ascii=False) + "\n").encode()
+                    )
 
     return response
 
@@ -459,6 +469,7 @@ async def main() -> Backend:
     app.router.add_get("/health", health)
     app.router.add_post("/reset", reset)
     app.router.add_post("/chat", chat)
+    app.router.add_post("/interrupt", interrupt)
     app.router.add_post("/confirm", confirm)
     app.router.add_post("/mode", set_mode)
     app.router.add_get("/status", status)

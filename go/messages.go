@@ -29,10 +29,14 @@ type confirmMsg struct {
 	preview    string
 	defaultVal string
 }
-type modeMsg struct{ auto bool }
+type modeMsg struct {
+	auto bool
+	err  error
+}
 type doneMsg struct {
 	tokenCount int
 	tokenLimit int
+	gen        int
 }
 type compactResultMsg struct {
 	tokensBefore int
@@ -50,10 +54,14 @@ type backendReadyMsg struct{}
 type backendErrorMsg struct{}
 type tickMsg struct{}
 type shellResultMsg struct{ output string }
-type startStreamMsg struct{ ch <-chan client.Event }
+type startStreamMsg struct {
+	ch  <-chan client.Event
+	gen int
+}
 type nextMsg struct {
 	inner tea.Msg
 	ch    <-chan client.Event
+	gen   int
 }
 
 type questionMsg struct {

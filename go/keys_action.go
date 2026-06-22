@@ -40,7 +40,7 @@ func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.escPending = false
-		m.interruptStream = true
+		m.streamGen++
 		m.streaming = false
 		m.loading = false
 		m.thinkBuf = ""
@@ -48,9 +48,10 @@ func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.toolRunning = false
 		m.userScrolled = false
 		m.finishThink()
+		m.freezeChain()
 		m.textinput.Placeholder = ""
 		m.syncViewport()
-		return m, m.focusInput(), true
+		return m, tea.Batch(m.focusInput(), m.sendInterrupt()), true
 	}
 	if m.questioning {
 		ch := m.questionCh
@@ -58,7 +59,7 @@ func (m model) handleKeyEsc(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m = m.clearQuestionState()
 		m.updateViewportHeight()
 		m.syncViewport()
-		return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch)), true
+		return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch, m.streamGen)), true
 	}
 	if m.confirming {
 		newM, cmd := m.resolveConfirm(false)

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import uuid
@@ -162,6 +163,16 @@ class ChatSession:
         self._extractor = MemoryExtractor()
         self.token_count: int = 0
         self.token_limit: int = _guess_context_limit(model)
+        self._cancelled = asyncio.Event()
+
+    def cancel(self) -> None:
+        self._cancelled.set()
+
+    def reset_cancellation(self) -> None:
+        self._cancelled.clear()
+
+    def is_cancelled(self) -> bool:
+        return self._cancelled.is_set()
 
     def reset(self) -> None:
         if self.memory_store is not None:
@@ -266,6 +277,8 @@ class ChatSession:
                 messages=messages,
                 tools=_TOOLS,
             ):
+                if self.is_cancelled():
+                    break
                 if chunk.usage_tokens:
                     result["usage_tokens"] = chunk.usage_tokens
                     continue
@@ -327,6 +340,8 @@ class ChatSession:
                         messages=stripped,
                         tools=_TOOLS,
                     ):
+                        if self.is_cancelled():
+                            break
                         if chunk.usage_tokens:
                             result["usage_tokens"] = chunk.usage_tokens
                             continue
@@ -374,10 +389,13 @@ class ChatSession:
 
         history_insert_at = len(self.history) + 1
         self.add_user(text)
+        self.reset_cancellation()
         iter_count = 0
 
         while iter_count < MAX_ITER:
             iter_count += 1
+            if self.is_cancelled():
+                break
             yield ("warden_start", {})
 
             system = build_system(self.model)
@@ -393,9 +411,11 @@ class ChatSession:
 
             llm_result: dict = {}
             async for event in self._call_llm(messages, llm_result):
+                if self.is_cancelled():
+                    break
                 yield event
 
-            if llm_result.get("error"):
+            if self.is_cancelled() or llm_result.get("error"):
                 break
 
             full_content = llm_result.get("content", "")
@@ -412,8 +432,12 @@ class ChatSession:
                 break
 
             for tc in collected_tool_calls:
+                if self.is_cancelled():
+                    break
                 async for event in self._execute_tool_call(tc, auto_mode):
                     yield event
 
-        if iter_count >= MAX_ITER:
+        if self.is_cancelled():
+            yield ("token", "\n[interrupted]")
+        elif iter_count >= MAX_ITER:
             yield ("token", "\n[iteration limit reached]")

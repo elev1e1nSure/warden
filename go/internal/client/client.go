@@ -150,6 +150,10 @@ func (c *Client) Shutdown() error {
 	return c.postOK("/shutdown", nil)
 }
 
+func (c *Client) Interrupt() error {
+	return c.postOK("/interrupt", nil)
+}
+
 func (c *Client) GetMemoryState() (*MemoryState, error) {
 	var result MemoryState
 	if err := c.getJSON("/memory/state", &result); err != nil {
