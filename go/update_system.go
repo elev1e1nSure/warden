@@ -66,7 +66,7 @@ func (m *model) handleUpdateResult(msg updateResultMsg) (*model, tea.Cmd) {
 func (m *model) handleBackendReady(msg backendReadyMsg) (*model, tea.Cmd) {
 	m.loading = false
 	m.tokenCount = 0
-	m.client.ResetSession()
+	m.backend.ResetSession()
 	m.syncViewport()
 	if m.autoMode {
 		return m, m.setMode(true)

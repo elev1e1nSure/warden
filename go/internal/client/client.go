@@ -10,14 +10,14 @@ import (
 )
 
 type Client struct {
-	BaseURL      string
+	baseURL      string
 	HTTPClient   *http.Client
 	StreamClient *http.Client
 }
 
 func NewClient(url string) *Client {
 	return &Client{
-		BaseURL: url,
+		baseURL: url,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -39,7 +39,7 @@ func (c *Client) postJSON(path string, payload any) (*http.Response, error) {
 		}
 		body = bytes.NewReader(data)
 	}
-	return c.HTTPClient.Post(c.BaseURL+path, "application/json", body)
+	return c.HTTPClient.Post(c.baseURL+path, "application/json", body)
 }
 
 // postOK POSTs payload to path and expects a 200 response.
@@ -67,13 +67,15 @@ func (c *Client) postDecode(path string, payload any, v any) error {
 
 // getJSON GETs path and decodes the JSON response into v.
 func (c *Client) getJSON(path string, v any) error {
-	resp, err := c.HTTPClient.Get(c.BaseURL + path)
+	resp, err := c.HTTPClient.Get(c.baseURL + path)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	return json.NewDecoder(resp.Body).Decode(v)
 }
+
+func (c *Client) BaseURL() string { return c.baseURL }
 
 func (c *Client) ResetSession() error {
 	return c.postOK("/reset", nil)
@@ -195,7 +197,7 @@ func (c *Client) ListSkills() ([]Skill, error) {
 }
 
 func (c *Client) LoadSkill(name string) (string, error) {
-	resp, err := c.HTTPClient.Get(c.BaseURL + "/skill/" + name)
+	resp, err := c.HTTPClient.Get(c.baseURL + "/skill/" + name)
 	if err != nil {
 		return "", err
 	}

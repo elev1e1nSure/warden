@@ -17,7 +17,7 @@ import (
 
 func (m *model) checkBackend() tea.Cmd {
 	return func() tea.Msg {
-		resp, err := http.Get(m.client.BaseURL + "/health")
+		resp, err := http.Get(m.backend.BaseURL() + "/health")
 		if err != nil || resp.StatusCode != 200 {
 			if resp != nil {
 				resp.Body.Close()
@@ -31,21 +31,21 @@ func (m *model) checkBackend() tea.Cmd {
 
 func (m *model) sendQuestion(id string, answers [][]string) tea.Cmd {
 	return func() tea.Msg {
-		m.client.SendQuestion(id, answers)
+		m.backend.SendQuestion(id, answers)
 		return nil
 	}
 }
 
 func (m *model) sendConfirm(id string, ok bool) tea.Cmd {
 	return func() tea.Msg {
-		m.client.SendConfirm(id, ok)
+		m.backend.SendConfirm(id, ok)
 		return nil
 	}
 }
 
 func (m *model) setMode(auto bool) tea.Cmd {
 	return func() tea.Msg {
-		m.client.SetMode(auto)
+		m.backend.SetMode(auto)
 		err := saveAutoMode(auto)
 		return modeMsg{auto: auto, err: err}
 	}
@@ -91,7 +91,7 @@ func saveAutoMode(auto bool) error {
 
 func (m *model) fetchStatus(brief bool) tea.Cmd {
 	return func() tea.Msg {
-		s, err := m.client.GetStatus()
+		s, err := m.backend.GetStatus()
 		if err != nil {
 			return statusResultMsg{model: "error: " + err.Error(), brief: brief}
 		}
@@ -108,7 +108,7 @@ func (m *model) fetchStatus(brief bool) tea.Cmd {
 
 func (m *model) runCompact() tea.Cmd {
 	return func() tea.Msg {
-		result, err := m.client.Compact()
+		result, err := m.backend.Compact()
 		if err != nil {
 			return compactResultMsg{err: err.Error()}
 		}
@@ -121,7 +121,7 @@ func (m *model) runCompact() tea.Cmd {
 
 func (m *model) runMemoryOn() tea.Cmd {
 	return func() tea.Msg {
-		if err := m.client.SetMemoryState(true); err != nil {
+		if err := m.backend.SetMemoryState(true); err != nil {
 			return memoryResultMsg{err: err.Error()}
 		}
 		return memoryResultMsg{text: "memory enabled"}
@@ -130,7 +130,7 @@ func (m *model) runMemoryOn() tea.Cmd {
 
 func (m *model) runMemoryOff() tea.Cmd {
 	return func() tea.Msg {
-		if err := m.client.SetMemoryState(false); err != nil {
+		if err := m.backend.SetMemoryState(false); err != nil {
 			return memoryResultMsg{err: err.Error()}
 		}
 		return memoryResultMsg{text: "memory disabled"}
@@ -139,7 +139,7 @@ func (m *model) runMemoryOff() tea.Cmd {
 
 func (m *model) runMemoryClear() tea.Cmd {
 	return func() tea.Msg {
-		count, err := m.client.ClearMemory()
+		count, err := m.backend.ClearMemory()
 		if err != nil {
 			return memoryResultMsg{err: err.Error()}
 		}
@@ -149,7 +149,7 @@ func (m *model) runMemoryClear() tea.Cmd {
 
 func (m *model) runMemoryStatus() tea.Cmd {
 	return func() tea.Msg {
-		state, err := m.client.GetMemoryState()
+		state, err := m.backend.GetMemoryState()
 		if err != nil {
 			return memoryResultMsg{err: err.Error()}
 		}
@@ -200,7 +200,7 @@ func (m *model) tick() tea.Cmd {
 
 func (m *model) fetchModels() tea.Cmd {
 	return func() tea.Msg {
-		models, current, err := m.client.ListModels()
+		models, current, err := m.backend.ListModels()
 		if err != nil {
 			return modelsResultMsg{err: err.Error()}
 		}
@@ -210,7 +210,7 @@ func (m *model) fetchModels() tea.Cmd {
 
 func (m *model) applyModel(name string) tea.Cmd {
 	return func() tea.Msg {
-		if err := m.client.SetModel(name); err != nil {
+		if err := m.backend.SetModel(name); err != nil {
 			return modelSetMsg{err: err.Error()}
 		}
 		return modelSetMsg{model: name}
@@ -219,7 +219,7 @@ func (m *model) applyModel(name string) tea.Cmd {
 
 func (m *model) fetchSkills() tea.Cmd {
 	return func() tea.Msg {
-		skills, err := m.client.ListSkills()
+		skills, err := m.backend.ListSkills()
 		if err != nil {
 			return skillsResultMsg{err: err.Error()}
 		}
@@ -229,7 +229,7 @@ func (m *model) fetchSkills() tea.Cmd {
 
 func (m *model) loadSkill(name string) tea.Cmd {
 	return func() tea.Msg {
-		content, err := m.client.LoadSkill(name)
+		content, err := m.backend.LoadSkill(name)
 		if err != nil {
 			return skillLoadedMsg{name: name, err: err.Error()}
 		}
@@ -405,7 +405,7 @@ func (m *model) submitConnect() tea.Cmd {
 	m.updateViewportHeight()
 	m.syncViewport()
 	return func() tea.Msg {
-		err := m.client.Connect(provider, apiURL, apiKey, modelName)
+		err := m.backend.Connect(provider, apiURL, apiKey, modelName)
 		if err != nil {
 			return connectResultMsg{ok: false, err: err.Error()}
 		}

@@ -159,7 +159,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.lastAssistantRaw = ""
 		m.syncViewport()
 		return true, func() tea.Msg {
-			m.client.ResetSession()
+			m.backend.ResetSession()
 			return nil
 		}
 	case "/compact":

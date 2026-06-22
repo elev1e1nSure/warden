@@ -18,7 +18,7 @@ import (
 type model struct {
 	viewport  viewport.Model
 	textinput textarea.Model
-	client    *client.Client
+	backend   Backend
 	messages  []messageEntry
 	streaming bool
 	height    int
@@ -130,7 +130,7 @@ func filterModels(models []string, filter string) []string {
 	return result
 }
 
-func initialModel(modelName string, connected bool) *model {
+func initialModel(backend Backend, modelName string, connected bool) *model {
 	ti := textarea.New()
 	ti.Placeholder = ""
 	ti.Prompt = ""
@@ -163,7 +163,7 @@ func initialModel(modelName string, connected bool) *model {
 	m := model{
 		textinput: ti,
 		viewport:  vp,
-		client:    client.NewClient("http://localhost:8765"),
+		backend:   backend,
 		messages:  []messageEntry{},
 		autoMode:  loadAutoMode(),
 		cwd:       cwd,

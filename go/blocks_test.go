@@ -49,7 +49,7 @@ func TestRenderModelPicker(t *testing.T) {
 }
 
 func TestRenderThinkEntryHasLeadingIndent(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	got := m.renderThinkEntry(messageEntry{duration: 2 * time.Second}, false, false)
 
 	// think summary is indented to align with assistant text (column 2)
@@ -78,7 +78,7 @@ func stripANSI(s string) string {
 }
 
 func TestRenderChainActionHasNoLeadingIndent(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.loading = true
 	got := m.renderChainAction(messageEntry{activity: "Thinking"}, true)
 

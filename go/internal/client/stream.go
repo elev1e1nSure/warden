@@ -82,7 +82,7 @@ func (c *Client) StreamChat(payload map[string]string) <-chan Event {
 			return
 		}
 
-		resp, err := c.StreamClient.Post(c.BaseURL+"/chat", "application/json", bytes.NewReader(body))
+		resp, err := c.StreamClient.Post(c.baseURL+"/chat", "application/json", bytes.NewReader(body))
 		if err != nil {
 			ch <- EventError{Text: "\nnetwork error: " + err.Error()}
 			ch <- EventDone{}

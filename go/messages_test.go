@@ -6,7 +6,7 @@ import (
 )
 
 func newTestModel() *model {
-	m := initialModel("test", false)
+	m := initialModel(&mockBackend{}, "test", false)
 	m.messages = make([]messageEntry, 0)
 	m.streamStart = 0
 	return m

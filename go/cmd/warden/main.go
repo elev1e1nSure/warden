@@ -293,12 +293,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tui.Run(cfg.Model, connected)
+	cli := client.NewClient(fmt.Sprintf("http://localhost:%d", port))
+
+	err = tui.Run(cli, cfg.Model, connected)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "frontend error:", err)
 	}
 
-	cli := client.NewClient(fmt.Sprintf("http://localhost:%d", port))
 	cli.Shutdown()
 
 	if backend != nil {

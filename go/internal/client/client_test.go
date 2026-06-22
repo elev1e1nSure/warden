@@ -12,7 +12,7 @@ import (
 
 func newTestClient(ts *httptest.Server) *Client {
 	return &Client{
-		BaseURL:      ts.URL,
+		baseURL:      ts.URL,
 		HTTPClient:   ts.Client(),
 		StreamClient: ts.Client(),
 	}
@@ -30,7 +30,7 @@ func requireMethodPath(t *testing.T, r *http.Request, method, path string) {
 
 func TestNewClient(t *testing.T) {
 	c := NewClient("http://localhost:8765")
-	if c.BaseURL != "http://localhost:8765" {
+	if c.BaseURL() != "http://localhost:8765" {
 		t.Errorf("expected BaseURL to be set")
 	}
 	if c.HTTPClient == nil || c.StreamClient == nil {

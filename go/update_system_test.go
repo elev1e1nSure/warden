@@ -2,8 +2,6 @@ package tui
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"warden/internal/client"
@@ -154,11 +152,6 @@ func TestHandleUpdateResult(t *testing.T) {
 }
 
 func TestHandleBackendReady(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
 
@@ -166,11 +159,6 @@ func TestHandleBackendReady(t *testing.T) {
 	m.autoMode = false
 	m.loading = true
 	m.tokenCount = 100
-	m.client = &client.Client{
-		BaseURL:      ts.URL,
-		HTTPClient:   ts.Client(),
-		StreamClient: ts.Client(),
-	}
 
 	m2, cmd := m.handleBackendReady(backendReadyMsg{})
 	if m2.loading {
@@ -186,11 +174,6 @@ func TestHandleBackendReady(t *testing.T) {
 	// In autoMode, it should return a setMode command
 	m = newTestModel()
 	m.autoMode = true
-	m.client = &client.Client{
-		BaseURL:      ts.URL,
-		HTTPClient:   ts.Client(),
-		StreamClient: ts.Client(),
-	}
 	_, cmd = m.handleBackendReady(backendReadyMsg{})
 	if cmd == nil {
 		t.Errorf("expected setMode command when autoMode is true")

@@ -9,7 +9,7 @@ import (
 )
 
 func TestSlashNavigationDoesNotChangeInput(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
@@ -29,7 +29,7 @@ func TestSlashNavigationDoesNotChangeInput(t *testing.T) {
 }
 
 func TestBangNavigationDoesNotChangeInput(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
@@ -60,7 +60,7 @@ func TestBangNavigationDoesNotChangeInput(t *testing.T) {
 }
 
 func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.skills = []client.Skill{
 		{Name: "build-web", Description: "Build web"},
 		{Name: "build-worker", Description: "Build worker"},
@@ -78,7 +78,7 @@ func TestBangTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 }
 
 func TestBangTabCompletesSingleMatch(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.skills = []client.Skill{
 		{Name: "cat-text", Description: "Cat text"},
 		{Name: "skill-creator", Description: "Skill creator"},
@@ -95,7 +95,7 @@ func TestBangTabCompletesSingleMatch(t *testing.T) {
 }
 
 func TestSlashTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.textinput.SetValue("/c")
 	m.refreshHints()
 	m.slashIdx = 1
@@ -109,7 +109,7 @@ func TestSlashTabSelectsCurrentHintOnPartialPrefix(t *testing.T) {
 }
 
 func TestBangTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.skills = []client.Skill{
 		{Name: "alpha", Description: "Alpha skill"},
 		{Name: "beta", Description: "Beta skill"},
@@ -127,7 +127,7 @@ func TestBangTabSelectsCurrentHintOnBarePrefix(t *testing.T) {
 }
 
 func TestRenderHintScrollsSlashCommandsWithoutMarkers(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.width = 80
 	m.textinput.SetValue("/")
 	m.refreshHints()
@@ -147,7 +147,7 @@ func TestRenderHintScrollsSlashCommandsWithoutMarkers(t *testing.T) {
 }
 
 func TestHandleBangUnknownSkillShowsError(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 
 	handled, cmd := m.handleBang("!ghost")
 
@@ -163,7 +163,7 @@ func TestHandleBangUnknownSkillShowsError(t *testing.T) {
 }
 
 func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.skills = []client.Skill{{Name: "demo", Description: "Demo skill"}}
 
 	handled, cmd := m.handleBang("!demo")
@@ -193,7 +193,7 @@ func TestHandleBangKnownSkillStartsBackendInvocation(t *testing.T) {
 }
 
 func TestHandleBangKnownSkillWithArgsStartsBackendInvocation(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.skills = []client.Skill{{Name: "demo", Description: "Demo skill"}}
 
 	handled, cmd := m.handleBang("!demo arg1 arg2")

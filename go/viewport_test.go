@@ -7,7 +7,7 @@ import (
 )
 
 func TestSyncViewportFollowsTail(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
@@ -25,7 +25,7 @@ func TestSyncViewportFollowsTail(t *testing.T) {
 }
 
 func TestSyncViewportPreservesManualScrollWhenIdle(t *testing.T) {
-	m := initialModel("test-model", true)
+	m := initialModel(&mockBackend{},"test-model", true)
 	m.width = 80
 	m.height = 20
 	m.viewport.Width = 80
