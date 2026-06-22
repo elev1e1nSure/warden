@@ -21,12 +21,14 @@ Minimal CLI computer-control agent. Go TUI frontend + Python backend. Drives the
 - Pillow — screenshots
 - playwright — browser automation
 - duckduckgo-search — web search
+- html2text — HTML to markdown conversion
 
 ## project structure
 
 ```
 go/                      — bubbletea TUI
-  cmd/warden/            — entry point & launcher
+  main.go                — TUI entry point (Run)
+  backend.go             — Backend interface definition
   blocks.go              — connect wizard & block rendering
   chain.go               — action chain (animations)
   client_adapter.go      — backend message adapter
@@ -50,10 +52,14 @@ go/                      — bubbletea TUI
   update_system.go       — backend lifecycle handlers
   view.go                — layout & message rendering
   viewport*.go           — scrollable viewport
+  internal/client/       — HTTP client, NDJSON stream, DTOs
+  internal/security/     — API key encryption (DPAPI/keyring)
+  cmd/warden/            — launcher, settings, proc helpers
 
 justfile                 — task runner
 
 agent/                   — Python backend
+  conftest.py             — shared pytest fixtures
   server.py              — aiohttp server, routes
   chat.py                — chat session & streaming
   llm_client.py          — Ollama / OpenAI client
