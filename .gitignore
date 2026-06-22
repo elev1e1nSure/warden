@@ -26,10 +26,13 @@ go/warden.exe
 
 # Scratch files
 
+# Config
+quill.toml
 
-# Claude worktrees
-.claude/
-
-# External
+# External references
 opencode/
 .opencode/
+opencode-reference/
+
+# IDE
+.claude/
