@@ -77,7 +77,7 @@ func ErrorStyle() lipgloss.Style {
 }
 
 func ToolStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	return lipgloss.NewStyle().Foreground(Dim)
 }
 
 func SlashNameStyle(active bool, autoMode bool) lipgloss.Style {
