@@ -7,7 +7,10 @@ def _configure_stdio() -> None:
         stream = getattr(sys, stream_name)
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure:
-            reconfigure(encoding="utf-8", errors="replace")
+            kwargs = {"encoding": "utf-8", "errors": "replace"}
+            if stream_name == "stdout":
+                kwargs["line_buffering"] = True
+            reconfigure(**kwargs)
 
 
 _configure_stdio()

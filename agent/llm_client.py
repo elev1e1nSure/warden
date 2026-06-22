@@ -202,10 +202,7 @@ class OpenAIClient(LLMClient):
             reasoning = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_text", None) or ""
             if reasoning:
                 accumulated_reasoning.append(str(reasoning))
-
-            reasoning_details = getattr(delta, "reasoning_details", None) or []
-            if reasoning_details:
-                accumulated_reasoning_details.extend(list(reasoning_details))
+                yield LLMChunk(thinking=str(reasoning))
 
             if delta.tool_calls:
                 for tc in delta.tool_calls:
@@ -225,11 +222,8 @@ class OpenAIClient(LLMClient):
             if delta.content:
                 yield LLMChunk(content=delta.content)
 
-        if accumulated_reasoning or accumulated_reasoning_details:
-            yield LLMChunk(
-                reasoning="".join(accumulated_reasoning),
-                reasoning_details=accumulated_reasoning_details or None,
-            )
+        if accumulated_reasoning_details:
+            yield LLMChunk(reasoning_details=accumulated_reasoning_details or None)
 
         if accumulated_tool_calls:
             yield LLMChunk(tool_calls=accumulated_tool_calls)
