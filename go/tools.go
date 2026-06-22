@@ -323,6 +323,23 @@ func extractToolDetail(name, args string) string {
 	return truncateRunes(args, 60)
 }
 
+// extractFilenameFromResult strips a past-tense verb prefix from a tool result
+// label and returns just the base filename (e.g. "edited README.md +1 -1" → "README.md").
+func extractFilenameFromResult(result string) string {
+	s := strings.TrimSpace(result)
+	lower := strings.ToLower(s)
+	for _, v := range []string{"edited ", "wrote ", "patched ", "deleted ", "applied ", "created "} {
+		if strings.HasPrefix(lower, v) {
+			s = s[len(v):]
+			break
+		}
+	}
+	if i := strings.IndexByte(s, ' '); i > 0 {
+		s = s[:i]
+	}
+	return pathBase(s)
+}
+
 // pathBase returns the last component of a file path (handles both / and \).
 func pathBase(p string) string {
 	p = strings.TrimRight(p, "/\\")
@@ -390,7 +407,8 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 		return summaryLine
 	}
 	if entry.toolDiff != "" {
-		diffBlock := renderUnifiedDiff(entry.toolDiff, m.barWidth()-len(bodyIndent))
+		hint := extractFilenameFromResult(entry.toolResult)
+		diffBlock := renderUnifiedDiff(entry.toolDiff, m.barWidth()-len(bodyIndent), hint)
 		indented := indentLines(diffBlock, bodyIndent)
 		return summaryLine + "\n" + indented
 	}

@@ -11,6 +11,7 @@ Minimal CLI computer-control agent. Go TUI frontend + Python backend. Drives the
 - **Large changes:** ask the user before doing them
 - **Safety:** risk classification lives in `agent/safety/_policy.py` — deterministic code, never the model or prompt
 - **New TUI patterns:** discuss with the user first, then document here
+- **Commits:** commit after every logically complete change — one message per user turn, split into multiple commits only when the diff clearly contains independent concerns. Leave the worktree clean. Exception: if a turn leaves a feature objectively half-done, say so and ask whether to commit anyway or finish first.
 
 ## stack
 
@@ -96,7 +97,7 @@ agent/                   — Python backend
 - **user messages:** `#242424` block, no `>` prompt in history
 - **assistant messages:** `[HH:MM]  text` — no "Warden:" label; timestamp dim, markdown rendered
 - **think line:** `[HH:MM]  + Thought: Xs` dim
-- **tool lines:** `▶ name  args` → `  ✓ name → result`; name blue, result dim, errors red
+- **tool lines:** `→ name  args` → `+ name  result  +N -N`; name neutral `#d0d0d0`, result dim, stats green/red, errors red; click line to expand diff inline
 - **slash hints:** 2 columns — name (green, 14-char) + description (dim)
 - **controls:** arrows, Enter, Esc, Ctrl+C, Shift+Tab (toggle mode), Tab (complete), Ctrl+W (delete word)
 - **prefix hints:** `/` → slash commands; `!` → skills.

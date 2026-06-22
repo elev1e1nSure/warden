@@ -3,72 +3,133 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
+var hunkRe = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
 var diffStatsRe = regexp.MustCompile(`(\+\d+)\s+(-\d+)$`)
 
 var (
-	diffAddStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0")).Background(lipgloss.Color("#10221A"))
-	diffRemoveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F")).Background(lipgloss.Color("#241313"))
-	diffHunkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Background(lipgloss.Color("#0C1B26"))
-	diffCtxStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#6E6E6E")).Background(lipgloss.Color("#151515"))
-	diffFileStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#CFCFCF")).Bold(true)
-	diffFrameStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A"))
-	diffAddGutter   = lipgloss.NewStyle().Foreground(lipgloss.Color("#2D8A5A"))
-	diffDelGutter   = lipgloss.NewStyle().Foreground(lipgloss.Color("#9A4343"))
-	diffAddStat     = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0"))
-	diffDelStat     = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F"))
+	diffAddStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0"))
+	diffRemoveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F"))
+	diffCtxStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6E6E6E"))
+	diffFileStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#CFCFCF")).Bold(true)
+	diffFrameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A"))
+	diffAddGutter  = lipgloss.NewStyle().Foreground(lipgloss.Color("#2D8A5A"))
+	diffDelGutter  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9A4343"))
+	diffAddStat    = lipgloss.NewStyle().Foreground(lipgloss.Color("#8AE0A0"))
+	diffDelStat    = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0908F"))
 )
 
-// renderUnifiedDiff renders a unified diff as a self-contained block, framed
-// with a left rail and a header (file · +adds -dels), so edits stand out
-// clearly from surrounding prose. Changed rows get a full-width color band.
-func renderUnifiedDiff(diff string, width int) string {
+type diffBodyLine struct {
+	sign    byte // '+', '-', or ' '
+	content string
+	num     int
+}
+
+// renderUnifiedDiff renders a unified diff with line numbers and a framed header.
+// filenameHint overrides the filename extracted from the diff header (optional).
+func renderUnifiedDiff(diff string, width int, filenameHint ...string) string {
+	hint := ""
+	if len(filenameHint) > 0 {
+		hint = filenameHint[0]
+	}
+
 	raw := strings.Split(strings.TrimRight(diff, "\n"), "\n")
 
-	// First pass: count changes and find the target file path.
+	var body []diffBodyLine
 	adds, dels := 0, 0
-	file := ""
+	file := hint
+	maxNum := 1
+	oldLine, newLine := 1, 1
+
 	for _, l := range raw {
 		l = strings.TrimSuffix(l, "\r")
 		switch {
+		case strings.HasPrefix(l, "diff --git"), strings.HasPrefix(l, "index "),
+			strings.HasPrefix(l, "new file mode"), strings.HasPrefix(l, "deleted file mode"):
+			// skip git metadata
+
 		case strings.HasPrefix(l, "+++"):
-			if p := strings.TrimSpace(strings.TrimPrefix(l, "+++")); p != "" && p != "/dev/null" {
-				file = strings.TrimPrefix(p, "b/")
+			if file == "" {
+				if p := strings.TrimSpace(strings.TrimPrefix(l, "+++")); p != "" && p != "/dev/null" {
+					file = pathBase(strings.TrimPrefix(p, "b/"))
+				}
 			}
+
 		case strings.HasPrefix(l, "---"):
 			if file == "" {
 				if p := strings.TrimSpace(strings.TrimPrefix(l, "---")); p != "" && p != "/dev/null" {
-					file = strings.TrimPrefix(p, "a/")
+					file = pathBase(strings.TrimPrefix(p, "a/"))
 				}
 			}
+
+		case strings.HasPrefix(l, "@@"):
+			if m := hunkRe.FindStringSubmatch(l); m != nil {
+				o, _ := strconv.Atoi(m[1])
+				n, _ := strconv.Atoi(m[2])
+				oldLine = o
+				newLine = n
+			}
+
 		case strings.HasPrefix(l, "+"):
 			adds++
+			if newLine > maxNum {
+				maxNum = newLine
+			}
+			body = append(body, diffBodyLine{'+', l[1:], newLine})
+			newLine++
+
 		case strings.HasPrefix(l, "-"):
 			dels++
+			if oldLine > maxNum {
+				maxNum = oldLine
+			}
+			body = append(body, diffBodyLine{'-', l[1:], oldLine})
+			oldLine++
+
+		default:
+			// context line (starts with space in unified diff)
+			content := ""
+			if len(l) > 0 {
+				content = l[1:]
+			}
+			if newLine > maxNum {
+				maxNum = newLine
+			}
+			body = append(body, diffBodyLine{' ', content, newLine})
+			oldLine++
+			newLine++
 		}
 	}
 
-	contentW := width - 4 // 2-space indent + rail + space
-	if contentW < 8 {
-		contentW = 8
-	}
-	// Truncate only — no full-width padding. Full-width background fills can
-	// cause adjacent colored lines to merge visually in Windows Terminal.
-	pad := func(s string) string {
-		return truncateRunes(s, contentW)
-	}
-	rail := func(style lipgloss.Style) string { return "  " + style.Render("│") + " " }
-
-	out := make([]string, 0, len(raw)+3)
-
-	// Header
 	if file == "" {
 		file = "diff"
 	}
+
+	numWidth := len(fmt.Sprintf("%d", maxNum))
+
+	// Visible layout per body line:
+	//   rail "  │ " = 4 chars
+	//   linenum = numWidth chars (right-aligned, dim)
+	//   " " = 1 char
+	//   sign = 1 char (colored)
+	//   "    " = 4 chars (colored with content)
+	//   content = remaining
+	overhead := 4 + numWidth + 1 + 1 + 4
+	contentW := width - overhead
+	if contentW < 4 {
+		contentW = 4
+	}
+
+	rail := "  " + diffFrameStyle.Render("│") + " "
+
+	out := make([]string, 0, len(body)+3)
+
+	// Header
 	stats := ""
 	if adds > 0 {
 		stats += diffAddStat.Render(fmt.Sprintf("+%d", adds))
@@ -79,28 +140,32 @@ func renderUnifiedDiff(diff string, width int) string {
 		}
 		stats += diffDelStat.Render(fmt.Sprintf("-%d", dels))
 	}
-	header := "  " + diffFrameStyle.Render("╭ ") + diffFileStyle.Render(pathBase(file))
+	header := "  " + diffFrameStyle.Render("╭ ") + diffFileStyle.Render(file)
 	if stats != "" {
 		header += "  " + stats
 	}
 	out = append(out, header)
 
 	// Body
-	for _, l := range raw {
-		l = strings.TrimSuffix(l, "\r")
-		switch {
-		case strings.HasPrefix(l, "diff --git"), strings.HasPrefix(l, "index "),
-			strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"):
-			continue // metadata folded into the header
-		case strings.HasPrefix(l, "@@"):
-			continue // skip hunk headers
-		case strings.HasPrefix(l, "+"):
-			out = append(out, rail(diffAddGutter)+diffAddStyle.Render(pad(l)))
-		case strings.HasPrefix(l, "-"):
-			out = append(out, rail(diffDelGutter)+diffRemoveStyle.Render(pad(l)))
+	for _, bl := range body {
+		numStr := DimStyle().Render(fmt.Sprintf("%*d", numWidth, bl.num))
+		content := truncateRunes(bl.content, contentW)
+
+		var signStr string
+		var lineStyle lipgloss.Style
+		switch bl.sign {
+		case '+':
+			signStr = diffAddGutter.Render("+")
+			lineStyle = diffAddStyle
+		case '-':
+			signStr = diffDelGutter.Render("-")
+			lineStyle = diffRemoveStyle
 		default:
-			out = append(out, rail(diffFrameStyle)+diffCtxStyle.Render(pad(l)))
+			signStr = " "
+			lineStyle = diffCtxStyle
 		}
+
+		out = append(out, rail+numStr+" "+signStr+lineStyle.Render("    "+content))
 	}
 
 	out = append(out, "  "+diffFrameStyle.Render("╰"))
