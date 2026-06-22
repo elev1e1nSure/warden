@@ -50,6 +50,10 @@ tmp/
 *.swo
 *~
 .claude/
+quill.toml
+opencode/
+.opencode/
+opencode-reference/
 
 # --- Scratch ---
 scratch/
