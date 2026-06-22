@@ -74,52 +74,19 @@ warden/
 │   └── test_*.py            # pytest suite
 ├── .warden/
 │   └── skills/              # Built-in skills
-├── build.bat                # Fast build wrapper
-├── build.ps1                # Coloured build script
+├── justfile                 # Task runner
 ├── requirements.txt         # Python dependencies
 └── run_backend.py           # PyInstaller entry point
 ```
 
 ## Build
 
-Fast build (development):
+All tasks use [just](https://github.com/casey/just):
 
 ```powershell
-# Windows
-build.bat
-```
-
-Or manually:
-
-```powershell
-cd go/cmd/warden
-go build -o ../../warden.exe .
-```
-
-Full release build (includes PyInstaller backend):
-
-```powershell
-# Build frontend
-cd go
-go build -ldflags="-s -w" -o ../warden.exe ./cmd/warden
-
-# Build backend (requires pyinstaller)
-cd ..
-pip install -r requirements.txt pyinstaller
-pyinstaller --onefile --name warden-backend `
-  --collect-all agent `
-  --collect-all playwright `
-  --collect-submodules openai `
-  --collect-submodules ollama `
-  --hidden-import=aiohttp `
-  --hidden-import=PIL `
-  --hidden-import=pyautogui `
-  --hidden-import=openai `
-  --hidden-import=ollama `
-  --hidden-import=duckduckgo_search `
-  --hidden-import=html2text `
-  --hidden-import=certifi `
-  run_backend.py
+just build              # Go TUI → warden.exe
+just build-backend      # Python backend → dist/warden-backend.exe (requires pyinstaller)
+just release            # both
 ```
 
 ## Run
@@ -229,12 +196,14 @@ Path safety uses `Path.resolve()` with containment checks. UNC paths, device pat
 
 ## Tests
 
-```bash
-pip install -r requirements.txt
-pytest agent/ --no-cov -q
+```powershell
+just install            # install dependencies
+just test               # pytest (coverage)
+just test --no-cov -q   # quick, no coverage
+just test-go            # Go tests
+just lint-go            # Go vet
+just fmt-go             # Go format check
 ```
-
-Run after any change to `agent/safety/`.
 
 ## Troubleshooting
 

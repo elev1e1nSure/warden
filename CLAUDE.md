@@ -72,7 +72,7 @@ agent/                   — Python backend
 - Mandatory typing (`typing`, `dataclasses`)
 - No unnecessary abstractions — keep it simple
 - Async only where streaming or I/O concurrency is needed
-- Run `pytest agent/` after any change to `agent/safety/`
+- Run `just test` after any change to `agent/safety/`
 
 ## TUI visual spec
 
