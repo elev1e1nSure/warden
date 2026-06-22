@@ -399,10 +399,13 @@ func (m model) renderToolActivityEntry(entry messageEntry, hovered bool) string 
 	}
 	var summaryLine string
 	if hovered {
-		// Strip embedded ANSI and re-render the whole line in hover color so
-		// the highlight covers "Edit README.md +1 -1", not just the indicator.
 		plain := strings.Replace(ansi.Strip(entry.text), contentIndent+"→ ", contentIndent+toggle+" ", 1)
-		summaryLine = HoverStyle().Render(plain)
+		prefix, stats := renderDiffStats(plain)
+		if stats != "" {
+			summaryLine = HoverStyle().Render(prefix) + "  " + stats
+		} else {
+			summaryLine = HoverStyle().Render(plain)
+		}
 	} else {
 		arrow := ToolStyle().Render(contentIndent + "→ ")
 		indicator := ToolStyle().Render(contentIndent + toggle + " ")
