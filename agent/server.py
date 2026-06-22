@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import os
+import secrets
 import sys
 
 from aiohttp import web
@@ -21,12 +22,13 @@ from agent.tools.input import _cleanup_old_screenshots, _get_screenshot_dir
 
 
 class Backend:
-    def __init__(self, api_key: str = "") -> None:
+    def __init__(self, api_key: str = "", auth_token: str = "") -> None:
         with contextlib.suppress(Exception):
             _cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
         self.model: str = os.environ.get("WARDEN_MODEL", "")
         self.api_url: str = os.environ.get("WARDEN_API_URL", "")
         self.api_key: str = api_key
+        self.auth_token: str = auth_token
         self.llm: OllamaClient | OpenAIClient | None = None
         self.ollama: OllamaProcessManager | None = None
         self.chat: ChatSession | None = None
@@ -78,6 +80,19 @@ class Backend:
 
     def set_auto_mode(self, enabled: bool) -> None:
         self.auto_mode = enabled
+
+
+@web.middleware
+async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+    backend: Backend = request.app.get("backend")
+    if backend is None or not backend.auth_token:
+        return await handler(request)
+    if request.path == "/health":
+        return await handler(request)
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {backend.auth_token}":
+        return web.json_response({"error": "unauthorized"}, status=401)
+    return await handler(request)
 
 
 def _get_backend(request: web.Request) -> Backend:
@@ -454,9 +469,9 @@ async def chat(request: web.Request) -> web.StreamResponse:
     return response
 
 
-async def main(api_key: str = "") -> Backend:
+async def main(api_key: str = "", auth_token: str = "") -> Backend:
     info("starting backend...")
-    backend = Backend(api_key=api_key)
+    backend = Backend(api_key=api_key, auth_token=auth_token)
     await backend.setup()
     if backend.ollama is not None:
         success("ollama ready")
@@ -465,6 +480,7 @@ async def main(api_key: str = "") -> Backend:
 
     shutdown_event = asyncio.Event()
     app = web.Application()
+    app.middlewares.append(auth_middleware)
     app["backend"] = backend
     app["shutdown_event"] = shutdown_event
     app.router.add_get("/health", health)
@@ -499,15 +515,17 @@ async def main(api_key: str = "") -> Backend:
 
 def entrypoint() -> Backend:
     api_key = ""
+    auth_token = ""
     if not sys.stdin.isatty():
         try:
             line = sys.stdin.readline()
             if line:
                 config = json.loads(line.strip())
                 api_key = config.get("api_key", "")
+                auth_token = config.get("auth_token", "")
         except (EOFError, json.JSONDecodeError):
             pass
-    return asyncio.run(main(api_key))
+    return asyncio.run(main(api_key, auth_token))
 
 
 if __name__ == "__main__":

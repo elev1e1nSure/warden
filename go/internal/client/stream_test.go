@@ -125,7 +125,7 @@ func TestStreamChat_ErrorLineAndMalformed(t *testing.T) {
 
 func TestStreamChat_NetworkError(t *testing.T) {
 	// Point to an invalid server or closed server
-	c := NewClient("http://localhost:9999") // no server running here
+	c := NewClient("http://localhost:9999", "") // no server running here
 
 	ch := c.StreamChat(map[string]string{"prompt": "hello"})
 	var received []Event

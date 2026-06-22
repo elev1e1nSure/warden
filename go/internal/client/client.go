@@ -11,13 +11,15 @@ import (
 
 type Client struct {
 	baseURL      string
+	authToken    string
 	HTTPClient   *http.Client
 	StreamClient *http.Client
 }
 
-func NewClient(url string) *Client {
+func NewClient(url, authToken string) *Client {
 	return &Client{
-		baseURL: url,
+		baseURL:   url,
+		authToken: authToken,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -27,6 +29,18 @@ func NewClient(url string) *Client {
 			},
 		},
 	}
+}
+
+func (c *Client) newRequest(method, path string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, c.baseURL+path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+	return req, nil
 }
 
 // postJSON marshals payload (when non-nil) and POSTs it to path.
@@ -39,7 +53,11 @@ func (c *Client) postJSON(path string, payload any) (*http.Response, error) {
 		}
 		body = bytes.NewReader(data)
 	}
-	return c.HTTPClient.Post(c.baseURL+path, "application/json", body)
+	req, err := c.newRequest("POST", path, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.HTTPClient.Do(req)
 }
 
 // postOK POSTs payload to path and expects a 200 response.
@@ -67,7 +85,11 @@ func (c *Client) postDecode(path string, payload any, v any) error {
 
 // getJSON GETs path and decodes the JSON response into v.
 func (c *Client) getJSON(path string, v any) error {
-	resp, err := c.HTTPClient.Get(c.baseURL + path)
+	req, err := c.newRequest("GET", path, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -197,7 +219,11 @@ func (c *Client) ListSkills() ([]Skill, error) {
 }
 
 func (c *Client) LoadSkill(name string) (string, error) {
-	resp, err := c.HTTPClient.Get(c.baseURL + "/skill/" + name)
+	req, err := c.newRequest("GET", "/skill/"+name, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}

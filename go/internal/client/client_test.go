@@ -13,6 +13,7 @@ import (
 func newTestClient(ts *httptest.Server) *Client {
 	return &Client{
 		baseURL:      ts.URL,
+		authToken:    "test-token",
 		HTTPClient:   ts.Client(),
 		StreamClient: ts.Client(),
 	}
@@ -29,12 +30,15 @@ func requireMethodPath(t *testing.T, r *http.Request, method, path string) {
 }
 
 func TestNewClient(t *testing.T) {
-	c := NewClient("http://localhost:8765")
+	c := NewClient("http://localhost:8765", "test-token")
 	if c.BaseURL() != "http://localhost:8765" {
 		t.Errorf("expected BaseURL to be set")
 	}
 	if c.HTTPClient == nil || c.StreamClient == nil {
 		t.Errorf("expected HTTP clients to be initialized")
+	}
+	if c.authToken != "test-token" {
+		t.Errorf("expected authToken to be set")
 	}
 }
 
@@ -321,6 +325,20 @@ func TestLoadSkillNotFound(t *testing.T) {
 	_, err := newTestClient(ts).LoadSkill("missing")
 	if err == nil || !strings.Contains(err.Error(), "skill not found") {
 		t.Errorf("expected skill not found error, got %v", err)
+	}
+}
+
+func TestAuthHeaderSent(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("expected Authorization header, got %q", r.Header.Get("Authorization"))
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	if err := newTestClient(ts).ResetSession(); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

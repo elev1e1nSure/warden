@@ -19,6 +19,7 @@ def _make_backend(auto_mode: bool = False, api_url: str = "") -> MagicMock:
     backend.model = "test-model"
     backend.api_url = api_url
     backend.auto_mode = auto_mode
+    backend.auth_token = ""
     backend.confirmation_manager = ConfirmationManager()
     backend.question_manager = QuestionManager()
     # ChatSession-like attributes
@@ -317,3 +318,54 @@ def test_client_disconnected_no_transport():
     request = MagicMock()
     request.transport = None
     assert server_module._client_disconnected(request) is False
+
+
+# ── auth middleware ────────────────────────────────────────────────────────────
+
+
+def _make_auth_app(auth_token: str) -> web.Application:
+    backend = _make_backend()
+    backend.auth_token = auth_token
+    backend.chat.token_count = 0
+    backend.chat.token_limit = 8192
+    backend.chat.reset = MagicMock()
+    app = _make_app(backend)
+    app.middlewares.append(server_module.auth_middleware)
+    return app
+
+
+async def test_auth_skipped_when_no_token(aiohttp_client):
+    app = _make_auth_app("")
+    client = await aiohttp_client(app)
+    resp = await client.get("/status")
+    assert resp.status == 200
+
+
+async def test_auth_required_when_token_set(aiohttp_client):
+    app = _make_auth_app("secret123")
+    client = await aiohttp_client(app)
+    resp = await client.get("/status")
+    assert resp.status == 401
+    data = await resp.json()
+    assert data["error"] == "unauthorized"
+
+
+async def test_auth_passes_with_valid_token(aiohttp_client):
+    app = _make_auth_app("secret123")
+    client = await aiohttp_client(app)
+    resp = await client.get("/status", headers={"Authorization": "Bearer secret123"})
+    assert resp.status == 200
+
+
+async def test_auth_fails_with_wrong_token(aiohttp_client):
+    app = _make_auth_app("secret123")
+    client = await aiohttp_client(app)
+    resp = await client.get("/status", headers={"Authorization": "Bearer wrong"})
+    assert resp.status == 401
+
+
+async def test_auth_health_exempt(aiohttp_client):
+    app = _make_auth_app("secret123")
+    client = await aiohttp_client(app)
+    resp = await client.get("/health")
+    assert resp.status == 200

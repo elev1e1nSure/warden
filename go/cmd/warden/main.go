@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -163,7 +165,15 @@ func ensurePythonDeps(root string, logFile *os.File) error {
 	return nil
 }
 
-func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
+func generateAuthToken() string {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("fallback-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buf)
+}
+
+func startBackend(root string, cfg WardenConfig) (*exec.Cmd, string, error) {
 	runtimeDir := filepath.Join(root, ".warden")
 	os.MkdirAll(runtimeDir, 0755)
 
@@ -172,11 +182,12 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 
 	outFile, err := os.Create(outLog)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	errFile, err := os.Create(errLog)
 	if err != nil {
-		return nil, err
+		outFile.Close()
+		return nil, "", err
 	}
 
 	var cmd *exec.Cmd
@@ -185,15 +196,19 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 		cmd = exec.Command(backendExe)
 	} else {
 		if err := ensurePythonDeps(root, outFile); err != nil {
-			return nil, err
+			outFile.Close()
+			errFile.Close()
+			return nil, "", err
 		}
 		cmd = exec.Command("python", "-m", "agent.server")
 	}
 	cmd.Dir = root
 
+	authToken := generateAuthToken()
+
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	env := os.Environ()
@@ -212,19 +227,22 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	cmd.Stderr = errFile
 	setupCmd(cmd)
 
+	stdinData := map[string]string{"auth_token": authToken}
+	if cfg.APIKey != "" {
+		stdinData["api_key"] = cfg.APIKey
+	}
+	configJSON, _ := json.Marshal(stdinData)
+
 	if err := cmd.Start(); err != nil {
 		stdinPipe.Close()
-		return nil, err
+		return nil, "", err
 	}
 
-	if cfg.APIKey != "" {
-		configJSON, _ := json.Marshal(map[string]string{"api_key": cfg.APIKey})
-		stdinPipe.Write(configJSON)
-		stdinPipe.Write([]byte("\n"))
-	}
+	stdinPipe.Write(configJSON)
+	stdinPipe.Write([]byte("\n"))
 	stdinPipe.Close()
 
-	return cmd, nil
+	return cmd, authToken, nil
 }
 
 func stopBackend(cmd *exec.Cmd) {
@@ -289,8 +307,9 @@ func main() {
 	}
 
 	var backend *exec.Cmd
+	var authToken string
 	if !alreadyRunning {
-		backend, err = startBackend(root, cfg)
+		backend, authToken, err = startBackend(root, cfg)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start backend failed:", err)
 			os.Exit(1)
@@ -305,7 +324,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cli := client.NewClient(fmt.Sprintf("http://localhost:%d", port))
+	cli := client.NewClient(fmt.Sprintf("http://localhost:%d", port), authToken)
 
 	err = tui.Run(cli, cfg.Model, connected)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"net/http"
 )
 
 // Event is a neutral streaming event emitted by the backend.
@@ -82,7 +83,17 @@ func (c *Client) StreamChat(payload map[string]string) <-chan Event {
 			return
 		}
 
-		resp, err := c.StreamClient.Post(c.baseURL+"/chat", "application/json", bytes.NewReader(body))
+		req, err := http.NewRequest("POST", c.baseURL+"/chat", bytes.NewReader(body))
+		if err != nil {
+			ch <- EventError{Text: "\nrequest error: " + err.Error()}
+			ch <- EventDone{}
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if c.authToken != "" {
+			req.Header.Set("Authorization", "Bearer "+c.authToken)
+		}
+		resp, err := c.StreamClient.Do(req)
 		if err != nil {
 			ch <- EventError{Text: "\nnetwork error: " + err.Error()}
 			ch <- EventDone{}
