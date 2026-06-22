@@ -38,6 +38,7 @@ const (
 type launchModel struct {
 	state     state
 	spinner   int
+	loadingMs float64
 	deadline  time.Time
 	startedAt time.Time
 	ready     bool
@@ -88,6 +89,7 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		m.spinner = (m.spinner + 1) % len(spinnerFrames)
+		m.loadingMs += 0.1
 		return m, checkHealthCmd()
 
 	case readyMsg:
@@ -105,27 +107,20 @@ func (m launchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m launchModel) View() string {
-	elapsed := time.Since(m.startedAt).Round(time.Millisecond)
-	if elapsed < 0 {
-		elapsed = 0
-	}
 	frame := spinnerFrames[m.spinner%len(spinnerFrames)]
 
-	var status string
 	switch m.state {
 	case stateReady:
-		status = "ready"
+		return "ready"
 	case stateFailed:
-		status = "startup failed"
+		s := "startup failed"
 		if m.errMsg != "" {
-			status += ": " + m.errMsg
+			s += ": " + m.errMsg
 		}
-		return status
+		return s
 	default:
-		status = frame + " Warden loading..."
+		return fmt.Sprintf("%s Warden loading (%.1fms.)...", frame, m.loadingMs)
 	}
-
-	return status + "\n" + fmt.Sprintf("%dms", elapsed.Milliseconds())
 }
 
 func findProjectRoot() (string, error) {
