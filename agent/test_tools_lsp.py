@@ -230,9 +230,7 @@ async def test_lsp_client_definition_roundtrip(tmp_path, monkeypatch):
 
     client = _LspClient(sys.executable, [str(script)], str(workspace))
     await client.start("file://" + str(workspace))
-    result = await client.definition(
-        "file://" + str(workspace).replace("\\", "/") + "/foo.py", 0, 0
-    )
+    result = await client.definition("file://" + str(workspace).replace("\\", "/") + "/foo.py", 0, 0)
     await client.stop()
 
     assert isinstance(result, list)

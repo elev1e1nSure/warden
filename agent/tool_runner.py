@@ -3,15 +3,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator
 
 from agent.confirmations import ConfirmationManager, QuestionManager
 from agent.logger import tool as log_tool
 from agent.safety import assess_tool_call
 from agent.tools import REGISTRY, ToolResult, parse_args
 from agent.tools.input import CU_MAX_SIDE
-
 
 _SCREENSHOT_TOOLS = {"screenshot", "browser_screenshot"}
 
@@ -21,183 +20,188 @@ _TRUNCATE_MAX_BYTES = 50_000
 _TRUNCATE_MARKER = "\n…[truncated: showing first {} of {} lines, {} of {} bytes]…\n"
 
 
-
 def _truncate(text: str, max_lines: int = _TRUNCATE_MAX_LINES, max_bytes: int = _TRUNCATE_MAX_BYTES) -> str:
-	"""Cut large tool outputs so they don't blow up the LLM context.
+    """Cut large tool outputs so they don't blow up the LLM context.
 
-	Mirrors opencode's truncate.ts: keep first max_lines lines, then cap at max_bytes.
-	Adds an explicit marker with the original totals so the model knows it lost data.
-	"""
-	if not isinstance(text, str):
-		return text
-	if not text:
-		return text
-	lines = text.split("\n")
-	total_lines = len(lines)
-	total_bytes = len(text.encode("utf-8"))
-	if total_lines <= max_lines and total_bytes <= max_bytes:
-		return text
-	truncated = "\n".join(lines[:max_lines])
-	truncated_bytes = len(truncated.encode("utf-8"))
-	if truncated_bytes > max_bytes:
-		# hard byte cap; keep whole lines
-		enc = truncated.encode("utf-8")
-		truncated = enc[:max_bytes].decode("utf-8", errors="ignore")
-	marker = _TRUNCATE_MARKER.format(
-		min(total_lines, max_lines), total_lines, len(truncated.encode("utf-8")), total_bytes,
-	)
-	return truncated + marker
+    Mirrors opencode's truncate.ts: keep first max_lines lines, then cap at max_bytes.
+    Adds an explicit marker with the original totals so the model knows it lost data.
+    """
+    if not isinstance(text, str):
+        return text
+    if not text:
+        return text
+    lines = text.split("\n")
+    total_lines = len(lines)
+    total_bytes = len(text.encode("utf-8"))
+    if total_lines <= max_lines and total_bytes <= max_bytes:
+        return text
+    truncated = "\n".join(lines[:max_lines])
+    truncated_bytes = len(truncated.encode("utf-8"))
+    if truncated_bytes > max_bytes:
+        # hard byte cap; keep whole lines
+        enc = truncated.encode("utf-8")
+        truncated = enc[:max_bytes].decode("utf-8", errors="ignore")
+    marker = _TRUNCATE_MARKER.format(
+        min(total_lines, max_lines),
+        total_lines,
+        len(truncated.encode("utf-8")),
+        total_bytes,
+    )
+    return truncated + marker
 
 
 def _extract_saved_path(result: str) -> str | None:
-	if not result.startswith("saved: "):
-		return None
-	path_part = result.removeprefix("saved: ").split(" (")[0].strip()
-	p = Path(path_part)
-	return str(p) if p.exists() else None
+    if not result.startswith("saved: "):
+        return None
+    path_part = result.removeprefix("saved: ").split(" (")[0].strip()
+    p = Path(path_part)
+    return str(p) if p.exists() else None
 
 
 def _encode_image(path: str, max_side: int = CU_MAX_SIDE) -> str | None:
-	try:
-		from PIL import Image
-		img = Image.open(path)
-		w, h = img.size
-		if max(w, h) > max_side:
-			scale = max_side / max(w, h)
-			img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-		buf = io.BytesIO()
-		img.save(buf, format="PNG")
-		return base64.b64encode(buf.getvalue()).decode()
-	except Exception:
-		return None
+    try:
+        from PIL import Image
+
+        img = Image.open(path)
+        w, h = img.size
+        if max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return None
 
 
 def _resolve_preview(args: dict, fallback: str) -> str:
-	if "command" in args:
-		return str(args["command"])
-	if "path" in args:
-		try:
-			return str(Path(str(args["path"])).resolve())
-		except Exception:
-			return str(args["path"])
-	return fallback
+    if "command" in args:
+        return str(args["command"])
+    if "path" in args:
+        try:
+            return str(Path(str(args["path"])).resolve())
+        except Exception:
+            return str(args["path"])
+    return fallback
 
 
 async def execute_tool_call(
-	tc,
-	auto_mode: bool,
-	history: list,
-	confirmation_manager: ConfirmationManager | None,
-	question_manager: QuestionManager | None,
-	add_tool_result_fn,
+    tc,
+    auto_mode: bool,
+    history: list,
+    confirmation_manager: ConfirmationManager | None,
+    question_manager: QuestionManager | None,
+    add_tool_result_fn,
 ) -> AsyncIterator[tuple]:
-	"""Execute a single tool call. Yields events and records results in history."""
-	try:
-		name = tc.function.name
-		raw_args = tc.function.arguments
-		tool_call_id = tc.id
-	except AttributeError:
-		func = tc.get("function", {})
-		name = func.get("name", "")
-		raw_args = func.get("arguments", {})
-		tool_call_id = tc.get("id", "")
+    """Execute a single tool call. Yields events and records results in history."""
+    try:
+        name = tc.function.name
+        raw_args = tc.function.arguments
+        tool_call_id = tc.id
+    except AttributeError:
+        func = tc.get("function", {})
+        name = func.get("name", "")
+        raw_args = func.get("arguments", {})
+        tool_call_id = tc.get("id", "")
 
-	tool = REGISTRY.get(name)
-	if not tool:
-		add_tool_result_fn(name, f"error: tool '{name}' not found")
-		return
+    tool = REGISTRY.get(name)
+    if not tool:
+        add_tool_result_fn(name, f"error: tool '{name}' not found")
+        return
 
-	args = parse_args(raw_args)
-	args_str = ", ".join(f"{k}={v}" for k, v in args.items())
+    args = parse_args(raw_args)
+    args_str = ", ".join(f"{k}={v}" for k, v in args.items())
 
-	# ── question tool: special interactive flow ──
-	if name == "question":
-		if question_manager is None:
-			add_tool_result_fn(name, "error: no question manager")
-			yield ("tool", {"name": name, "args": args_str, "result": "error: no question manager"})
-			return
-		questions = args.get("questions", [])
-		if not questions:
-			add_tool_result_fn(name, "error: no questions provided")
-			yield ("tool", {"name": name, "args": args_str, "result": "error: no questions"})
-			return
-		call_id, _ = question_manager.register(questions)
-		yield ("question", {"id": call_id, "questions": questions})
-		answers = await question_manager.wait(call_id)
-		if answers is None:
-			answers = [[] for _ in questions]
-		formatted = ", ".join(
-			f'"{q.get("question", "")}"="{", ".join(a) if a else "Unanswered"}"'
-			for q, a in zip(questions, answers)
-		)
-		result_str = f"User answered: {formatted}"
-		yield ("tool", {"name": name, "args": args_str, "result": result_str})
-		add_tool_result_fn(name, result_str, tool_call_id)
-		return
+    # ── question tool: special interactive flow ──
+    if name == "question":
+        if question_manager is None:
+            add_tool_result_fn(name, "error: no question manager")
+            yield ("tool", {"name": name, "args": args_str, "result": "error: no question manager"})
+            return
+        questions = args.get("questions", [])
+        if not questions:
+            add_tool_result_fn(name, "error: no questions provided")
+            yield ("tool", {"name": name, "args": args_str, "result": "error: no questions"})
+            return
+        call_id, _ = question_manager.register(questions)
+        yield ("question", {"id": call_id, "questions": questions})
+        answers = await question_manager.wait(call_id)
+        if answers is None:
+            answers = [[] for _ in questions]
+        formatted = ", ".join(
+            f'"{q.get("question", "")}"="{", ".join(a) if a else "Unanswered"}"'
+            for q, a in zip(questions, answers, strict=True)
+        )
+        result_str = f"User answered: {formatted}"
+        yield ("tool", {"name": name, "args": args_str, "result": result_str})
+        add_tool_result_fn(name, result_str, tool_call_id)
+        return
 
-	# ── regular tool execution with safety ──
-	mode = "auto" if auto_mode else "ask"
-	decision = assess_tool_call(name, args, mode=mode)
-	if decision.risk == "blocked":
-		add_tool_result_fn(name, f"blocked: {decision.reason}")
-		yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {decision.reason}"})
-		return
+    # ── regular tool execution with safety ──
+    mode = "auto" if auto_mode else "ask"
+    decision = assess_tool_call(name, args, mode=mode)
+    if decision.risk == "blocked":
+        add_tool_result_fn(name, f"blocked: {decision.reason}")
+        yield ("tool", {"name": name, "args": args_str, "result": f"blocked: {decision.reason}"})
+        return
 
-	if decision.risk == "confirm":
-		if confirmation_manager is None:
-			add_tool_result_fn(name, "cancelled: no confirmation manager")
-			yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
-			return
-		call_id, _ = confirmation_manager.register()
-		confirm_payload = {
-			"id": call_id,
-			"tool": name,
-			"risk": decision.risk,
-			"title": decision.summary,
-			"summary": decision.reason,
-			"details": decision.details,
-			"args": args_str,
-			"preview": _resolve_preview(args, args_str),
-			"default": "cancel",
-		}
-		yield ("confirm", confirm_payload)
-		ok = await confirmation_manager.wait(call_id)
-		if not ok:
-			add_tool_result_fn(name, "cancelled by user")
-			yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
-			return
+    if decision.risk == "confirm":
+        if confirmation_manager is None:
+            add_tool_result_fn(name, "cancelled: no confirmation manager")
+            yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
+            return
+        call_id, _ = confirmation_manager.register()
+        confirm_payload = {
+            "id": call_id,
+            "tool": name,
+            "risk": decision.risk,
+            "title": decision.summary,
+            "summary": decision.reason,
+            "details": decision.details,
+            "args": args_str,
+            "preview": _resolve_preview(args, args_str),
+            "default": "cancel",
+        }
+        yield ("confirm", confirm_payload)
+        ok = await confirmation_manager.wait(call_id)
+        if not ok:
+            add_tool_result_fn(name, "cancelled by user")
+            yield ("tool", {"name": name, "args": args_str, "result": "cancelled"})
+            return
 
-	yield ("tool_start", {"name": name, "args": args_str})
-	try:
-		result_val = await asyncio.wait_for(tool.execute(args), timeout=60)
-	except asyncio.TimeoutError:
-		result_val = "error: timeout 60s"
-	except RuntimeError as e:
-		if "question tool must be handled" in str(e):
-			result_val = "error: question tool needs interactive flow"
-		else:
-			result_val = f"error: {e}"
-	except Exception as e:
-		result_val = f"error: {e}"
-	diff_str = result_val.diff if isinstance(result_val, ToolResult) else None
-	result_str = result_val.result if isinstance(result_val, ToolResult) else result_val
-	# Truncate large outputs so we don't blow up the LLM context.
-	# Errors and tool results with explicit diffs are kept as-is (diff is small by design).
-	if isinstance(result_str, str) and not diff_str:
-		result_str = _truncate(result_str)
-	log_tool(name, args_str, result_str[:200] if result_str else None)
-	payload: dict = {"name": name, "args": args_str, "result": result_str}
-	if diff_str:
-		payload["diff"] = diff_str
-	yield ("tool", payload)
-	add_tool_result_fn(name, result_str, tool_call_id)
-	if name in _SCREENSHOT_TOOLS:
-		img_path = _extract_saved_path(result_str)
-		if img_path:
-			img_b64 = _encode_image(img_path)
-			if img_b64:
-				history.append({
-					"role": "user",
-					"content": "[screenshot attached]",
-					"images": [img_b64],
-				})
+    yield ("tool_start", {"name": name, "args": args_str})
+    try:
+        result_val = await asyncio.wait_for(tool.execute(args), timeout=60)
+    except TimeoutError:
+        result_val = "error: timeout 60s"
+    except RuntimeError as e:
+        if "question tool must be handled" in str(e):
+            result_val = "error: question tool needs interactive flow"
+        else:
+            result_val = f"error: {e}"
+    except Exception as e:
+        result_val = f"error: {e}"
+    diff_str = result_val.diff if isinstance(result_val, ToolResult) else None
+    result_str = result_val.result if isinstance(result_val, ToolResult) else result_val
+    # Truncate large outputs so we don't blow up the LLM context.
+    # Errors and tool results with explicit diffs are kept as-is (diff is small by design).
+    if isinstance(result_str, str) and not diff_str:
+        result_str = _truncate(result_str)
+    log_tool(name, args_str, result_str[:200] if result_str else None)
+    payload: dict = {"name": name, "args": args_str, "result": result_str}
+    if diff_str:
+        payload["diff"] = diff_str
+    yield ("tool", payload)
+    add_tool_result_fn(name, result_str, tool_call_id)
+    if name in _SCREENSHOT_TOOLS:
+        img_path = _extract_saved_path(result_str)
+        if img_path:
+            img_b64 = _encode_image(img_path)
+            if img_b64:
+                history.append(
+                    {
+                        "role": "user",
+                        "content": "[screenshot attached]",
+                        "images": [img_b64],
+                    }
+                )

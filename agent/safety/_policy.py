@@ -21,8 +21,7 @@ class SafetyDecision:
 
 
 def _decide(risk, reason, summary, details=None, args=None, tool=None, mode="ask") -> SafetyDecision:
-    d = SafetyDecision(risk=risk, reason=reason, summary=summary,
-                       details=details or [], normalized_args=args or {})
+    d = SafetyDecision(risk=risk, reason=reason, summary=summary, details=details or [], normalized_args=args or {})
     return _apply_mode(d, tool or "", mode)
 
 
@@ -51,8 +50,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name in ("file_write", "write"):
         path = str(norm.get("path", ""))
         if is_dangerous_path(path):
-            return _d("blocked", "dangerous path", "File path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "File path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if not is_path_within_workspace(path, workspace):
             return _d("confirm", "writes outside workspace", "Writing file outside workspace")
         return _d("confirm", "modifies files", "Writing file inside workspace")
@@ -61,8 +64,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name in ("file_delete", "delete"):
         path = str(norm.get("path", ""))
         if is_dangerous_path(path):
-            return _d("blocked", "dangerous path", "File path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "File path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if not is_path_within_workspace(path, workspace):
             return _d("blocked", "deletes outside workspace", "Deleting file outside workspace is blocked")
         return _d("confirm", "destructive file operation", "Deleting file inside workspace")
@@ -71,8 +78,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name in ("file_read", "read"):
         path = str(norm.get("path", ""))
         if is_dangerous_path(path):
-            return _d("blocked", "dangerous path", "File path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "File path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if not is_path_within_workspace(path, workspace):
             return _d("confirm", "reads outside workspace", "Reading file outside workspace")
         return _d("safe", "read-only", "Reading file")
@@ -81,8 +92,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name in ("file_list", "list"):
         path = str(norm.get("path", "."))
         if is_dangerous_path(path):
-            return _d("blocked", "dangerous path", "Path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "Path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if not is_path_within_workspace(path, workspace):
             return _d("confirm", "lists outside workspace", "Listing directory outside workspace")
         return _d("safe", "read-only", "Listing directory")
@@ -124,8 +139,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
         if action == "press":
             dangerous = {"delete", "backspace", "alt+f4", "ctrl+w", "ctrl+shift+w"}
             if any(dk in text for dk in dangerous):
-                return _d("confirm", "destructive key combination", f"Pressing {text}",
-                          ["can close windows or delete content"])
+                return _d(
+                    "confirm",
+                    "destructive key combination",
+                    f"Pressing {text}",
+                    ["can close windows or delete content"],
+                )
         return _d("confirm", "simulates input", f"Keyboard {action}", ["types or presses keys"])
 
     # browser_open
@@ -141,8 +160,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
 
     # apply_patch
     if tool_name == "apply_patch":
-        return _d("confirm", "modifies files via patch", "Applying patch to files",
-                  ["can create, modify, delete, or rename files"])
+        return _d(
+            "confirm",
+            "modifies files via patch",
+            "Applying patch to files",
+            ["can create, modify, delete, or rename files"],
+        )
 
     # webfetch
     if tool_name == "webfetch":
@@ -159,19 +182,30 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name == "process_list":
         return _d("safe", "read-only", "Listing processes")
     if tool_name == "process_kill":
-        return _d("confirm", "terminates a process", "Killing process",
-                  ["can disrupt the system or other applications"])
+        return _d(
+            "confirm",
+            "terminates a process",
+            "Killing process",
+            ["can disrupt the system or other applications"],
+        )
 
     # file_move / file_copy
     if tool_name in ("file_move", "file_copy"):
         src = str(norm.get("src", ""))
         dest = str(norm.get("dest", ""))
         if is_dangerous_path(src) or is_dangerous_path(dest):
-            return _d("blocked", "dangerous path", "Path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "Path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if not is_path_within_workspace(src, workspace) or not is_path_within_workspace(dest, workspace):
-            return _d("blocked", "path outside workspace",
-                      "file_move/file_copy outside workspace is blocked")
+            return _d(
+                "blocked",
+                "path outside workspace",
+                "file_move/file_copy outside workspace is blocked",
+            )
         return _d("confirm", "mutates filesystem", f"{tool_name} inside workspace")
 
     # archive
@@ -179,8 +213,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
         action = str(norm.get("action", "list")).lower()
         path = str(norm.get("path", ""))
         if is_dangerous_path(path):
-            return _d("blocked", "dangerous path", "Archive path is outside allowed scope",
-                      ["UNC path, device path, or traversal detected"])
+            return _d(
+                "blocked",
+                "dangerous path",
+                "Archive path is outside allowed scope",
+                ["UNC path, device path, or traversal detected"],
+            )
         if action == "list":
             return _d("safe", "read-only", "Listing archive")
         if action == "create":
@@ -189,27 +227,38 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
                 return _d("blocked", "path outside workspace", "Archive path is outside workspace")
             for s in sources:
                 if is_dangerous_path(str(s)) or not is_path_within_workspace(str(s), workspace):
-                    return _d("blocked", "source outside workspace",
-                              "Archive source is outside workspace")
+                    return _d("blocked", "source outside workspace", "Archive source is outside workspace")
             return _d("confirm", "creates archive", "Creating archive")
         if action == "extract":
             dest = str(norm.get("dest", "")) or path
             if is_dangerous_path(dest) or not is_path_within_workspace(dest, workspace):
                 return _d("blocked", "path outside workspace", "Extract dest is outside workspace")
             return _d("confirm", "extracts archive", "Extracting archive")
-        return _d("confirm", "unknown archive action", f"archive {action}",
-                  ["action must be list, extract, or create"])
+        return _d(
+            "confirm",
+            "unknown archive action",
+            f"archive {action}",
+            ["action must be list, extract, or create"],
+        )
 
     # window tools
     if tool_name == "window_list":
         return _d("safe", "read-only", "Listing windows")
     if tool_name == "window_focus":
-        return _d("confirm", "changes foreground window", "Focusing window",
-                  [f"title: {norm.get('title', '')}", f"hwnd: {norm.get('hwnd', '')}"])
+        return _d(
+            "confirm",
+            "changes foreground window",
+            "Focusing window",
+            [f"title: {norm.get('title', '')}", f"hwnd: {norm.get('hwnd', '')}"],
+        )
     if tool_name == "window_manage":
         action = str(norm.get("action", "")).lower()
-        return _d("confirm", "manipulates a window", f"Window {action}",
-                  ["can move, resize, minimize, maximize, or close windows"])
+        return _d(
+            "confirm",
+            "manipulates a window",
+            f"Window {action}",
+            ["can move, resize, minimize, maximize, or close windows"],
+        )
 
     # screen perception
     if tool_name == "image_locate":
@@ -217,8 +266,12 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
     if tool_name == "ocr":
         return _d("safe", "read-only", "Recognizing text on screen")
     if tool_name == "wait_for":
-        return _d("safe", "read-only polling", f"Waiting for {norm.get('type', '')}",
-                  [f"target: {norm.get('target', '')}"])
+        return _d(
+            "safe",
+            "read-only polling",
+            f"Waiting for {norm.get('type', '')}",
+            [f"target: {norm.get('target', '')}"],
+        )
 
     # system_info / notify
     if tool_name == "system_info":
@@ -236,16 +289,32 @@ def assess_tool_call(tool_name: str, args: dict, cwd: str | None = None, mode: s
         url = str(norm.get("url", ""))
         if method in ("GET", "HEAD", "OPTIONS"):
             return _d("safe", "read-only request", f"{method} {url}")
-        return _d("confirm", "sends a write request", f"{method} {url}",
-                  ["can create or modify remote state"])
+        return _d(
+            "confirm",
+            "sends a write request",
+            f"{method} {url}",
+            ["can create or modify remote state"],
+        )
 
     # interactive browser
     if tool_name == "browser_click":
-        return _d("confirm", "interacts with a web page", "Clicking page element",
-                  [f"selector: {norm.get('selector', '')}"])
+        return _d(
+            "confirm",
+            "interacts with a web page",
+            "Clicking page element",
+            [f"selector: {norm.get('selector', '')}"],
+        )
     if tool_name == "browser_fill":
-        return _d("confirm", "interacts with a web page", "Filling page field",
-                  [f"selector: {norm.get('selector', '')}"])
+        return _d(
+            "confirm",
+            "interacts with a web page",
+            "Filling page field",
+            [f"selector: {norm.get('selector', '')}"],
+        )
 
-    return _d("confirm", "unknown tool", f"Unknown tool: {tool_name}",
-              ["no safety policy defined — requires confirmation"])
+    return _d(
+        "confirm",
+        "unknown tool",
+        f"Unknown tool: {tool_name}",
+        ["no safety policy defined — requires confirmation"],
+    )

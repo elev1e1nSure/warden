@@ -1,30 +1,29 @@
 """Characterization tests for ChatSession behavior."""
 
-from typing import Any, Dict, List
-import asyncio
+from typing import Any
 
 import pytest
 
 import agent.skills as skills_mod
 from agent.chat import ChatSession
-from agent.llm_client import LLMClient, LLMChunk
+from agent.llm_client import LLMChunk, LLMClient
 
 
 class FakeLLMClient(LLMClient):
     """Records messages and yields controlled chunks."""
 
-    def __init__(self, chunks: List[LLMChunk] | None = None) -> None:
-        self.calls: List[List[Dict[str, Any]]] = []
+    def __init__(self, chunks: list[LLMChunk] | None = None) -> None:
+        self.calls: list[list[dict[str, Any]]] = []
         self._chunks = chunks or []
 
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         return []
 
     async def chat(
         self,
         model: str,
-        messages: List[Dict[str, Any]],
-        tools: List[Dict[str, Any]] | None = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
     ):
         self.calls.append(messages)
         for chunk in self._chunks:
@@ -95,7 +94,7 @@ class TestChatSessionCompact:
     @pytest.mark.asyncio
     async def test_compact_on_error_preserves_history(self) -> None:
         class BrokenLLM(LLMClient):
-            async def list_models(self) -> List[str]:
+            async def list_models(self) -> list[str]:
                 return []
 
             async def chat(self, model, messages, tools=None):
@@ -151,7 +150,7 @@ class TestChatSessionStream:
     @pytest.mark.asyncio
     async def test_stream_handles_errors_gracefully(self) -> None:
         class BrokenLLM(LLMClient):
-            async def list_models(self) -> List[str]:
+            async def list_models(self) -> list[str]:
                 return []
 
             async def chat(self, model, messages, tools=None):
@@ -182,5 +181,5 @@ class TestChatSessionStream:
             pass
 
         request_messages = fake.calls[0]
-        assert any("<skill_content name=\"demo\">" in str(msg.get("content", "")) for msg in request_messages)
+        assert any('<skill_content name="demo">' in str(msg.get("content", "")) for msg in request_messages)
         assert all("<skill_content" not in str(msg.get("content", "")) for msg in session.history)

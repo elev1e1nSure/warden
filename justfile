@@ -19,6 +19,18 @@ test *args:
 test-cov:
     pytest
 
+lint-py:
+    ruff check agent/
+
+lint-py-fix:
+    ruff check --fix agent/
+
+fmt-py:
+    ruff format --check agent/
+
+fmt-py-write:
+    ruff format agent/
+
 # ── go ──
 
 VERSION := env_var_or_default("TAG", "dev")

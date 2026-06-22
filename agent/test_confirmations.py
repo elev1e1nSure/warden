@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from agent.confirmations import ConfirmationManager, QuestionManager, _TIMEOUT_SECONDS
+from agent.confirmations import ConfirmationManager, QuestionManager
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +15,7 @@ def short_timeout(monkeypatch):
 # ---------------------------------------------------------------------------
 # ConfirmationManager
 # ---------------------------------------------------------------------------
+
 
 class TestConfirmationManager:
     def test_register_returns_uuid_and_event(self) -> None:
@@ -70,6 +71,7 @@ class TestConfirmationManager:
         mgr = ConfirmationManager()
         call_id, _ = mgr.register()
         import time
+
         time.sleep(0.1)
         assert mgr.get(call_id) is None
 
@@ -85,6 +87,7 @@ class TestConfirmationManager:
 # ---------------------------------------------------------------------------
 # QuestionManager
 # ---------------------------------------------------------------------------
+
 
 class TestQuestionManager:
     def test_register_stores_questions(self) -> None:
@@ -143,6 +146,7 @@ class TestQuestionManager:
         mgr.resolve(call_id, [["partial"]])
 
         import time
+
         time.sleep(0.1)
         entry = mgr.pop(call_id)
         # should preserve answers even if expired
@@ -153,5 +157,6 @@ class TestQuestionManager:
         mgr = QuestionManager()
         mgr.register([{"question": "q1"}])
         import time
+
         time.sleep(0.1)
         assert mgr.pending_count() == 0

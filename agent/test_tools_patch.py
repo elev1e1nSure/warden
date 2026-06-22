@@ -1,5 +1,8 @@
 """Tests for ApplyPatchTool — unified diff apply logic."""
+
 from __future__ import annotations
+
+import sys
 
 import pytest
 
@@ -7,6 +10,7 @@ import pytest
 class TestParsePatch:
     def _tool(self):
         from agent.tools import ApplyPatchTool
+
         return ApplyPatchTool()
 
     def test_add_file(self):
@@ -59,10 +63,7 @@ class TestParsePatch:
         assert "c:" in files[0]["path"].lower() or "bar.py" in files[0]["path"]
 
     def test_multiple_files(self):
-        patch = (
-            "--- a.py\n+++ a.py\n@@ -1,1 +1,1 @@\n-old\n+new\n"
-            "--- b.py\n+++ b.py\n@@ -1,1 +1,1 @@\n-x\n+y\n"
-        )
+        patch = "--- a.py\n+++ a.py\n@@ -1,1 +1,1 @@\n-old\n+new\n--- b.py\n+++ b.py\n@@ -1,1 +1,1 @@\n-x\n+y\n"
         files = self._tool()._parse_patch(patch)
         assert len(files) == 2
 
@@ -76,6 +77,7 @@ class TestParsePatch:
 class TestApplyHunk:
     def _tool(self):
         from agent.tools import ApplyPatchTool
+
         return ApplyPatchTool()
 
     def test_replace_context_match(self):
@@ -142,11 +144,13 @@ class TestApplyHunk:
 class TestApplyPatchExecute:
     async def test_empty_patch_text(self):
         from agent.tools import ApplyPatchTool
+
         result = await ApplyPatchTool().execute({"patch_text": ""})
         assert "error" in result
 
     async def test_add_new_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         patch = "--- /dev/null\n+++ new.txt\n@@ -0,0 +1,1 @@\n+hello\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
@@ -155,6 +159,7 @@ class TestApplyPatchExecute:
 
     async def test_patch_existing_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         f = tmp_path / "src.py"
         f.write_text("line1\nOLD\nline3\n")
@@ -165,6 +170,7 @@ class TestApplyPatchExecute:
 
     async def test_delete_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         f = tmp_path / "del.txt"
         f.write_text("bye")
@@ -175,6 +181,7 @@ class TestApplyPatchExecute:
 
     async def test_delete_nonexistent_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         patch = "--- missing.txt\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-x\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
@@ -182,15 +189,17 @@ class TestApplyPatchExecute:
 
     async def test_delete_directory_skipped(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         d = tmp_path / "mydir"
         d.mkdir()
-        patch = f"--- mydir\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-x\n"
+        patch = "--- mydir\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-x\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "directory" in result
 
     async def test_rename_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         old = tmp_path / "old.txt"
         old.write_text("content\n")
@@ -203,6 +212,7 @@ class TestApplyPatchExecute:
 
     async def test_rename_source_missing(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         patch = "--- ghost.txt\n+++ new.txt\n@@ -1,1 +1,1 @@\n line\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
@@ -210,6 +220,7 @@ class TestApplyPatchExecute:
 
     async def test_multi_hunk_offset_drift(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         f = tmp_path / "src.py"
         f.write_text("line1\nOLD_A\nline3\nOLD_B\nline5\n")
@@ -228,6 +239,7 @@ class TestApplyPatchExecute:
 
     async def test_hunk_match_failure(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         f = tmp_path / "src.py"
         f.write_text("unrelated content\n")
@@ -237,11 +249,13 @@ class TestApplyPatchExecute:
 
     async def test_no_valid_hunks(self):
         from agent.tools import ApplyPatchTool
+
         result = await ApplyPatchTool().execute({"patch_text": "just garbage text\n"})
         assert "error" in result
 
     def test_is_dangerous(self):
         from agent.tools import ApplyPatchTool
+
         assert ApplyPatchTool().is_dangerous({}) is True
 
 
@@ -251,18 +265,11 @@ class TestApplyPatchExecute:
 class TestOpencodeParse:
     def _tool(self):
         from agent.tools import ApplyPatchTool
+
         return ApplyPatchTool()
 
     def test_update_file(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: foo.py\n"
-            " line1\n"
-            "-OLD\n"
-            "+NEW\n"
-            " line3\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: foo.py\n line1\n-OLD\n+NEW\n line3\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert len(files) == 1
         f = files[0]
@@ -275,13 +282,7 @@ class TestOpencodeParse:
         assert h["at_eof"] is False
 
     def test_add_file(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Add File: new.py\n"
-            "+hello\n"
-            "+world\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Add File: new.py\n+hello\n+world\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert len(files) == 1
         f = files[0]
@@ -290,138 +291,82 @@ class TestOpencodeParse:
         assert f["hunks"][0]["new_lines"] == ["hello", "world"]
 
     def test_delete_file(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Delete File: gone.py\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Delete File: gone.py\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert len(files) == 1
         assert files[0]["kind"] == "delete"
         assert files[0]["path"] == "gone.py"
 
     def test_move_to(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: old.go\n"
-            " body\n"
-            "*** Move to: new.go\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: old.go\n body\n*** Move to: new.go\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert files[0]["move_to"] == "new.go"
 
     def test_end_of_file_marker(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: foo.py\n"
-            " last\n"
-            "*** End of File\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: foo.py\n last\n*** End of File\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert files[0]["hunks"][0]["at_eof"] is True
 
     def test_multiple_files(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Add File: a.py\n"
-            "+x\n"
-            "*** Add File: b.py\n"
-            "+y\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Add File: a.py\n+x\n*** Add File: b.py\n+y\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert [f["path"] for f in files] == ["a.py", "b.py"]
 
     def test_garbage_before_begin_ignored(self):
-        patch = (
-            "ignore me\n"
-            "*** Begin Patch\n"
-            "*** Add File: c.py\n"
-            "+z\n"
-            "*** End Patch\n"
-        )
+        patch = "ignore me\n*** Begin Patch\n*** Add File: c.py\n+z\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert len(files) == 1
         assert files[0]["path"] == "c.py"
 
     def test_path_normalization_strips_a_b_prefix(self):
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: a/src/foo.py\n"
-            " x\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: a/src/foo.py\n x\n*** End Patch\n"
         files = self._tool()._parse_opencode(patch)
         assert files[0]["path"] == "src/foo.py"
-
-
-import sys
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="opencode patch parser sensitive to Windows line endings in CI")
 class TestOpencodeApply:
     async def test_empty_patch_rejected(self):
         from agent.tools import ApplyPatchTool
+
         result = await ApplyPatchTool().execute({"patch_text": "*** Begin Patch\n*** End Patch\n"})
         assert "error" in result
 
     async def test_add_new_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
-        patch = (
-            "*** Begin Patch\n"
-            "*** Add File: new.txt\n"
-            "+hello\n"
-            "+world\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Add File: new.txt\n+hello\n+world\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "added" in result
         assert (tmp_path / "new.txt").read_text() == "hello\nworld\n"
 
     async def test_update_existing_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "src.py").write_text("a\nOLD\nc\n")
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: src.py\n"
-            " a\n"
-            "-OLD\n"
-            "+NEW\n"
-            " c\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: src.py\n a\n-OLD\n+NEW\n c\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "patched" in result
         assert (tmp_path / "src.py").read_text() == "a\nNEW\nc\n"
 
     async def test_delete_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "del.txt").write_text("bye\n")
-        patch = (
-            "*** Begin Patch\n"
-            "*** Delete File: del.txt\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Delete File: del.txt\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "deleted" in result
         assert not (tmp_path / "del.txt").exists()
 
     async def test_move_renames_file(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "old.go").write_text("package x\n")
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: old.go\n"
-            " package x\n"
-            "*** Move to: new.go\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: old.go\n package x\n*** Move to: new.go\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "renamed" in result
         assert not (tmp_path / "old.go").exists()
@@ -429,65 +374,40 @@ class TestOpencodeApply:
 
     async def test_update_with_eof_marker(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "eof.py").write_text("keep\nlast\n")
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: eof.py\n"
-            " last\n"
-            "+trailing\n"
-            "*** End of File\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: eof.py\n last\n+trailing\n*** End of File\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "patched" in result
         assert (tmp_path / "eof.py").read_text() == "keep\nlast\ntrailing\n"
 
     async def test_update_missing_file_skipped(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: ghost.py\n"
-            " x\n"
-            "*** End Patch\n"
-        )
+        patch = "*** Begin Patch\n*** Update File: ghost.py\n x\n*** End Patch\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "not found" in result
 
     async def test_multi_file_patch(self, tmp_path, monkeypatch):
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "a.py").write_text("x\n")
         (tmp_path / "b.py").write_text("y\n")
-        patch = (
-            "*** Begin Patch\n"
-            "*** Update File: a.py\n"
-            "-x\n"
-            "+X\n"
-            "*** Update File: b.py\n"
-            "-y\n"
-            "+Y\n"
-            "*** End Patch\n"
-        )
-        result = await ApplyPatchTool().execute({"patch_text": patch})
+        patch = "*** Begin Patch\n*** Update File: a.py\n-x\n+X\n*** Update File: b.py\n-y\n+Y\n*** End Patch\n"
+        await ApplyPatchTool().execute({"patch_text": patch})
         assert (tmp_path / "a.py").read_text() == "X\n"
         assert (tmp_path / "b.py").read_text() == "Y\n"
 
     async def test_unified_diff_still_works(self, tmp_path, monkeypatch):
         """Regression: legacy unified-diff path must still work alongside opencode format."""
         from agent.tools import ApplyPatchTool
+
         monkeypatch.chdir(tmp_path)
         (tmp_path / "u.py").write_text("one\nOLD\nthree\n")
-        patch = (
-            "--- u.py\n"
-            "+++ u.py\n"
-            "@@ -1,3 +1,3 @@\n"
-            " one\n"
-            "-OLD\n"
-            "+NEW\n"
-            " three\n"
-        )
+        patch = "--- u.py\n+++ u.py\n@@ -1,3 +1,3 @@\n one\n-OLD\n+NEW\n three\n"
         result = await ApplyPatchTool().execute({"patch_text": patch})
         assert "patched" in result
         assert (tmp_path / "u.py").read_text() == "one\nNEW\nthree\n"

@@ -1,7 +1,6 @@
 import asyncio
 import time
 import uuid
-from typing import Dict
 
 _TIMEOUT_SECONDS = 300  # 5 minutes
 
@@ -10,7 +9,7 @@ class _PendingManager:
     """Shared base: UUID registration, timeout, cancel_all."""
 
     def __init__(self) -> None:
-        self._pending: Dict[str, dict] = {}
+        self._pending: dict[str, dict] = {}
 
     def cancel_all(self) -> None:
         for call_id in list(self._pending):
@@ -46,7 +45,7 @@ class _PendingManager:
             return None
         try:
             await asyncio.wait_for(entry["event"].wait(), timeout=_TIMEOUT_SECONDS)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._cancel_entry(call_id)
         return self._pending.pop(call_id, None)
 
