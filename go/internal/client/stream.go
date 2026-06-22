@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -109,7 +110,7 @@ func (c *Client) StreamChat(payload map[string]string) <-chan Event {
 
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, 1024*1024)
+		scanner.Buffer(buf, 10*1024*1024)
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			var base struct {
@@ -219,6 +220,10 @@ func (c *Client) StreamChat(payload map[string]string) <-chan Event {
 				ch <- EventError{Text: e.Text}
 				ch <- EventDone{}
 			}
+		}
+		if err := scanner.Err(); err != nil {
+			ch <- EventError{Text: fmt.Sprintf("\nstream error: %v", err)}
+			ch <- EventDone{}
 		}
 	}()
 	return ch

@@ -24,7 +24,7 @@ const (
 	port              = 8765
 	startupTimeout    = 60 * time.Second
 	healthCheckPeriod = 1500 * time.Millisecond
-	spinnerPeriod     = 16 * time.Millisecond
+	spinnerPeriod     = 80 * time.Millisecond
 )
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -249,6 +249,8 @@ func stopBackend(cmd *exec.Cmd) {
 	if cmd == nil || cmd.Process == nil {
 		return
 	}
+	shutdownClient := &http.Client{Timeout: 3 * time.Second}
+	shutdownClient.Post(fmt.Sprintf("http://localhost:%d/shutdown", port), "application/json", nil)
 	cmd.Process.Kill()
 	if runtime.GOOS == "windows" {
 		exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid)).Run()
