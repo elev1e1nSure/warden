@@ -10,7 +10,7 @@ from agent.tools.input import _get_screenshot_dir, _cleanup_old_screenshots
 
 
 # ── persistent interactive session (shared by browser_click / browser_fill) ──
-# Keeps one headless page alive across calls so clicks and fills compound,
+# Keeps one browser page alive across calls so clicks and fills compound,
 # unlike the stateless read/screenshot tools that open a fresh browser each time.
 _SESSION: Dict[str, Any] = {"pw": None, "browser": None, "page": None}
 
@@ -42,7 +42,7 @@ async def _get_page():
 	# Clean up a stale session before creating a new one.
 	await _close_session()
 	pw = await async_playwright().start()
-	browser = await pw.chromium.launch(headless=True)
+	browser = await pw.chromium.launch(headless=False)
 	ctx = await browser.new_context(locale="en-US")
 	page = await ctx.new_page()
 	_SESSION.update(pw=pw, browser=browser, page=page)
@@ -108,7 +108,7 @@ class BrowserReadTool(Tool):
 		try:
 			from playwright.async_api import async_playwright
 			async with async_playwright() as pw:
-				browser = await pw.chromium.launch(headless=True)
+				browser = await pw.chromium.launch(headless=False)
 				ctx = await browser.new_context(locale="en-US")
 				page = await ctx.new_page()
 				await page.goto(url, timeout=20000)
@@ -162,7 +162,7 @@ class YouTubeSearchTool(Tool):
 		try:
 			from playwright.async_api import async_playwright
 			async with async_playwright() as pw:
-				browser = await pw.chromium.launch(headless=True)
+				browser = await pw.chromium.launch(headless=False)
 				try:
 					ctx = await browser.new_context(locale="en-US")
 					page = await ctx.new_page()
@@ -225,7 +225,7 @@ class BrowserScreenshotTool(Tool):
 			_cleanup_old_screenshots(screenshot_dir, max_age_seconds=300)
 			name = screenshot_dir / f"browser_{datetime.datetime.now():%Y%m%d_%H%M%S}.png"
 			async with async_playwright() as pw:
-				browser = await pw.chromium.launch(headless=True)
+				browser = await pw.chromium.launch(headless=False)
 				page = await browser.new_page()
 				await page.goto(url, timeout=20000)
 				await page.screenshot(path=str(name), full_page=True)
