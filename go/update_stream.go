@@ -53,7 +53,6 @@ func (m model) handleNextMsg(msg nextMsg) (model, tea.Cmd) {
 		}
 		m.appendToLastAssistant(inner.text)
 		m.lastAssistantRaw += inner.text
-		m.syncViewport()
 		return m, readNext(msg.ch)
 
 	case toolStartMsg:
