@@ -185,7 +185,7 @@ func (m *model) View() string {
 	}
 
 	if m.hintVisible {
-		layers = append(layers, m.renderHint())
+		layers = append(layers, indentLines(m.renderHint(), gutter))
 	}
 
 	layers = append(layers, "", m.renderFullWave(), m.renderInput(), "")

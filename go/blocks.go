@@ -116,7 +116,7 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 	for i := start; i < end; i++ {
 		name := filtered[i]
 		if i == idx {
-			lines = append(lines, accent.Render("  → "+name))
+			lines = append(lines, accent.Render("  "+name))
 		} else {
 			lines = append(lines, DimStyle().Render("    "+name))
 		}
@@ -127,7 +127,6 @@ func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) str
 
 func (m *model) renderHint() string {
 	val := m.textinput.Value()
-	accent := WardenStyleAuto(m.autoMode)
 	if strings.HasPrefix(val, "/") {
 		matches := matchSlash(val)
 		if len(matches) == 0 {
@@ -160,17 +159,8 @@ func (m *model) renderHint() string {
 			nameStyle := SlashNameStyle(active, m.autoMode)
 			descStyle := SlashDescStyle(active)
 			descLimit := m.width - lipgloss.Width(name) - 6
-			if active {
-				descLimit = m.width - lipgloss.Width(name) - 4
-			}
 			if descLimit < 0 {
 				descLimit = 0
-			}
-			if active {
-				lines = append(lines,
-					"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
-				)
-				continue
 			}
 			lines = append(lines,
 				"    "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(cmd.desc, descLimit)),
@@ -210,17 +200,8 @@ func (m *model) renderHint() string {
 			nameStyle := SlashNameStyle(active, m.autoMode)
 			descStyle := SlashDescStyle(active)
 			descLimit := m.width - lipgloss.Width(name) - 6
-			if active {
-				descLimit = m.width - lipgloss.Width(name) - 4
-			}
 			if descLimit < 0 {
 				descLimit = 0
-			}
-			if active {
-				lines = append(lines,
-					"  "+accent.Render(">")+" "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(s.Description, descLimit)),
-				)
-				continue
 			}
 			lines = append(lines,
 				"    "+nameStyle.Render(name)+"  "+descStyle.Render(truncateRunes(s.Description, descLimit)),
