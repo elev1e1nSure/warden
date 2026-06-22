@@ -293,7 +293,6 @@ class ChatSession:
 							in_think = False
 		except Exception as e:
 			if _is_vision_error(e) and _has_images(messages):
-				yield ("token", "\nSorry, this model doesn't support images. Retrying without them...")
 				stripped = _strip_images(messages)
 				try:
 					async for chunk in self._client.chat(
