@@ -65,3 +65,20 @@ class TestHttpRequestTool:
         with patch("asyncio.to_thread", side_effect=TimeoutError()):
             result = await tool.execute({"url": "http://example.com"})
         assert "timeout" in result.lower()
+
+    async def test_ssrf_blocking(self):
+        from agent.tools.http import HttpRequestTool
+
+        tool = HttpRequestTool()
+        for unsafe_url in [
+            "http://127.0.0.1",
+            "http://10.0.0.1",
+            "http://172.16.0.1",
+            "http://192.168.1.1",
+            "http://169.254.169.254",
+            "http://[::1]",
+            "http://localhost",
+            "file:///etc/passwd",
+        ]:
+            result = await tool.execute({"url": unsafe_url})
+            assert "blocked" in result.lower() or "error" in result.lower()

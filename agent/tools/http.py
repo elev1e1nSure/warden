@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from agent.tools.base import Tool
+from agent.tools.base import Tool, is_ssrf_safe_url
 
 _METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 _MAX_BYTES = 1_000_000
@@ -43,6 +43,8 @@ class HttpRequestTool(Tool):
         url = str(args.get("url", "")).strip()
         if not url.startswith("http://") and not url.startswith("https://"):
             return "error: URL must start with http:// or https://"
+        if not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         method = str(args.get("method", "GET")).strip().upper() or "GET"
         if method not in _METHODS:
             return f"error: unsupported method '{method}'"

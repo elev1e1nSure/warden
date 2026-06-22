@@ -6,7 +6,7 @@ import datetime
 import urllib.parse
 from typing import Any
 
-from agent.tools.base import Tool
+from agent.tools.base import Tool, is_ssrf_safe_url
 from agent.tools.input import _cleanup_old_screenshots, _get_screenshot_dir
 
 # ── persistent interactive session (shared by browser_click / browser_fill) ──
@@ -83,6 +83,8 @@ class BrowserOpenTool(Tool):
 
     async def execute(self, args: dict[str, Any]) -> str:
         url = args.get("url", "")
+        if not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         try:
             import webbrowser
 
@@ -102,6 +104,8 @@ class BrowserReadTool(Tool):
 
     async def execute(self, args: dict[str, Any]) -> str:
         url = args.get("url", "")
+        if not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         try:
             from playwright.async_api import async_playwright
 
@@ -214,6 +218,8 @@ class BrowserScreenshotTool(Tool):
 
     async def execute(self, args: dict[str, Any]) -> str:
         url = args.get("url", "")
+        if not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         try:
             from playwright.async_api import async_playwright
 
@@ -263,6 +269,8 @@ class BrowserClickTool(Tool):
         if not selector:
             return "error: selector is required"
         url = str(args.get("url", "")).strip()
+        if url and not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         timeout_ms = min(int(args.get("timeout", 15)), 60) * 1000
         try:
             page = await _get_page()
@@ -312,6 +320,8 @@ class BrowserFillTool(Tool):
             return "error: selector is required"
         value = str(args.get("value", ""))
         url = str(args.get("url", "")).strip()
+        if url and not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
         submit = bool(args.get("submit", False))
         timeout_ms = min(int(args.get("timeout", 15)), 60) * 1000
         try:

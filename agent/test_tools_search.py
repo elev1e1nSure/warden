@@ -56,3 +56,30 @@ class TestWebFetchTool:
             finally:
                 if old:
                     sys.modules["html2text"] = old
+
+    async def test_ssrf_blocking(self):
+        from agent.tools.search import WebFetchTool
+
+        tool = WebFetchTool()
+        for unsafe_url in [
+            "http://127.0.0.1",
+            "http://127.0.0.2",
+            "http://10.0.0.1",
+            "http://172.16.0.1",
+            "http://192.168.1.1",
+            "http://169.254.169.254",
+            "http://[::1]",
+            "http://localhost",
+            "file:///etc/passwd",
+        ]:
+            result = await tool.execute({"url": unsafe_url})
+            assert "blocked" in result.lower() or "error" in result.lower()
+
+    async def test_ssrf_safe_url(self):
+        from agent.tools.base import is_ssrf_safe_url
+        assert is_ssrf_safe_url("http://google.com") is True
+        assert is_ssrf_safe_url("https://github.com/test") is True
+        assert is_ssrf_safe_url("http://127.0.0.1") is False
+        assert is_ssrf_safe_url("file:///etc/passwd") is False
+        assert is_ssrf_safe_url("http://localhost") is False
+

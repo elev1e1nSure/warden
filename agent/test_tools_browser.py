@@ -57,3 +57,36 @@ class TestSelector:
         from agent.tools.browser import _selector
 
         assert _selector("//div") == "//div"
+
+
+class TestBrowserSSRF:
+    async def test_browser_open_ssrf(self):
+        from agent.tools.browser import BrowserOpenTool
+        tool = BrowserOpenTool()
+        result = await tool.execute({"url": "http://127.0.0.1"})
+        assert "blocked" in result.lower() or "error" in result.lower()
+
+    async def test_browser_read_ssrf(self):
+        from agent.tools.browser import BrowserReadTool
+        tool = BrowserReadTool()
+        result = await tool.execute({"url": "http://127.0.0.1"})
+        assert "blocked" in result.lower() or "error" in result.lower()
+
+    async def test_browser_screenshot_ssrf(self):
+        from agent.tools.browser import BrowserScreenshotTool
+        tool = BrowserScreenshotTool()
+        result = await tool.execute({"url": "http://127.0.0.1"})
+        assert "blocked" in result.lower() or "error" in result.lower()
+
+    async def test_browser_click_ssrf(self):
+        from agent.tools.browser import BrowserClickTool
+        tool = BrowserClickTool()
+        result = await tool.execute({"selector": "btn", "url": "http://127.0.0.1"})
+        assert "blocked" in result.lower() or "error" in result.lower()
+
+    async def test_browser_fill_ssrf(self):
+        from agent.tools.browser import BrowserFillTool
+        tool = BrowserFillTool()
+        result = await tool.execute({"selector": "input", "value": "val", "url": "http://127.0.0.1"})
+        assert "blocked" in result.lower() or "error" in result.lower()
+

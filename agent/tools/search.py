@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from agent.tools.base import Tool
+from agent.tools.base import Tool, is_ssrf_safe_url
 
 
 class GoogleSearchTool(Tool):
@@ -71,6 +71,9 @@ class WebFetchTool(Tool):
 
         if not url.startswith("http://") and not url.startswith("https://"):
             return "error: URL must start with http:// or https://"
+
+        if not is_ssrf_safe_url(url):
+            return "error: URL is blocked (SSRF or file scheme)"
 
         # encode non-ASCII chars in path/query so urllib doesn't raise on Cyrillic etc.
         _p = urllib.parse.urlparse(url)
