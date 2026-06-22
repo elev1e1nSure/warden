@@ -37,3 +37,4 @@ opencode-reference/
 # IDE
 .claude/
 log.txt
+go/cover.out
