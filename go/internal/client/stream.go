@@ -61,14 +61,14 @@ type EventDone struct {
 type EventError struct{ Text string }
 
 func (EventWardenStart) isEvent() {}
-func (EventToken) isEvent()         {}
-func (EventThink) isEvent()        {}
-func (EventToolStart) isEvent()    {}
-func (EventTool) isEvent()         {}
-func (EventConfirm) isEvent()      {}
+func (EventToken) isEvent()       {}
+func (EventThink) isEvent()       {}
+func (EventToolStart) isEvent()   {}
+func (EventTool) isEvent()        {}
+func (EventConfirm) isEvent()     {}
 func (EventQuestion) isEvent()    {}
-func (EventDone) isEvent()         {}
-func (EventError) isEvent()        {}
+func (EventDone) isEvent()        {}
+func (EventError) isEvent()       {}
 
 // StreamChat sends a chat payload and returns a channel of neutral Events.
 func (c *Client) StreamChat(payload map[string]string) <-chan Event {

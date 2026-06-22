@@ -28,7 +28,6 @@ func TestAppendToolActivity(t *testing.T) {
 	}
 }
 
-
 func TestAppendThink(t *testing.T) {
 	m := newTestModel()
 	m.appendThink()

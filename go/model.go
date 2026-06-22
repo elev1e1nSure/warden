@@ -160,20 +160,19 @@ func initialModel(modelName string, connected bool) model {
 
 	cwd, _ := os.Getwd()
 	m := model{
-		textinput:      ti,
-		viewport:       vp,
-		client:         client.NewClient("http://localhost:8765"),
-		messages:       []messageEntry{},
-		autoMode:       loadAutoMode(),
-		cwd:            cwd,
-		modelName:      modelName,
-		connected:      connected,
-		loading:        true,
+		textinput: ti,
+		viewport:  vp,
+		client:    client.NewClient("http://localhost:8765"),
+		messages:  []messageEntry{},
+		autoMode:  loadAutoMode(),
+		cwd:       cwd,
+		modelName: modelName,
+		connected: connected,
+		loading:   true,
 
-		slashIdx:       -1,
-		hoveredMsgIdx:  -1,
-		skillsIdx:      -1,
-
+		slashIdx:      -1,
+		hoveredMsgIdx: -1,
+		skillsIdx:     -1,
 	}
 	return m
 }

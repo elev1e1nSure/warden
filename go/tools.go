@@ -137,7 +137,6 @@ func toolSummaryLine(name, args, result string) string {
 	return arrow + nameRender + " " + DimStyle().Render(head)
 }
 
-
 func toolStartLine(name, args string) string {
 	arrow := ToolStyle().Render(contentIndent + "→ ")
 	display := ToolStyle().Render(toolDisplayName(name))

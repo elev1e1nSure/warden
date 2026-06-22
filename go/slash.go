@@ -195,7 +195,7 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 			return true, tea.DisableMouse
 		}
 		return true, tea.EnableMouseCellMotion
-}
+	}
 
 	// /memory subcommands
 	if strings.HasPrefix(trimmed, "/memory ") {
