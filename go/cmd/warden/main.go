@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -190,6 +191,11 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	}
 	cmd.Dir = root
 
+	stdinPipe, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+
 	env := os.Environ()
 	env = append(env,
 		"PYTHONPATH="+root,
@@ -200,9 +206,6 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	if cfg.APIURL != "" {
 		env = append(env, "WARDEN_API_URL="+cfg.APIURL)
 	}
-	if cfg.APIKey != "" {
-		env = append(env, "OPENROUTER_API_KEY="+cfg.APIKey)
-	}
 
 	cmd.Env = env
 	cmd.Stdout = outFile
@@ -210,8 +213,17 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, error) {
 	setupCmd(cmd)
 
 	if err := cmd.Start(); err != nil {
+		stdinPipe.Close()
 		return nil, err
 	}
+
+	if cfg.APIKey != "" {
+		configJSON, _ := json.Marshal(map[string]string{"api_key": cfg.APIKey})
+		stdinPipe.Write(configJSON)
+		stdinPipe.Write([]byte("\n"))
+	}
+	stdinPipe.Close()
+
 	return cmd, nil
 }
 

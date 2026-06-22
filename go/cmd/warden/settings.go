@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"warden/internal/security"
 )
 
 type WardenConfig struct {
@@ -39,6 +40,11 @@ func loadConfig() (WardenConfig, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return defaultConfig(), err
 	}
+	plainKey, err := security.DecryptString(cfg.APIKey)
+	if err != nil {
+		return defaultConfig(), err
+	}
+	cfg.APIKey = plainKey
 	if cfg.APIURL == "" {
 		cfg.APIURL = "https://openrouter.ai/api/v1"
 	}
@@ -49,6 +55,17 @@ func saveConfig(cfg WardenConfig) error {
 	path, err := configPath()
 	if err != nil {
 		return err
+	}
+	plainKey, err := security.DecryptString(cfg.APIKey)
+	if err != nil {
+		return err
+	}
+	if plainKey != "" {
+		encrypted, err := security.EncryptString(plainKey)
+		if err != nil {
+			return err
+		}
+		cfg.APIKey = encrypted
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

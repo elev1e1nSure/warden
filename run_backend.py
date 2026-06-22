@@ -1,5 +1,4 @@
 """PyInstaller entry point for the warden backend."""
-import asyncio
-from agent.server import main
+from agent.server import entrypoint
 
-asyncio.run(main())
+entrypoint()

@@ -1,5 +1,4 @@
 import dataclasses
-import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
@@ -64,7 +63,7 @@ class OpenAIClient(LLMClient):
 
         from openai import AsyncOpenAI
 
-        api_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or "sk-no-key"
+        api_key = api_key or "sk-no-key"
         if api_key == "sk-no-key":
             logging.warning("Using fallback API key 'sk-no-key' - requests may fail")
         headers = {}

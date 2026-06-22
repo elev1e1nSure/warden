@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import os
+import sys
 
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
@@ -20,12 +21,12 @@ from agent.tools.input import _cleanup_old_screenshots, _get_screenshot_dir
 
 
 class Backend:
-    def __init__(self) -> None:
+    def __init__(self, api_key: str = "") -> None:
         with contextlib.suppress(Exception):
             _cleanup_old_screenshots(_get_screenshot_dir(), max_age_seconds=0)
         self.model: str = os.environ.get("WARDEN_MODEL", "")
         self.api_url: str = os.environ.get("WARDEN_API_URL", "")
-        self.api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key: str = api_key
         self.llm: OllamaClient | OpenAIClient | None = None
         self.ollama: OllamaProcessManager | None = None
         self.chat: ChatSession | None = None
@@ -453,9 +454,9 @@ async def chat(request: web.Request) -> web.StreamResponse:
     return response
 
 
-async def main() -> Backend:
+async def main(api_key: str = "") -> Backend:
     info("starting backend...")
-    backend = Backend()
+    backend = Backend(api_key=api_key)
     await backend.setup()
     if backend.ollama is not None:
         success("ollama ready")
@@ -496,10 +497,23 @@ async def main() -> Backend:
     return backend
 
 
+def entrypoint() -> Backend:
+    api_key = ""
+    if not sys.stdin.isatty():
+        try:
+            line = sys.stdin.readline()
+            if line:
+                config = json.loads(line.strip())
+                api_key = config.get("api_key", "")
+        except (EOFError, json.JSONDecodeError):
+            pass
+    return asyncio.run(main(api_key))
+
+
 if __name__ == "__main__":
     backend = None
     try:
-        backend = asyncio.run(main())
+        backend = entrypoint()
     except KeyboardInterrupt:
         if backend is not None and backend.ollama is not None:
             backend.ollama.shutdown()

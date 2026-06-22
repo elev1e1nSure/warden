@@ -15,7 +15,7 @@ Minimal CLI computer-control agent. Go TUI frontend + Python backend. Drives the
 
 ## stack
 
-- **Go 1.24+** — TUI (bubbletea, lipgloss)
+- **Go 1.25+** — TUI (bubbletea, lipgloss, glamour)
 - **Python 3.11+** — backend (aiohttp, ollama SDK)
 - pyautogui — mouse / keyboard
 - Pillow — screenshots

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"warden/internal/client"
+	"warden/internal/security"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -315,6 +316,15 @@ func saveWardenConfigField(key string, value any) error {
 	}
 	if cfg == nil {
 		cfg = map[string]any{}
+	}
+	if key == "api_key" {
+		if str, ok := value.(string); ok && str != "" {
+			encrypted, err := security.EncryptString(str)
+			if err != nil {
+				return err
+			}
+			value = encrypted
+		}
 	}
 	cfg[key] = value
 	out, err := json.MarshalIndent(cfg, "", "  ")
