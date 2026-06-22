@@ -21,13 +21,16 @@ jobs:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Go vet
-        working-directory: go
-        run: go vet ./...
+        run: just lint-go
 
       - name: Go test
-        working-directory: go
-        run: go test ./...
+        run: just test-go
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,10 +39,10 @@ jobs:
           cache: pip
 
       - name: Install Python deps
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt just
 
       - name: Run Python tests
-        run: pytest --no-header -q
+        run: just test --no-header -q
 
   release:
     needs: [test]
@@ -55,10 +58,13 @@ jobs:
         with:
           go-version-file: go/go.mod
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Build warden.exe
-        run: |
-          cd go
-          go build -ldflags="-s -w" -o ..\warden.exe .\cmd\warden
+        run: just build
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,21 +75,7 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
 
       - name: Build warden-backend.exe
-        run: |
-          pyinstaller --onefile --name warden-backend `
-            --collect-all agent `
-            --collect-all playwright `
-            --collect-submodules openai `
-            --collect-submodules ollama `
-            --hidden-import=aiohttp `
-            --hidden-import=PIL `
-            --hidden-import=pyautogui `
-            --hidden-import=openai `
-            --hidden-import=ollama `
-            --hidden-import=duckduckgo_search `
-            --hidden-import=html2text `
-            --hidden-import=certifi `
-            run_backend.py
+        run: just build-backend
 
       - name: Generate release notes
         shell: python

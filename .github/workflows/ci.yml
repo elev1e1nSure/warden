@@ -33,10 +33,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
       - name: Install Python deps
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt just
 
       - name: Run tests
-        run: xvfb-run --auto-servernum pytest --no-header -q
+        run: xvfb-run --auto-servernum just test --no-header -q
 
       - name: Upload coverage reports
         if: matrix.python-version == '3.11'
@@ -59,27 +59,22 @@ jobs:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Check formatting
-        working-directory: go
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "These files are not gofmt-compliant:"
-            echo "$unformatted"
-            exit 1
-          fi
+        run: just fmt-go-check
 
       - name: Vet
-        working-directory: go
-        run: go vet ./...
+        run: just lint-go
 
       - name: Build
-        working-directory: go
-        run: go build ./...
+        run: just build-check
 
       - name: Test
-        working-directory: go
-        run: go test ./... -coverprofile=cover.out
+        run: just test-go -coverprofile=cover.out
 
       - name: Check coverage threshold
         working-directory: go
