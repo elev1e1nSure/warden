@@ -2,7 +2,16 @@ import asyncio
 import subprocess
 import time
 
-import ollama
+
+def __getattr__(name: str):
+    if name == "ollama":
+        import sys
+
+        import ollama
+
+        setattr(sys.modules[__name__], name, ollama)
+        return ollama
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class OllamaProcessManager:
@@ -38,6 +47,8 @@ class OllamaProcessManager:
         self._we_started = True
 
     async def wait_for_ready(self, timeout: int = 30) -> bool:
+        import ollama
+
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
@@ -54,6 +65,8 @@ class OllamaProcessManager:
         return await self.wait_for_ready()
 
     def has_model(self) -> bool:
+        import ollama
+
         try:
             models = ollama.list()
             names = [m.get("model", "") for m in models.get("models", [])]
@@ -62,6 +75,8 @@ class OllamaProcessManager:
             return False
 
     def _pull_sync(self) -> None:
+        import ollama
+
         ollama.pull(self.model)
 
     async def pull_model(self) -> None:
