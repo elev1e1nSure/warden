@@ -54,7 +54,6 @@ func (m *model) handleNextMsg(msg nextMsg) (*model, tea.Cmd) {
 	case toolMsg:
 		m.toolRunning = false
 		if inner.tool.Diff != "" {
-			// show a compact tool line only when there's a diff to expand
 			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
 			m.clearAction()
 			m.messages = append(m.messages, messageEntry{
@@ -65,7 +64,7 @@ func (m *model) handleNextMsg(msg nextMsg) (*model, tea.Cmd) {
 				toolDone:   true,
 			})
 		} else {
-			m.clearAction()
+			m.clearActionDelayed()
 		}
 		m.syncViewport()
 		return m, readNext(msg.ch, m.streamGen)
@@ -151,6 +150,7 @@ func (m *model) handleShellResult(msg shellResultMsg) (*model, tea.Cmd) {
 }
 
 func (m *model) handleTick(msg tickMsg) (*model, tea.Cmd) {
+	m.tickClearAction()
 	if m.loading {
 		m.spinner++
 		if m.streaming && !m.confirming && len(m.messages) > 0 {

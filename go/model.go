@@ -66,6 +66,9 @@ type model struct {
 	escPending       bool
 	quitPending      bool
 	quitPendingSince time.Time
+	// delayed chain action clear: keep action visible for min duration
+	chainPendingClear   bool
+	chainPendingClearAt time.Time
 	// viewport scroll: user manually scrolled up during streaming
 	userScrolled bool
 	// token tracking
