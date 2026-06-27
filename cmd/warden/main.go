@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -127,24 +126,6 @@ func (m launchModel) View() string {
 	}
 }
 
-//go:embed warden-backend*
-var embeddedBackend []byte
-
-func extractBackend(destDir string) (string, error) {
-	name := "warden-backend"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	dest := filepath.Join(destDir, name)
-	if existing, err := os.ReadFile(dest); err == nil && len(existing) == len(embeddedBackend) {
-		return dest, nil
-	}
-	if err := os.WriteFile(dest, embeddedBackend, 0755); err != nil {
-		return "", fmt.Errorf("extract backend: %w", err)
-	}
-	return dest, nil
-}
-
 func findProjectRoot() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -210,13 +191,13 @@ func startBackend(root string, cfg WardenConfig) (*exec.Cmd, string, error) {
 	}
 
 	var cmd *exec.Cmd
-	if len(embeddedBackend) > 0 {
-		backendExe, embedErr := extractBackend(runtimeDir)
-		if embedErr != nil {
-			outFile.Close()
-			errFile.Close()
-			return nil, "", embedErr
-		}
+	backendExe, extractErr := extractBackend(runtimeDir)
+	if extractErr != nil {
+		outFile.Close()
+		errFile.Close()
+		return nil, "", extractErr
+	}
+	if backendExe != "" {
 		cmd = exec.Command(backendExe)
 	} else {
 		backendExe := filepath.Join(root, "warden-backend.exe")
