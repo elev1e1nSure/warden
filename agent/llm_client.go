@@ -1,7 +1,15 @@
 package agent
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"sort"
+	"strings"
+	"time"
 )
 
 // LLMChunk is a structured chunk returned by LLM stream.
@@ -31,4 +39,394 @@ type ToolCallFunction struct {
 type LLMClient interface {
 	Chat(ctx context.Context, model string, messages []map[string]any, tools []ToolDefinition) (<-chan LLMChunk, error)
 	ListModels(ctx context.Context) ([]string, error)
+}
+
+func normalizeMessages(messages []map[string]any) []map[string]any {
+	result := make([]map[string]any, 0, len(messages))
+	for _, msg := range messages {
+		role, _ := msg["role"].(string)
+		switch role {
+		case "tool":
+			toolCallID, _ := msg["tool_call_id"].(string)
+			if toolCallID == "" {
+				name, _ := msg["name"].(string)
+				toolCallID = "call_" + name
+			}
+			result = append(result, map[string]any{
+				"role":         "tool",
+				"tool_call_id": toolCallID,
+				"content":      fmt.Sprint(msg["content"]),
+			})
+		case "assistant":
+			if tcs, ok := msg["tool_calls"].([]any); ok && len(tcs) > 0 {
+				openaiToolCalls := make([]map[string]any, 0, len(tcs))
+				for i, tc := range tcs {
+					tcMap, ok := tc.(map[string]any)
+					if !ok {
+						continue
+					}
+					var name, args, id string
+					if fn, ok := tcMap["function"].(map[string]any); ok {
+						name, _ = fn["name"].(string)
+						args, _ = fn["arguments"].(string)
+					}
+					id, _ = tcMap["id"].(string)
+					if id == "" {
+						id = fmt.Sprintf("call_%s_%d", name, i)
+					}
+					openaiToolCalls = append(openaiToolCalls, map[string]any{
+						"id":       id,
+						"type":     "function",
+						"function": map[string]any{"name": name, "arguments": args},
+					})
+				}
+				result = append(result, map[string]any{
+					"role":       "assistant",
+					"content":    fmt.Sprint(msg["content"]),
+					"tool_calls": openaiToolCalls,
+				})
+			} else {
+				m := make(map[string]any)
+				for k, v := range msg {
+					if k != "reasoning" && k != "reasoning_details" {
+						m[k] = v
+					}
+				}
+				result = append(result, m)
+			}
+		case "user":
+			if images, ok := msg["images"].([]string); ok && len(images) > 0 {
+				contentList := make([]map[string]any, 0, len(images)+1)
+				if text, ok := msg["content"].(string); ok && text != "" {
+					contentList = append(contentList, map[string]any{"type": "text", "text": text})
+				}
+				for _, imgB64 := range images {
+					contentList = append(contentList, map[string]any{
+						"type": "image_url",
+						"image_url": map[string]any{
+							"url": "data:image/png;base64," + imgB64,
+						},
+					})
+				}
+				result = append(result, map[string]any{
+					"role":    "user",
+					"content": contentList,
+				})
+			} else {
+				result = append(result, msg)
+			}
+		default:
+			result = append(result, msg)
+		}
+	}
+	return result
+}
+
+// ── OllamaClient ──
+
+type OllamaClient struct {
+	Host       string
+	HTTPClient *http.Client
+}
+
+func NewOllamaClient(host string) *OllamaClient {
+	if host == "" {
+		host = "http://localhost:11434"
+	}
+	return &OllamaClient{
+		Host:       host,
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+type ollamaChatRequest struct {
+	Model    string           `json:"model"`
+	Messages []map[string]any `json:"messages"`
+	Stream   bool             `json:"stream"`
+}
+
+type ollamaChatResponse struct {
+	Message struct {
+		Content   string     `json:"content"`
+		Thinking  string     `json:"thinking"`
+		ToolCalls []ToolCall `json:"tool_calls"`
+	} `json:"message"`
+	Done bool `json:"done"`
+}
+
+func (c *OllamaClient) Chat(ctx context.Context, model string, messages []map[string]any, tools []ToolDefinition) (<-chan LLMChunk, error) {
+	payload := ollamaChatRequest{
+		Model:    model,
+		Messages: normalizeMessages(messages),
+		Stream:   true,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.Host+"/api/chat", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan LLMChunk, 64)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return
+		}
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			var r ollamaChatResponse
+			if err := json.Unmarshal(scanner.Bytes(), &r); err != nil {
+				continue
+			}
+			ch <- LLMChunk{
+				Thinking:  r.Message.Thinking,
+				Content:   r.Message.Content,
+				ToolCalls: r.Message.ToolCalls,
+			}
+			if r.Done {
+				break
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+func (c *OllamaClient) ListModels(ctx context.Context) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.Host+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var r struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, m := range r.Models {
+		if m.Name != "" {
+			names = append(names, m.Name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// ── OpenAIClient ──
+
+type OpenAIClient struct {
+	BaseURL    string
+	APIKey     string
+	HTTPClient *http.Client
+}
+
+func NewOpenAIClient(baseURL, apiKey string) *OpenAIClient {
+	if baseURL == "" {
+		baseURL = "https://openrouter.ai/api/v1"
+	}
+	return &OpenAIClient{
+		BaseURL:    baseURL,
+		APIKey:     apiKey,
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+type openAIChatRequest struct {
+	Model         string           `json:"model"`
+	Messages      []map[string]any `json:"messages"`
+	Stream        bool             `json:"stream"`
+	StreamOptions *map[string]any  `json:"stream_options,omitempty"`
+	Tools         []ToolDefinition `json:"tools,omitempty"`
+	ToolChoice    string           `json:"tool_choice,omitempty"`
+}
+
+type openAIChatResponse struct {
+	Choices []struct {
+		Delta struct {
+			Content   string `json:"content"`
+			Reasoning string `json:"reasoning"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+	} `json:"choices"`
+	Usage *struct {
+		TotalTokens int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+func (c *OpenAIClient) Chat(ctx context.Context, model string, messages []map[string]any, tools []ToolDefinition) (<-chan LLMChunk, error) {
+	payload := openAIChatRequest{
+		Model:    model,
+		Messages: normalizeMessages(messages),
+		Stream:   true,
+		StreamOptions: &map[string]any{
+			"include_usage": true,
+		},
+	}
+
+	if len(tools) > 0 {
+		payload.Tools = tools
+		payload.ToolChoice = "auto"
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan LLMChunk, 64)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return
+		}
+
+		scanner := bufio.NewScanner(resp.Body)
+		var accumulatedToolCalls []ToolCall
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			data := strings.TrimPrefix(line, "data: ")
+			data = strings.TrimSpace(data)
+			if data == "[DONE]" {
+				break
+			}
+
+			var r openAIChatResponse
+			if err := json.Unmarshal([]byte(data), &r); err != nil {
+				continue
+			}
+
+			var usageTokens int
+			if r.Usage != nil {
+				usageTokens = r.Usage.TotalTokens
+			}
+
+			var thinking, content string
+			if len(r.Choices) > 0 {
+				thinking = r.Choices[0].Delta.Reasoning
+				content = r.Choices[0].Delta.Content
+
+				// Handle tool calls aggregation
+				for _, tc := range r.Choices[0].Delta.ToolCalls {
+					for len(accumulatedToolCalls) <= tc.Index {
+						accumulatedToolCalls = append(accumulatedToolCalls, ToolCall{
+							ID:   fmt.Sprintf("call_%d", len(accumulatedToolCalls)),
+							Type: "function",
+						})
+					}
+					if tc.ID != "" {
+						accumulatedToolCalls[tc.Index].ID = tc.ID
+					}
+					if tc.Type != "" {
+						accumulatedToolCalls[tc.Index].Type = tc.Type
+					}
+					if tc.Function.Name != "" {
+						accumulatedToolCalls[tc.Index].Function.Name = tc.Function.Name
+					}
+					if tc.Function.Arguments != "" {
+						accumulatedToolCalls[tc.Index].Function.Arguments += tc.Function.Arguments
+					}
+				}
+			}
+
+			ch <- LLMChunk{
+				Thinking:    thinking,
+				Content:     content,
+				UsageTokens: usageTokens,
+			}
+		}
+
+		if len(accumulatedToolCalls) > 0 {
+			ch <- LLMChunk{
+				ToolCalls: accumulatedToolCalls,
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+func (c *OpenAIClient) ListModels(ctx context.Context) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/models", nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var r struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, m := range r.Data {
+		if m.ID != "" {
+			names = append(names, m.ID)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
