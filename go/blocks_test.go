@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"github.com/elev1e1n/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/client"
 )
 
 func TestRenderConfirmBlock(t *testing.T) {

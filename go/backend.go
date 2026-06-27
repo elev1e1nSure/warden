@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/elev1e1n/warden/internal/client"
+import "github.com/elev1e1nSure/warden/internal/client"
 
 type Backend interface {
 	StreamChat(payload map[string]string) <-chan client.Event

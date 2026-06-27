@@ -37,7 +37,7 @@ VERSION := env_var_or_default("TAG", "dev")
 
 build:
     just build-backend
-    cd go && go build -ldflags="-s -w -X 'github.com/elev1e1n/warden.wardenVersion={{VERSION}}'" -o ../warden.exe ./cmd/warden
+    cd go && go build -ldflags="-s -w -X 'github.com/elev1e1nSure/warden.wardenVersion={{VERSION}}'" -o ../warden.exe ./cmd/warden
 
 build-check:
     cd go && go build ./...

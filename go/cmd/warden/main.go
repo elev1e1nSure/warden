@@ -14,9 +14,9 @@ import (
 	"runtime"
 	"strconv"
 	"time"
-	"github.com/elev1e1n/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/client"
 
-	tui "github.com/elev1e1n/warden"
+	tui "github.com/elev1e1nSure/warden"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

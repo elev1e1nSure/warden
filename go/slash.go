@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"github.com/elev1e1n/warden/internal/client"
-	"github.com/elev1e1n/warden/internal/security"
+	"github.com/elev1e1nSure/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/security"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

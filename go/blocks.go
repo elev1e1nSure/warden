@@ -3,7 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"github.com/elev1e1n/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/client"
 
 	"github.com/charmbracelet/lipgloss"
 )

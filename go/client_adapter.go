@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/elev1e1n/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/client"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

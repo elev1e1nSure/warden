@@ -1,4 +1,4 @@
-module github.com/elev1e1n/warden
+module github.com/elev1e1nSure/warden
 
 go 1.25.0
 

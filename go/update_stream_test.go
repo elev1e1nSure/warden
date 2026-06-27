@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
-	"github.com/elev1e1n/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/client"
 )
 
 func TestHandleNextMsg_WardenStart(t *testing.T) {

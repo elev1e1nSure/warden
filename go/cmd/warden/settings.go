@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"github.com/elev1e1n/warden/internal/security"
+	"github.com/elev1e1nSure/warden/internal/security"
 )
 
 type WardenConfig struct {
