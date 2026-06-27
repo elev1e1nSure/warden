@@ -434,9 +434,52 @@ func formatArgs(args map[string]any) string {
 	return strings.Join(parts, ", ")
 }
 
+func generateLLMPreview(ctx context.Context, llmClient LLMClient, model string, toolName string, args map[string]any) string {
+	if llmClient == nil || model == "" {
+		return ""
+	}
+	argsBytes, err := json.Marshal(args)
+	if err != nil {
+		return ""
+	}
+
+	prompt := fmt.Sprintf(
+		"Describe what this tool execution does in one short, clear, human-readable sentence in the user's language. "+
+			"Do not include any intro, prefix, markdown, quotes or explanation. Just write the sentence itself. "+
+			"Tool: %s, Arguments: %s",
+		toolName, string(argsBytes),
+	)
+
+	messages := []map[string]any{
+		{"role": "user", "content": prompt},
+	}
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	chunkCh, err := llmClient.Chat(ctxTimeout, model, messages, nil)
+	if err != nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for chunk := range chunkCh {
+		if chunk.Content != "" {
+			sb.WriteString(chunk.Content)
+		}
+	}
+
+	res := strings.TrimSpace(sb.String())
+	res = strings.Trim(res, "\"' \t\r\n.")
+	return res
+}
+
 // executeToolCall runs a single tool call, emitting events to ch and recording
 // results into history.
 func executeToolCall(
+	ctx context.Context,
+	llmClient LLMClient,
+	model string,
 	tc ToolCall,
 	autoMode bool,
 	history *[]map[string]any,
@@ -522,6 +565,13 @@ func executeToolCall(
 			ch <- client.EventTool{Tool: client.ToolMsg{Name: name, Args: argsStr, Result: "cancelled"}}
 			return
 		}
+		preview := resolvePreview(name, args, argsStr)
+		if preview == argsStr && name != "powershell" && name != "bash" {
+			if llmPreview := generateLLMPreview(ctx, llmClient, model, name, args); llmPreview != "" {
+				preview = llmPreview
+			}
+		}
+
 		callID, _ := confirmMgr.Register()
 		ch <- client.EventConfirm{
 			ID:         callID,
@@ -531,7 +581,7 @@ func executeToolCall(
 			Summary:    decision.Reason,
 			Details:    decision.Details,
 			Args:       argsStr,
-			Preview:    resolvePreview(name, args, argsStr),
+			Preview:    preview,
 			DefaultVal: "cancel",
 		}
 		if !confirmMgr.Wait(callID) {

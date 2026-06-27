@@ -504,6 +504,9 @@ func (s *ChatSession) streamLoop(
 				break
 			}
 			executeToolCall(
+				ctx,
+				s.Client,
+				s.Model,
 				tc,
 				autoMode,
 				&s.History,
