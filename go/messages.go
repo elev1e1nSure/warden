@@ -3,7 +3,7 @@ package tui
 import (
 	"time"
 
-	"warden/internal/client"
+	"github.com/elev1e1n/warden/internal/client"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"warden/internal/client"
+	"github.com/elev1e1n/warden/internal/client"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"

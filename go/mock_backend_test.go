@@ -1,6 +1,6 @@
 package tui
 
-import "warden/internal/client"
+import "github.com/elev1e1n/warden/internal/client"
 
 var _ Backend = (*mockBackend)(nil)
 
