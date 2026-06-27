@@ -114,24 +114,24 @@ func (m *model) layoutViewportHeight() int {
 			title:   "Dangerous action",
 			tool:    m.confirmTool,
 			details: []string{},
-		}, m.width, m.autoMode))
+		}, m.width, m.autoMode)) + 1
 	}
 
 	questionHeight := 0
 	if m.questioning && len(m.questionsData) > 0 {
 		questionHeight = lipgloss.Height(renderQuestionBlock(
 			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.width, m.autoMode,
-		))
+		)) + 1
 	}
 
 	modelPickerHeight := 0
 	if m.modelPicking {
-		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode))
+		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode)) + 1
 	}
 
 	cwHeight := 0
 	if m.cwOpen {
-		cwHeight = lipgloss.Height(m.renderConnectWizard())
+		cwHeight = lipgloss.Height(m.renderConnectWizard()) + 1
 	}
 
 	// input box: top-pad + N content lines + blank spacer + status + bottom-pad
@@ -166,22 +166,22 @@ func (m *model) View() string {
 			details: m.confirmDetails,
 			preview: m.confirmPreview,
 		}, m.barWidth(), m.autoMode)
-		layers = append(layers, indentLines(block, gutter))
+		layers = append(layers, "", indentLines(block, gutter))
 	}
 
 	if m.questioning && len(m.questionsData) > 0 {
 		block := renderQuestionBlock(
 			m.questionsData[m.questionIdx], m.questionIdx, len(m.questionsData), m.barWidth(), m.autoMode,
 		)
-		layers = append(layers, indentLines(block, gutter))
+		layers = append(layers, "", indentLines(block, gutter))
 	}
 
 	if m.modelPicking {
-		layers = append(layers, indentLines(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode), gutter))
+		layers = append(layers, "", indentLines(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode), gutter))
 	}
 
 	if m.cwOpen {
-		layers = append(layers, indentLines(m.renderConnectWizard(), gutter))
+		layers = append(layers, "", indentLines(m.renderConnectWizard(), gutter))
 	}
 
 	if m.hintVisible {

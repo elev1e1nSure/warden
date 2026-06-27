@@ -12,21 +12,27 @@ func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 	var b strings.Builder
 
 	b.WriteString("  " + HeaderStyle().Render("▸") + " " + HeaderStyle().Render(toolDisplayName(inner.tool)))
-	b.WriteString("\n")
 
 	if inner.preview != "" {
+		b.WriteString("\n")
 		limit := width - 6
 		if limit < 10 {
 			limit = 10
 		}
 		shown := 0
-		for _, line := range strings.Split(inner.preview, "\n") {
+		lines := strings.Split(inner.preview, "\n")
+		var nonOpt []string
+		for _, line := range lines {
 			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
+			if line != "" {
+				nonOpt = append(nonOpt, line)
 			}
+		}
+		for i, line := range nonOpt {
 			b.WriteString(DimStyle().Render("    " + truncateRunes(line, limit)))
-			b.WriteString("\n")
+			if i < len(nonOpt)-1 && shown < 3 {
+				b.WriteString("\n")
+			}
 			shown++
 			if shown >= 4 {
 				break
