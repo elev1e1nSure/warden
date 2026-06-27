@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -177,14 +178,16 @@ func (c *OllamaClient) Chat(ctx context.Context, model string, messages []map[st
 		return nil, err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("Ollama error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
 	ch := make(chan LLMChunk, 64)
 	go func() {
 		defer close(ch)
 		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return
-		}
 
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)
@@ -322,14 +325,16 @@ func (c *OpenAIClient) Chat(ctx context.Context, model string, messages []map[st
 		return nil, err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
 	ch := make(chan LLMChunk, 64)
 	go func() {
 		defer close(ch)
 		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return
-		}
 
 		scanner := bufio.NewScanner(resp.Body)
 		buf := make([]byte, 0, 64*1024)

@@ -34,10 +34,14 @@ var screenshotTools = map[string]bool{
 
 // ToolDefinition is the JSON-schema description of a tool, passed to the LLM.
 type ToolDefinition struct {
-	Type        string         `json:"type"`
+	Type     string                 `json:"type"`
+	Function ToolFunctionDefinition `json:"function"`
+}
+
+type ToolFunctionDefinition struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
-	Parameters  map[string]any `json:"parameters,omitempty"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 var (
@@ -103,10 +107,17 @@ func Definitions() []ToolDefinition {
 	reg := Registry()
 	out := make([]ToolDefinition, 0, len(reg))
 	for name := range reg {
+		params := map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		}
 		out = append(out, ToolDefinition{
-			Type:        "function",
-			Name:        name,
-			Description: describe(name),
+			Type: "function",
+			Function: ToolFunctionDefinition{
+				Name:        name,
+				Description: describe(name),
+				Parameters:  params,
+			},
 		})
 	}
 	return out
