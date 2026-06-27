@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/elev1e1nSure/warden/internal/client"
 )
 
 const pendingTimeout = 5 * time.Minute
@@ -177,7 +179,7 @@ type QuestionManager struct {
 
 type questionEntry struct {
 	pendingEntry
-	questions []QuestionItem
+	questions []client.QuestionItem
 	answers   [][]string
 }
 
@@ -196,7 +198,7 @@ func (m *QuestionManager) CancelAll() {
 	}
 }
 
-func (m *QuestionManager) Register(questions []QuestionItem) (string, chan struct{}) {
+func (m *QuestionManager) Register(questions []client.QuestionItem) (string, chan struct{}) {
 	id := newID()
 	e := &questionEntry{
 		pendingEntry: newPendingEntry(),
@@ -225,7 +227,7 @@ func (m *QuestionManager) Resolve(id string, answers [][]string) bool {
 	return true
 }
 
-func (m *QuestionManager) Pop(id string) (questions []QuestionItem, answers [][]string, found bool) {
+func (m *QuestionManager) Pop(id string) (questions []client.QuestionItem, answers [][]string, found bool) {
 	m.mu.Lock()
 	e, exists := m.pending[id]
 	if !exists {

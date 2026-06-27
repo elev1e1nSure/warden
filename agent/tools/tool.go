@@ -188,7 +188,7 @@ func inCwd(path string) bool {
 	return !strings.HasPrefix(rel, "..")
 }
 
-func parseArgs(arguments any) map[string]any {
+func ParseArgs(arguments any) map[string]any {
 	switch v := arguments.(type) {
 	case map[string]any:
 		return v

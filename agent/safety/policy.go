@@ -34,7 +34,7 @@ func applyMode(d SafetyDecision, toolName string, mode string) SafetyDecision {
 	return d
 }
 
-func assessToolCall(toolName string, args map[string]any, cwd string, mode string) SafetyDecision {
+func AssessToolCall(toolName string, args map[string]any, cwd string, mode string) SafetyDecision {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
