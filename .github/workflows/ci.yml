@@ -67,8 +67,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Install just
         uses: taiki-e/install-action@v2
@@ -88,7 +88,6 @@ jobs:
         run: just test-go -coverprofile=cover.out
 
       - name: Check coverage threshold
-        working-directory: go
         run: |
           coverage=$(go tool cover -func=cover.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Go coverage: ${coverage}%"
@@ -101,4 +100,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: go-coverage
-          path: go/cover.out
+          path: cover.out

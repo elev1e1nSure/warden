@@ -24,8 +24,8 @@ venv/
 # --- Go ---
 *.exe
 *.exe~
-go/cover.out
-go/vendor/
+/go.cover
+vendor/
 
 # --- Logs ---
 *.log
