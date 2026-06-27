@@ -335,6 +335,21 @@ func executeToolCall(
 	if name == "" {
 		return
 	}
+	// Normalize common tool name aliases used by LLMs
+	switch name {
+	case "read":
+		name = "file_read"
+	case "write":
+		name = "file_write"
+	case "delete":
+		name = "file_delete"
+	case "list":
+		name = "file_list"
+	case "move":
+		name = "file_move"
+	case "copy":
+		name = "file_copy"
+	}
 	toolCallID := tc.ID
 
 	reg := Registry()
