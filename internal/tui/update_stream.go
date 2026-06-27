@@ -54,19 +54,15 @@ func (m *model) handleNextMsg(msg nextMsg) (*model, tea.Cmd) {
 
 	case toolMsg:
 		m.toolRunning = false
-		if inner.tool.Diff != "" {
-			summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
-			m.clearAction()
-			m.messages = append(m.messages, messageEntry{
-				kind:       messageToolActivity,
-				text:       summary,
-				toolResult: inner.tool.Result,
-				toolDiff:   inner.tool.Diff,
-				toolDone:   true,
-			})
-		} else {
-			m.clearActionDelayed()
-		}
+		summary := toolSummaryLine(inner.tool.Name, inner.tool.Args, inner.tool.Result)
+		m.clearAction()
+		m.messages = append(m.messages, messageEntry{
+			kind:       messageToolActivity,
+			text:       summary,
+			toolResult: inner.tool.Result,
+			toolDiff:   inner.tool.Diff,
+			toolDone:   true,
+		})
 		m.syncViewport()
 		return m, readNext(msg.ch, m.streamGen)
 
