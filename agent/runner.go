@@ -299,16 +299,130 @@ func downscaleNearest(src image.Image, newW, newH int) image.Image {
 	return dst
 }
 
-func resolvePreview(args map[string]any, fallback string) string {
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+func resolvePreview(name string, args map[string]any, fallback string) string {
+	// 1. If it's a shell command
 	if cmd, ok := args["command"].(string); ok && cmd != "" {
 		return cmd
 	}
+	if cmd, ok := args["cmd"].(string); ok && cmd != "" {
+		return cmd
+	}
+
+	// 2. Specific tools
+	switch name {
+	case "glob", "file_list":
+		pattern := ""
+		if pat, ok := args["pattern"].(string); ok {
+			pattern = pat
+		}
+		path := ""
+		if p, ok := args["path"].(string); ok {
+			path = p
+		} else if r, ok := args["root_dir"].(string); ok {
+			path = r
+		}
+		if pattern != "" && path != "" {
+			return fmt.Sprintf("Files matching '%s' in %s", pattern, path)
+		} else if pattern != "" {
+			return fmt.Sprintf("Files matching '%s'", pattern)
+		} else if path != "" {
+			return fmt.Sprintf("Files in %s", path)
+		}
+
+	case "grep":
+		pattern := ""
+		if pat, ok := args["pattern"].(string); ok {
+			pattern = pat
+		}
+		path := ""
+		if p, ok := args["path"].(string); ok {
+			path = p
+		}
+		if pattern != "" && path != "" {
+			return fmt.Sprintf("Search for '%s' in %s", pattern, path)
+		} else if pattern != "" {
+			return fmt.Sprintf("Search for '%s'", pattern)
+		}
+
+	case "file_read", "file_delete", "file_write", "edit":
+		if p, ok := args["path"].(string); ok && p != "" {
+			if abs, err := filepath.Abs(p); err == nil {
+				return abs
+			}
+			return p
+		} else if p, ok := args["file_path"].(string); ok && p != "" {
+			if abs, err := filepath.Abs(p); err == nil {
+				return abs
+			}
+			return p
+		}
+
+	case "file_move", "file_copy":
+		src := ""
+		if s, ok := args["src"].(string); ok {
+			src = s
+		}
+		dest := ""
+		if d, ok := args["dest"].(string); ok {
+			dest = d
+		}
+		if src != "" && dest != "" {
+			return fmt.Sprintf("%s ➔ %s", src, dest)
+		}
+
+	case "archive":
+		action := ""
+		if act, ok := args["action"].(string); ok {
+			action = act
+		}
+		path := ""
+		if p, ok := args["path"].(string); ok {
+			path = p
+		}
+		if action != "" && path != "" {
+			return fmt.Sprintf("%s archive: %s", capitalize(action), path)
+		}
+
+	case "browser_open":
+		if url, ok := args["url"].(string); ok {
+			return url
+		}
+
+	case "http_request":
+		method := "GET"
+		if m, ok := args["method"].(string); ok && m != "" {
+			method = strings.ToUpper(m)
+		}
+		url := ""
+		if u, ok := args["url"].(string); ok {
+			url = u
+		}
+		if url != "" {
+			return fmt.Sprintf("%s %s", method, url)
+		}
+
+	case "window_focus":
+		if title, ok := args["title"].(string); ok && title != "" {
+			return fmt.Sprintf("Focus window: %s", title)
+		}
+	}
+
+	// 3. Fallback to path if present
 	if p, ok := args["path"].(string); ok && p != "" {
 		if abs, err := filepath.Abs(p); err == nil {
 			return abs
 		}
 		return p
 	}
+
+	// 4. Default: return key-value pairs formatted nicely
 	return fallback
 }
 
@@ -417,7 +531,7 @@ func executeToolCall(
 			Summary:    decision.Reason,
 			Details:    decision.Details,
 			Args:       argsStr,
-			Preview:    resolvePreview(args, argsStr),
+			Preview:    resolvePreview(name, args, argsStr),
 			DefaultVal: "cancel",
 		}
 		if !confirmMgr.Wait(callID) {
