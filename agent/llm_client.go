@@ -187,6 +187,8 @@ func (c *OllamaClient) Chat(ctx context.Context, model string, messages []map[st
 		}
 
 		scanner := bufio.NewScanner(resp.Body)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 10*1024*1024)
 		for scanner.Scan() {
 			var r ollamaChatResponse
 			if err := json.Unmarshal(scanner.Bytes(), &r); err != nil {
@@ -267,8 +269,9 @@ type openAIChatRequest struct {
 type openAIChatResponse struct {
 	Choices []struct {
 		Delta struct {
-			Content   string `json:"content"`
-			Reasoning string `json:"reasoning"`
+			Content       string `json:"content"`
+			Reasoning     string `json:"reasoning"`
+			ReasoningText string `json:"reasoning_text"`
 			ToolCalls []struct {
 				Index    int    `json:"index"`
 				ID       string `json:"id"`
@@ -329,6 +332,8 @@ func (c *OpenAIClient) Chat(ctx context.Context, model string, messages []map[st
 		}
 
 		scanner := bufio.NewScanner(resp.Body)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 10*1024*1024)
 		var accumulatedToolCalls []ToolCall
 
 		for scanner.Scan() {
@@ -355,6 +360,9 @@ func (c *OpenAIClient) Chat(ctx context.Context, model string, messages []map[st
 			var thinking, content string
 			if len(r.Choices) > 0 {
 				thinking = r.Choices[0].Delta.Reasoning
+				if thinking == "" {
+					thinking = r.Choices[0].Delta.ReasoningText
+				}
 				content = r.Choices[0].Delta.Content
 
 				// Handle tool calls aggregation
