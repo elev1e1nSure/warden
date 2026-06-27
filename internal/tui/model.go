@@ -385,7 +385,7 @@ func (m *model) resolveConfirm(ok bool) (*model, tea.Cmd) {
 	m.resetInput()
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.focusInput(), m.sendConfirm(id, ok), readNext(ch, m.streamGen))
+	return m, tea.Batch(m.sendConfirm(id, ok), readNext(ch, m.streamGen))
 }
 
 // answerQuestion records the answer for the current question and advances;
@@ -405,7 +405,7 @@ func (m *model) answerQuestion(answer string) (*model, tea.Cmd) {
 	m.appendQuizHistory(saved, answers)
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.focusInput(), m.sendQuestion(id, answers), readNext(ch, m.streamGen), m.tick())
+	return m, tea.Batch(m.sendQuestion(id, answers), readNext(ch, m.streamGen), m.tick())
 }
 
 // beginStream marks the start of a streaming turn and sends text to the backend.
@@ -413,6 +413,7 @@ func (m *model) beginStream(text string) tea.Cmd {
 	m.streamGen++
 	m.streamStart = len(m.messages)
 	m.resetInput()
+	m.textinput.Blur()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0
@@ -427,6 +428,7 @@ func (m *model) beginSkillStream(name, args string) tea.Cmd {
 	m.streamGen++
 	m.streamStart = len(m.messages)
 	m.resetInput()
+	m.textinput.Blur()
 	m.streaming = true
 	m.loading = true
 	m.spinner = 0

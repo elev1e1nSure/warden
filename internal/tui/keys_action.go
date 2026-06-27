@@ -59,7 +59,7 @@ func (m *model) handleKeyEsc(msg tea.KeyMsg) (*model, tea.Cmd, bool) {
 		m = m.clearQuestionState()
 		m.updateViewportHeight()
 		m.syncViewport()
-		return m, tea.Batch(m.focusInput(), m.sendQuestion(id, nil), readNext(ch, m.streamGen)), true
+		return m, tea.Batch(m.sendQuestion(id, nil), readNext(ch, m.streamGen)), true
 	}
 	if m.confirming {
 		newM, cmd := m.resolveConfirm(false)
