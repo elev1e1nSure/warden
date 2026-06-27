@@ -384,7 +384,8 @@ func (m *model) resolveConfirm(ok bool) (*model, tea.Cmd) {
 	m.resetInput()
 	m.updateViewportHeight()
 	m.syncViewport()
-	return m, tea.Batch(m.sendConfirm(id, ok), readNext(ch, m.streamGen))
+	m.loading = true
+	return m, tea.Batch(m.sendConfirm(id, ok), readNext(ch, m.streamGen), m.tick())
 }
 
 // answerQuestion records the answer for the current question and advances;
