@@ -317,17 +317,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	oldVal := m.textinput.Value()
+	m.textinput, cmd = m.textinput.Update(msg)
+	cmds = append(cmds, cmd)
+
 	isInteractive := m.confirming || m.questioning || m.modelPicking
 	if (!m.streaming && !m.loading) || isInteractive {
 		cmds = append(cmds, m.focusInput())
 	} else {
 		m.textinput.Blur()
 	}
-
-
-	oldVal := m.textinput.Value()
-	m.textinput, cmd = m.textinput.Update(msg)
-	cmds = append(cmds, cmd)
 	m.syncInputHeight()
 	if m.slashIdx >= 0 && m.textinput.Value() != oldVal {
 		m.slashIdx = -1
