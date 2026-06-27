@@ -11,18 +11,18 @@
 ## Layout
 - No top header
 - Chat viewport fills screen
-- Bottom bar: full-width wave + rounded input + single-line status bar
+- Bottom bar: full-width wave + left-accented input block containing the status line inside it
 
 ## Elements
 
 ### Status bar
-`Ask · model · hint [tokens]` — mode colored, model white, hint dim, tokens right-aligned
+`Ask · model · hint` — mode colored, model white, hint dim
 
 ### Wave
 Full-width bouncing `·` dots under input. Green in Ask, blue in Auto, faint when idle.
 
 ### Input
-`RoundedBorder`, green idle / blue Auto / faint streaming. Prompt: `> `
+Left border `▌` of the accent color (green idle / blue Auto / faint streaming). Prompt: `> `
 
 ### Messages
 - User: `#242424` block, no `>` prompt in history

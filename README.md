@@ -7,9 +7,9 @@
 
 > **Describe the task. Skip the script.**
 
-Warden is an AI agent that lives in your terminal and controls your Windows machine. You tell it what to do in plain English — it figures out the steps, runs them, and shows you what's happening in real time.
+Warden is a computer-control AI agent that lives in your terminal. You tell it what to do in plain English — it looks at your screen, runs commands, edits files, drives the browser, and streams every action back in real time.
 
-It sees your screen, runs shell commands, edits files, drives the browser. No IDE plugin. No Electron wrapper. No cloud account required.
+One binary, no Electron, no cloud account, no plugins.
 
 ![demo](assets/warden-gif.gif)
 
@@ -19,18 +19,18 @@ It sees your screen, runs shell commands, edits files, drives the browser. No ID
 
 [**⬇ Download for Windows x64**](https://github.com/elev1e1nSure/warden/releases/latest)
 
-Unzip anywhere. Two binaries, one folder, zero setup. Run `warden.exe` and pick your LLM provider on first launch.
+Unzip anywhere. Run `warden.exe` and pick your LLM provider on first launch.
 
 ```powershell
-# Or build from source (Go 1.25+, Python 3.11+)
-just release
+# Or build from source (Go 1.25+)
+just build
 ```
 
 ---
 
 ## What it's for
 
-You have a task that's annoying enough to think about but not worth writing a script for. Warden handles those.
+Tasks that are annoying enough to think about but not worth scripting:
 
 ```
 > find the five largest files on my desktop and zip them into archive.zip
@@ -40,7 +40,7 @@ You have a task that's annoying enough to think about but not worth writing a sc
 > rename all the screenshots in this folder to match the date they were taken
 ```
 
-It works across your whole machine — shell, browser, file system, running processes — and streams every action back to you as it goes.
+Warden works across your whole machine — shell, browser, file system, running processes.
 
 ---
 
@@ -62,7 +62,7 @@ You type a task
   Next step (or done)
 ```
 
-Every action is visible in the chat stream. **Ask mode** pauses before writes and mouse clicks so you stay in control. **Auto mode** lets the agent run freely when you trust the task.
+Every action streams into the chat. **Ask mode** pauses before writes and mouse clicks so you stay in control. **Auto mode** lets the agent run freely when you trust the task.
 
 Toggle between them with `Shift+Tab` at any time.
 
@@ -70,15 +70,15 @@ Toggle between them with `Shift+Tab` at any time.
 
 ## Safety
 
-Actions are classified by code — not by the model — before anything runs.
+Actions are classified by Go code — not by the model — before anything runs.
 
 | Level | What | Behaviour |
 |---|---|---|
 | Safe | Read-only: file reads, screenshots, `git status`, browser reads | Runs immediately |
 | Confirm | Writes, installs, mouse/keyboard, process kills | Pauses in Ask mode |
-| Blocked | Recursive deletes outside workspace, encoded payloads, registry changes | Always rejected |
+| Blocked | Recursive deletes outside workspace, dangerous paths, registry changes | Always rejected |
 
-Fail-safe: slam the mouse into the top-left corner to abort any automated action mid-run.
+Kill switch: slam the mouse to the top-left corner to abort any automated action mid-run.
 
 ---
 
@@ -121,7 +121,7 @@ Pre-configure with `~/.warden-config.json` to skip the setup wizard:
 }
 ```
 
-The API key is encrypted on disk (DPAPI on Windows). Key and auth token are passed to the backend via stdin — never in environment variables. Every backend request is authenticated with a shared secret generated at startup.
+The API key is encrypted on disk (DPAPI on Windows). Key and auth token are passed to the backend via stdin — never in environment variables. Every request is authenticated with a shared secret generated at startup.
 
 Use `WARDEN_MODEL` to override the model via environment variable. Works with Ollama (local) or any OpenAI-compatible API.
 
@@ -152,39 +152,41 @@ Use `WARDEN_MODEL` to override the model via environment variable. Works with Ol
 | `/memory` | Manage memory |
 | `/select` | Enable text selection mode |
 | `/update` | Download and install latest release |
-| `/verbose` | Show tool calls and diffs |
 
 ---
 
-## Stack
+## Architecture
+
+Single Go binary — no separate backend process.
 
 | Layer | Technology |
 |---|---|
-| TUI | Go 1.24+, bubbletea, lipgloss, glamour |
-| Backend | Python 3.11+, aiohttp |
+| TUI | bubbletea, lipgloss, glamour |
+| Agent loop | Native Go — screenshot → LLM → tool execution |
 | LLM | Ollama or any OpenAI-compatible API |
-| Screen & input | pyautogui, Pillow |
-| Browser | Playwright |
-| Search | duckduckgo-search |
+| Screen & input | Win32 API via `kbinani/screenshot`, SendInput |
+| Browser | Playwright for Go (`mxschmitt/playwright-go`) |
+| Search | DuckDuckGo instant answer API |
+| Memory | SQLite via `modernc.org/sqlite` |
+| Safety | Deterministic — `agent/safety/policy.go` |
 
-Frontend and backend are fully decoupled over HTTP NDJSON. Either can be swapped independently.
+The agent runs entirely inside the Go process. Tools are built-in Go implementations — PowerShell, file ops, browser control, mouse/keyboard simulation, OCR, image search, and more.
 
 ---
 
 ## Build & test
 
 ```powershell
-just build              # Go TUI only
-just build-backend      # Python backend (requires PyInstaller)
-just release            # Both
-
-just install            # Python deps
-just test               # pytest with coverage
-just test --no-cov -q   # Quick run
-just test-go            # Go tests
-just lint-go            # Go vet
-just fmt-go             # Go format diff
+just build              # Build warden.exe
+just test               # Run Go tests
+just test -v ./agent    # Test a specific package
+just test-cov           # With coverage
+just lint               # go vet
+just fmt                # Check formatting
+just fmt-write          # Fix formatting
 ```
+
+The justfile has no Python targets — this project is pure Go.
 
 ---
 
