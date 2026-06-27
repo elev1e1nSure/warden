@@ -15,7 +15,7 @@ import (
 	"time"
 	"github.com/elev1e1nSure/warden/internal/client"
 
-	tui "github.com/elev1e1nSure/warden"
+	tui "github.com/elev1e1nSure/warden/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
