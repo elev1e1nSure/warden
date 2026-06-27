@@ -11,8 +11,7 @@ import (
 func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 	var b strings.Builder
 
-	accent := WardenStyleAuto(autoMode)
-	b.WriteString("  " + accent.Render("▸") + " " + accent.Render(toolDisplayName(inner.tool)))
+	b.WriteString("  " + HeaderStyle().Render("▸") + " " + HeaderStyle().Render(toolDisplayName(inner.tool)))
 	b.WriteString("\n")
 
 	if inner.preview != "" {
@@ -34,20 +33,6 @@ func renderConfirmBlock(inner confirmMsg, width int, autoMode bool) string {
 			}
 		}
 	}
-
-	details := inner.details
-	if len(details) == 0 && inner.summary != "" {
-		details = []string{inner.summary}
-	}
-	if len(details) > 0 {
-		for _, d := range details {
-			b.WriteString(DimStyle().Render("    " + d))
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(ConfirmYStyle().Render("  Y  run  ") + ConfirmNStyle().Render("  N  cancel  "))
 
 	return b.String()
 }

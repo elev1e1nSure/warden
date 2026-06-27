@@ -18,8 +18,8 @@ func TestRenderConfirmBlock(t *testing.T) {
 	if !strings.Contains(result, "Shell") {
 		t.Errorf("expected tool display name in output")
 	}
-	if !strings.Contains(result, "run") {
-		t.Errorf("expected run action in output")
+	if !strings.Contains(result, "ls -la") {
+		t.Errorf("expected preview in output")
 	}
 }
 
