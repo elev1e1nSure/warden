@@ -317,7 +317,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	cmds = append(cmds, m.focusInput())
+	isInteractive := m.confirming || m.questioning || m.modelPicking
+	if (!m.streaming && !m.loading) || isInteractive {
+		cmds = append(cmds, m.focusInput())
+	} else {
+		m.textinput.Blur()
+	}
+
 
 	oldVal := m.textinput.Value()
 	m.textinput, cmd = m.textinput.Update(msg)
