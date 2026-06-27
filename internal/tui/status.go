@@ -46,7 +46,7 @@ func (m *model) inputContentWidth() int {
 // Precomputed gradient cells: each entry is a single "·"/"•" already rendered
 // at its brightness, so a frame is just a string concat (no per-char styling).
 var (
-	waveCellsGreen = buildWaveCells(0x8A, 0xB8, 0x9A)
+	waveCellsGreen = buildWaveCells(0xFF, 0xFF, 0xFF)
 	waveCellsBlue  = buildWaveCells(0x5C, 0x9C, 0xF5)
 )
 

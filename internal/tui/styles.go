@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	Green      = lipgloss.Color("#8AB89A")
-	GreenMid   = lipgloss.Color("#2D8A5A")
-	GreenFaint = lipgloss.Color("#1A4D34")
+	Green      = lipgloss.Color("#ffffff")
+	GreenMid   = lipgloss.Color("#b0b0b0")
+	GreenFaint = lipgloss.Color("#3a3a3a")
 	Blue       = lipgloss.Color("#5C9CF5")
 	BlueMid    = lipgloss.Color("#2F80ED")
 	BlueFaint  = lipgloss.Color("#0F3562")
@@ -22,8 +22,8 @@ var (
 
 // RGB triples for smooth color interpolation in animations.
 var (
-	greenRGB      = [3]int{0x8A, 0xB8, 0x9A}
-	greenFaintRGB = [3]int{0x1A, 0x4D, 0x34}
+	greenRGB      = [3]int{0xFF, 0xFF, 0xFF}
+	greenFaintRGB = [3]int{0x3A, 0x3A, 0x3A}
 	blueRGB       = [3]int{0x5C, 0x9C, 0xF5}
 	blueFaintRGB  = [3]int{0x0F, 0x35, 0x62}
 	dimRGB        = [3]int{0x66, 0x66, 0x66}

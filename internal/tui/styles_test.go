@@ -8,7 +8,7 @@ import (
 
 func TestAccentStyle(t *testing.T) {
 	s := AccentStyle()
-	if s.GetForeground() != lipgloss.Color("#8AB89A") {
+	if s.GetForeground() != Green {
 		t.Errorf("unexpected foreground color")
 	}
 }
