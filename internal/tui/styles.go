@@ -10,9 +10,9 @@ var (
 	Green      = lipgloss.Color("#8AB89A")
 	GreenMid   = lipgloss.Color("#2D8A5A")
 	GreenFaint = lipgloss.Color("#1A4D34")
-	Blue       = lipgloss.Color("#38BDF8")
-	BlueMid    = lipgloss.Color("#0EA5E9")
-	BlueFaint  = lipgloss.Color("#0C4A6E")
+	Blue       = lipgloss.Color("#5C9CF5")
+	BlueMid    = lipgloss.Color("#2F80ED")
+	BlueFaint  = lipgloss.Color("#0F3562")
 	Red        = lipgloss.Color("#ff4444")
 	Dim        = lipgloss.Color("#666666")
 	DimHover   = lipgloss.Color("#999999")
@@ -24,8 +24,8 @@ var (
 var (
 	greenRGB      = [3]int{0x8A, 0xB8, 0x9A}
 	greenFaintRGB = [3]int{0x1A, 0x4D, 0x34}
-	blueRGB       = [3]int{0x38, 0xBD, 0xF8}
-	blueFaintRGB  = [3]int{0x0C, 0x4A, 0x6E}
+	blueRGB       = [3]int{0x5C, 0x9C, 0xF5}
+	blueFaintRGB  = [3]int{0x0F, 0x35, 0x62}
 	dimRGB        = [3]int{0x66, 0x66, 0x66}
 	whiteRGB      = [3]int{0xFF, 0xFF, 0xFF}
 )

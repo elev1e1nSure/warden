@@ -47,7 +47,7 @@ func (m *model) inputContentWidth() int {
 // at its brightness, so a frame is just a string concat (no per-char styling).
 var (
 	waveCellsGreen = buildWaveCells(0x8A, 0xB8, 0x9A)
-	waveCellsBlue  = buildWaveCells(0x38, 0xBD, 0xF8)
+	waveCellsBlue  = buildWaveCells(0x5C, 0x9C, 0xF5)
 )
 
 func buildWaveCells(pr, pg, pb int) []string {
