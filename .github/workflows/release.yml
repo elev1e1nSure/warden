@@ -163,7 +163,6 @@ jobs:
           $folder = "warden-$env:TAG-windows-x64"
           New-Item -ItemType Directory -Path $folder | Out-Null
           Copy-Item warden.exe "$folder\warden.exe"
-          Copy-Item dist\warden-backend.exe "$folder\warden-backend.exe"
 
           $readme = @"
           # warden $env:TAG
@@ -176,14 +175,7 @@ jobs:
           2. Enter your model, API URL, and API key (get a free key at openrouter.ai)
           3. Start chatting
 
-          ## Files
-
-          | File | Description |
-          |---|---|
-          | ``warden.exe`` | TUI frontend — run this |
-          | ``warden-backend.exe`` | Python backend (started automatically) |
-
-          Keep both files in the same folder.
+          All components (TUI + Python backend) are self-contained in a single executable.
 
           ## Controls
 

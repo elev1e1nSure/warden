@@ -36,6 +36,7 @@ fmt-py-write:
 VERSION := env_var_or_default("TAG", "dev")
 
 build:
+    just build-backend
     cd go && go build -ldflags="-s -w -X 'warden.wardenVersion={{VERSION}}'" -o ../warden.exe ./cmd/warden
 
 build-check:
@@ -81,7 +82,8 @@ build-backend:
       --hidden-import=duckduckgo_search \
       --hidden-import=html2text \
       --hidden-import=certifi \
+      --distpath go/cmd/warden \
       run_backend.py
 
-release: build build-backend
-    @echo "warden.exe + dist/warden-backend.exe ready"
+release: build
+    @echo "warden.exe ready"

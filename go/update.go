@@ -180,8 +180,7 @@ func validateUpdateZip(path string) error {
 	defer zr.Close()
 
 	required := map[string]bool{
-		"warden.exe":         false,
-		"warden-backend.exe": false,
+		"warden.exe": false,
 	}
 	for _, f := range zr.File {
 		name := strings.ToLower(filepath.Base(f.Name))
@@ -221,7 +220,7 @@ try {
 	}
 	Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
 
-	$required = @("warden.exe", "warden-backend.exe")
+	$required = @("warden.exe")
 	foreach ($name in $required) {
 		$source = Get-ChildItem -LiteralPath $extractDir -Recurse -File -Filter $name | Select-Object -First 1
 		if ($null -eq $source) {
