@@ -3,9 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -101,21 +99,6 @@ type ChatSession struct {
 	cancelled           int32 // atomic bool: 0 is false, 1 is true
 }
 
-func buildEnvContext() string {
-	var parts []string
-	parts = append(parts, fmt.Sprintf("os: %s/%s", runtime.GOOS, runtime.GOARCH))
-	if tempDir := os.TempDir(); tempDir != "" {
-		parts = append(parts, "temp: "+tempDir)
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		parts = append(parts, "home: "+home)
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		parts = append(parts, "cwd: "+cwd)
-	}
-	return strings.Join(parts, "\n")
-}
-
 func NewChatSession(
 	model string,
 	llmClient LLMClient,
@@ -123,14 +106,8 @@ func NewChatSession(
 	questionMgr *QuestionManager,
 	memStore *memory.MemoryStore,
 ) *ChatSession {
-	envCtx := buildEnvContext()
-	history := []map[string]any{
-		{"role": "user", "content": "[env]"},
-		{"role": "assistant", "content": envCtx},
-	}
 	return &ChatSession{
 		Model:               model,
-		History:             history,
 		Client:              llmClient,
 		ConfirmationManager: confirmMgr,
 		QuestionManager:     questionMgr,
@@ -463,13 +440,16 @@ func (s *ChatSession) streamLoop(
 	historyInsertAt := len(s.History) + 1
 	s.AddUser(text)
 	s.ResetCancellation()
+	iterCount := 0
+
 	// Set session on todowrite tool if it implements SessionSettable
 	todowriteTool := Registry()["todowrite"]
 	if settable, ok := todowriteTool.(interface{ SetSession(id string) }); ok {
 		settable.SetSession(s.SessionID)
 	}
 
-	for {
+	for iterCount < 20 { // MAX_ITER is 20
+		iterCount++
 		if s.IsCancelled() {
 			break
 		}
@@ -540,5 +520,7 @@ func (s *ChatSession) streamLoop(
 
 	if s.IsCancelled() {
 		ch <- client.EventToken{Text: "\n[interrupted]"}
+	} else if iterCount >= 20 {
+		ch <- client.EventToken{Text: "\n[iteration limit reached]"}
 	}
 }
