@@ -2,6 +2,8 @@ package agent
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 	"time"
 )
 
@@ -29,13 +31,24 @@ const CompactPrompt = "Summarize the conversation above in a few sentences. " +
 	"Keep all key facts, decisions, file paths, and tool results. " +
 	"Discard chatty filler."
 
-// BuildSystem assembles the system prompt, including today's date and the
-// configured model name (when non-empty).
+// BuildSystem assembles the system prompt, including today's date, runtime OS
+// context, and the configured model name (when non-empty).
 func BuildSystem(model string) string {
 	today := time.Now().Format("January 02, 2006")
 	out := baseSystem + fmt.Sprintf(
 		" The current date is %s — use it to judge the freshness of "+
 			"search results and filter out outdated information.", today)
+
+	out += fmt.Sprintf(" OS: %s/%s.", runtime.GOOS, runtime.GOARCH)
+	if tempDir := os.Getenv("TEMP"); tempDir != "" {
+		out += fmt.Sprintf(" Temp directory: %s.", tempDir)
+	} else if tempDir = os.TempDir(); tempDir != "" {
+		out += fmt.Sprintf(" Temp directory: %s.", tempDir)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		out += fmt.Sprintf(" Home directory: %s.", home)
+	}
+
 	if model != "" {
 		out += fmt.Sprintf(" Configured model name: %s.", model)
 	}
