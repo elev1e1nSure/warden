@@ -1,11 +1,18 @@
 package tui
 
 import (
+	"image/color"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/cellbuf"
 )
+
+// overlayDimFg is the forced foreground for the dimmed backdrop. Faint alone
+// is too subtle — many terminals render it as a barely-noticeable dim, so we
+// also flatten the foreground color to a fixed dark gray for a stronger,
+// more consistent darkening across terminals.
+var overlayDimFg = color.RGBA{R: 0x55, G: 0x55, B: 0x55, A: 0xff}
 
 var wardenVersion = "dev"
 
@@ -154,6 +161,8 @@ func (m *model) renderOverlay(base, box string) string {
 			}
 			dimmed := cell.Clone()
 			dimmed.Style.Faint(true)
+			dimmed.Style.Foreground(overlayDimFg)
+			dimmed.Style.Background(color.Black)
 			canvas.SetCell(x, y, dimmed)
 		}
 	}
