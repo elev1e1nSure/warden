@@ -2,11 +2,11 @@ package tui
 
 import (
 	"encoding/json"
+	"github.com/elev1e1nSure/warden/internal/client"
+	"github.com/elev1e1nSure/warden/internal/security"
 	"os"
 	"path/filepath"
 	"strings"
-	"github.com/elev1e1nSure/warden/internal/client"
-	"github.com/elev1e1nSure/warden/internal/security"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -151,6 +151,8 @@ func (m *model) handleSlash(text string) (bool, tea.Cmd) {
 		m.cwLoading = false
 		m.cwAPIKey = ""
 		m.cwModels = nil
+		m.cwModelsAll = nil
+		m.cwFilter = ""
 		m.updateViewportHeight()
 		m.syncViewport()
 		return true, nil

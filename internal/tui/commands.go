@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/elev1e1nSure/warden/agent"
 )
 
 func (m *model) checkBackend() tea.Cmd {
@@ -206,6 +208,23 @@ func (m *model) fetchModels() tea.Cmd {
 	}
 }
 
+func (m *model) fetchCWModels() tea.Cmd {
+	return func() tea.Msg {
+		var llm agent.LLMClient
+		if m.cwProvider == "openrouter" {
+			llm = agent.NewOpenAIClient("https://openrouter.ai/api/v1", m.cwAPIKey)
+		} else {
+			llm = agent.NewOllamaClient("")
+		}
+		models, err := llm.ListModels(context.Background())
+		if err != nil {
+			return cwModelsResultMsg{err: err.Error()}
+		}
+		models = append(models, "enter custom...")
+		return cwModelsResultMsg{models: models}
+	}
+}
+
 func (m *model) applyModel(name string) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.backend.SetModel(name); err != nil {
@@ -233,6 +252,30 @@ func (m *model) loadSkill(name string) tea.Cmd {
 		}
 		return skillLoadedMsg{name: name, content: content}
 	}
+}
+
+// newModalTextInput builds a textinput.Model styled to match the modal's own
+// background (inputBg) instead of the library default, so the field doesn't
+// show up as a mismatched black box inside the dialog.
+func newModalTextInput() textinput.Model {
+	ti := textinput.New()
+	ti.Prompt = ""
+	ti.TextStyle = ti.TextStyle.Background(inputBg)
+	ti.PlaceholderStyle = ti.PlaceholderStyle.Background(inputBg)
+	ti.Cursor.Style = ti.Cursor.Style.Background(inputBg)
+	ti.Cursor.TextStyle = ti.Cursor.TextStyle.Background(inputBg)
+	return ti
+}
+
+// enterCWModelStep resets the model-list step's search state before fetching models.
+func (m *model) enterCWModelStep() {
+	ti := newModalTextInput()
+	ti.Placeholder = "Search"
+	ti.Width = 40
+	ti.Focus()
+	m.cwSearch = ti
+	m.cwFilter = ""
+	m.cwModelsAll = nil
 }
 
 func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -264,11 +307,9 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		case tea.KeyEnter:
 			providers := []string{"openrouter", "ollama"}
 			m.cwProvider = providers[m.cwPickIdx]
-			// no hardcoded model lists — models are free-form
 			m.cwModels = []string{"enter custom..."}
 			if m.cwProvider == "openrouter" {
-				ti := textinput.New()
-				ti.Prompt = ""
+				ti := newModalTextInput()
 				ti.EchoMode = textinput.EchoPassword
 				ti.EchoCharacter = '•'
 				ti.CharLimit = 256
@@ -280,6 +321,11 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.cwPickIdx = 0
 				m.cwCustom = false
 				m.cwStep = 2
+				m.cwLoading = true
+				m.enterCWModelStep()
+				m.updateViewportHeight()
+				m.syncViewport()
+				return true, m.fetchCWModels()
 			}
 		case tea.KeyEsc:
 			m.cwOpen = false
@@ -297,8 +343,11 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.cwPickIdx = 0
 				m.cwCustom = false
 				m.cwStep = 2
+				m.cwLoading = true
+				m.enterCWModelStep()
 				m.updateViewportHeight()
 				m.syncViewport()
+				return true, m.fetchCWModels()
 			}
 		case tea.KeyEsc:
 			m.cwStep = 0
@@ -357,8 +406,7 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 			m.syncViewport()
 		case tea.KeyEnter:
 			if m.cwPickIdx == len(m.cwModels)-1 {
-				ti := textinput.New()
-				ti.Prompt = ""
+				ti := newModalTextInput()
 				ti.CharLimit = 256
 				ti.Width = 50
 				ti.Focus()
@@ -379,6 +427,18 @@ func (m *model) handleConnectWizardKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 			m.cwCustom = false
 			m.updateViewportHeight()
 			m.syncViewport()
+		default:
+			var cmd tea.Cmd
+			m.cwSearch, cmd = m.cwSearch.Update(msg)
+			if m.cwSearch.Value() != m.cwFilter {
+				m.cwFilter = m.cwSearch.Value()
+				m.cwModels = filterModels(m.cwModelsAll, m.cwFilter)
+				m.cwPickIdx = 0
+				m.cwScroll = 0
+			}
+			m.updateViewportHeight()
+			m.syncViewport()
+			return true, cmd
 		}
 		return true, nil
 	}

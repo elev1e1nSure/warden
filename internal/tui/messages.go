@@ -91,6 +91,10 @@ type connectResultMsg struct {
 	apiURL   string
 	apiKey   string
 }
+type cwModelsResultMsg struct {
+	models []string
+	err    string
+}
 type skillsResultMsg struct {
 	skills []client.Skill
 	err    string

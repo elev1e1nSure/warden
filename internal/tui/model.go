@@ -103,17 +103,20 @@ type model struct {
 	// connection
 	connected bool
 	// connect wizard
-	cwOpen     bool
-	cwStep     int    // 0=provider 1=apikey 2=model
-	cwProvider string // "openrouter" | "ollama"
-	cwInput    textinput.Model
-	cwModels   []string
-	cwPickIdx  int
-	cwScroll   int
-	cwCustom   bool
-	cwLoading  bool
-	cwErr      string
-	cwAPIKey   string
+	cwOpen      bool
+	cwStep      int    // 0=provider 1=apikey 2=model
+	cwProvider  string // "openrouter" | "ollama"
+	cwInput     textinput.Model
+	cwModels    []string
+	cwPickIdx   int
+	cwScroll    int
+	cwCustom    bool
+	cwLoading   bool
+	cwErr       string
+	cwAPIKey    string
+	cwSearch    textinput.Model
+	cwFilter    string
+	cwModelsAll []string
 }
 
 func filterModels(models []string, filter string) []string {
@@ -263,6 +266,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case connectResultMsg:
 		m, cmd = m.handleConnectResult(msg)
+		cmds = append(cmds, cmd)
+
+	case cwModelsResultMsg:
+		m, cmd = m.handleCWModelsResult(msg)
 		cmds = append(cmds, cmd)
 
 	case backendReadyMsg:

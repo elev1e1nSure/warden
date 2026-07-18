@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -92,6 +93,28 @@ func SlashDescStyle(active bool) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#585858"))
 	}
 	return DimStyle()
+}
+
+// renderKeyHint renders a single "key label" hint: bold blue key, dim label.
+// Every span explicitly carries inputBg (the modal's own background) because
+// each lipgloss Style.Render call ends with its own ANSI reset — leaving a
+// span unstyled would let it fall back to the terminal's true background
+// instead of the modal's, showing up as a mismatched patch.
+func renderKeyHint(key, label string) string {
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Blue).Background(inputBg)
+	labelStyle := lipgloss.NewStyle().Foreground(Dim).Background(inputBg)
+	return keyStyle.Render(key) + labelStyle.Render(" "+label)
+}
+
+// renderKeyHintRow joins several {key, label} pairs into one hint line,
+// with an inputBg-colored gap between them.
+func renderKeyHintRow(pairs ...[2]string) string {
+	gap := lipgloss.NewStyle().Background(inputBg).Render("   ")
+	parts := make([]string, len(pairs))
+	for i, p := range pairs {
+		parts[i] = renderKeyHint(p[0], p[1])
+	}
+	return strings.Join(parts, gap)
 }
 
 func ConfirmYStyle() lipgloss.Style {

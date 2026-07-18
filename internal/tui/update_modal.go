@@ -3,7 +3,14 @@ package tui
 import tea "github.com/charmbracelet/bubbletea"
 
 func (m *model) handleModelsResult(msg modelsResultMsg) (*model, tea.Cmd) {
-	if msg.err != "" || len(msg.models) == 0 {
+	if msg.err != "" {
+		m.appendText(ErrorStyle().Render("  " + msg.err))
+		m.syncViewport()
+		return m, nil
+	}
+	if len(msg.models) == 0 {
+		m.appendText(DimStyle().Render("  no models available"))
+		m.syncViewport()
 		return m, nil
 	}
 	m.modelList = msg.models
@@ -60,6 +67,21 @@ func (m *model) handleConnectResult(msg connectResultMsg) (*model, tea.Cmd) {
 		m.cwErr = msg.err
 		m.cwLoading = false
 	}
+	m.updateViewportHeight()
+	m.syncViewport()
+	return m, nil
+}
+
+func (m *model) handleCWModelsResult(msg cwModelsResultMsg) (*model, tea.Cmd) {
+	m.cwLoading = false
+	if msg.err != "" || len(msg.models) <= 1 {
+		m.cwModelsAll = []string{"enter custom..."}
+	} else {
+		m.cwModelsAll = msg.models
+	}
+	m.cwModels = filterModels(m.cwModelsAll, m.cwFilter)
+	m.cwPickIdx = 0
+	m.cwScroll = 0
 	m.updateViewportHeight()
 	m.syncViewport()
 	return m, nil

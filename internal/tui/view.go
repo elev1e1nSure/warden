@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/cellbuf"
 )
 
 var wardenVersion = "dev"
@@ -124,20 +125,10 @@ func (m *model) layoutViewportHeight() int {
 		)) + 1
 	}
 
-	modelPickerHeight := 0
-	if m.modelPicking {
-		modelPickerHeight = lipgloss.Height(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode)) + 1
-	}
-
-	cwHeight := 0
-	if m.cwOpen {
-		cwHeight = lipgloss.Height(m.renderConnectWizard()) + 1
-	}
-
 	// input box: top-pad + N content lines + blank spacer + status + bottom-pad
 	// blank + wave: 2 lines, bottom "": 1 line
 	inputHeight := m.inputLineCount() + 4
-	reserved := hintHeight + confirmHeight + questionHeight + modelPickerHeight + cwHeight + inputHeight + 3
+	reserved := hintHeight + confirmHeight + questionHeight + inputHeight + 3
 	height := m.height - reserved
 	if height < 1 {
 		height = 1
@@ -147,6 +138,42 @@ func (m *model) layoutViewportHeight() int {
 
 func (m *model) updateViewportHeight() {
 	m.viewport.Height = m.layoutViewportHeight()
+}
+
+// renderOverlay dims the normal layout and draws a dialog over it. Terminal
+// cells have no alpha channel, so the faint attribute is the closest portable
+// equivalent to the GUI's translucent black backdrop.
+func (m *model) renderOverlay(base, box string) string {
+	canvas := cellbuf.NewBuffer(m.width, m.height)
+	cellbuf.SetContent(canvas, base)
+	for y := range m.height {
+		for x := range m.width {
+			cell := canvas.Cell(x, y)
+			if cell == nil || cell.Width == 0 {
+				continue
+			}
+			dimmed := cell.Clone()
+			dimmed.Style.Faint(true)
+			canvas.SetCell(x, y, dimmed)
+		}
+	}
+
+	boxWidth := lipgloss.Width(box)
+	boxHeight := lipgloss.Height(box)
+	modal := cellbuf.NewBuffer(boxWidth, boxHeight)
+	cellbuf.SetContent(modal, box)
+
+	left := max(0, (m.width-boxWidth)/2)
+	top := max(0, (m.height-boxHeight)/2)
+	for y := range boxHeight {
+		for x := range boxWidth {
+			if cell := modal.Cell(x, y); cell != nil {
+				canvas.SetCell(left+x, top+y, cell)
+			}
+		}
+	}
+
+	return cellbuf.Render(canvas)
 }
 
 func (m *model) View() string {
@@ -176,18 +203,18 @@ func (m *model) View() string {
 		layers = append(layers, "", indentLines(block, gutter))
 	}
 
-	if m.modelPicking {
-		layers = append(layers, "", indentLines(renderModelPicker(m.modelFiltered, m.modelPickIdx, m.modelScrollTop, m.autoMode), gutter))
-	}
-
-	if m.cwOpen {
-		layers = append(layers, "", indentLines(m.renderConnectWizard(), gutter))
-	}
-
 	if m.hintVisible {
 		layers = append(layers, "", indentLines(m.renderHint(), gutter))
 	}
 
 	layers = append(layers, "", m.renderFullWave(), m.renderInput(), "")
-	return lipgloss.JoinVertical(lipgloss.Left, layers...)
+	base := lipgloss.JoinVertical(lipgloss.Left, layers...)
+
+	if m.cwOpen {
+		return m.renderOverlay(base, m.renderConnectWizard())
+	}
+	if m.modelPicking {
+		return m.renderOverlay(base, m.renderModelPickerModal())
+	}
+	return base
 }

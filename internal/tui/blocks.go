@@ -2,8 +2,8 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"github.com/elev1e1nSure/warden/internal/client"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -83,37 +83,64 @@ func renderQuestionBlock(q client.QuestionItem, idx, total, width int, autoMode 
 	return b.String()
 }
 
-func renderModelPicker(filtered []string, idx, scrollTop int, autoMode bool) string {
-	const maxVisible = 8
-	start := scrollTop
-	end := start + maxVisible
-	if end > len(filtered) {
-		end = len(filtered)
+// modalContentWidth is the inner text width passed to renderModalFrame,
+// sized so the rendered box (border + padding) reads as roughly half the
+// terminal width, capped for readability on wide screens.
+func (m *model) modalContentWidth() int {
+	w := m.width*3/5 - 6
+	if w > 66 {
+		w = 66
 	}
-	lines := make([]string, 0, maxVisible+4)
+	if max := m.width - 10; w > max {
+		w = max
+	}
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
 
-	accent := WardenStyleAuto(autoMode)
-	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
-	if autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
-	}
-	key := func(s string) string { return keyStyle.Render(s) }
-	hint := key("←→") + DimStyle().Render(" navigate   ") +
-		key("Enter") + DimStyle().Render(" select   ") +
-		key("Esc") + DimStyle().Render(" cancel")
-	lines = append(lines, "  "+hint)
+// renderModalFrame draws a centered dialog box: title, blank line, then body.
+func renderModalFrame(width int, title, body string) string {
+	titleStyled := HeaderStyle().Background(inputBg).Render(title)
+	content := titleStyled + "\n\n" + body
+	return lipgloss.NewStyle().
+		Background(inputBg).
+		Padding(1, 2).
+		Width(width).
+		Render(content)
+}
+
+func (m *model) renderModelPickerModal() string {
+	dim := DimStyle()
+	accent := WardenStyleAuto(m.autoMode)
+
+	var lines []string
+	lines = append(lines, m.textinput.View())
 	lines = append(lines, "")
 
+	const maxVisible = 8
+	start := m.modelScrollTop
+	end := start + maxVisible
+	if end > len(m.modelFiltered) {
+		end = len(m.modelFiltered)
+	}
+	if len(m.modelFiltered) == 0 {
+		lines = append(lines, dim.Render("  no matches"))
+	}
 	for i := start; i < end; i++ {
-		name := filtered[i]
-		if i == idx {
-			lines = append(lines, accent.Render("  "+name))
+		name := m.modelFiltered[i]
+		if i == m.modelPickIdx {
+			lines = append(lines, accent.Render("→ "+name))
 		} else {
-			lines = append(lines, DimStyle().Render("    "+name))
+			lines = append(lines, dim.Render("  "+name))
 		}
 	}
+	lines = append(lines, "")
+	hint := renderKeyHintRow([2]string{"↑↓", "navigate"}, [2]string{"enter", "select"}, [2]string{"esc", "cancel"})
+	lines = append(lines, hint)
 
-	return strings.Join(lines, "\n")
+	return renderModalFrame(m.modalContentWidth(), "Select a model", strings.Join(lines, "\n"))
 }
 
 func (m *model) renderHint() string {
@@ -207,75 +234,75 @@ func (m *model) renderConnectWizard() string {
 	acc := WardenStyleAuto(m.autoMode)
 	dim := DimStyle()
 	errStyle := ErrorStyle()
-	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(Green)
-	if m.autoMode {
-		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(Blue)
-	}
-	key := func(s string) string { return keyStyle.Render(s) }
-
-	var lines []string
+	cw := m.modalContentWidth()
 
 	if m.cwErr != "" {
-		lines = append(lines, "  "+errStyle.Render("•  "+m.cwErr))
-		lines = append(lines, "  "+dim.Render(key("esc")+" dismiss"))
-		return strings.Join(lines, "\n")
+		body := errStyle.Render("•  "+m.cwErr) + "\n\n" + renderKeyHint("esc", "dismiss")
+		return renderModalFrame(cw, "Connect a provider", body)
 	}
 
 	if m.cwLoading {
-		lines = append(lines, "  "+dim.Render("connecting..."))
-		return strings.Join(lines, "\n")
+		return renderModalFrame(cw, "Connect a provider", dim.Render("connecting..."))
 	}
+
+	var lines []string
 
 	switch m.cwStep {
 	case 0:
-		lines = append(lines, "  "+acc.Render("connect"), "")
 		providers := []string{"openrouter", "ollama"}
 		for i, p := range providers {
 			if i == m.cwPickIdx {
-				lines = append(lines, "  "+acc.Render("→ "+p))
+				lines = append(lines, acc.Render("→ "+p))
 			} else {
-				lines = append(lines, "  "+dim.Render("  "+p))
+				lines = append(lines, dim.Render("  "+p))
 			}
 		}
 		lines = append(lines, "")
-		hint := key("←→") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" cancel")
-		lines = append(lines, "  "+hint)
+		hint := renderKeyHintRow([2]string{"↑↓", "navigate"}, [2]string{"enter", "select"}, [2]string{"esc", "cancel"})
+		lines = append(lines, hint)
+		return renderModalFrame(cw, "Connect a provider", strings.Join(lines, "\n"))
 
 	case 1:
-		lines = append(lines, "  "+acc.Render("api key"), "")
-		lines = append(lines, "  "+m.cwInput.View())
-		lines = append(lines, "  "+dim.Render("get one at openrouter.ai/keys"))
+		lines = append(lines, m.cwInput.View())
+		lines = append(lines, dim.Render("get one at openrouter.ai/keys"))
 		lines = append(lines, "")
-		hint := key("Enter") + dim.Render(" confirm   ") + key("Esc") + dim.Render(" back")
-		lines = append(lines, "  "+hint)
+		hint := renderKeyHintRow([2]string{"enter", "confirm"}, [2]string{"esc", "back"})
+		lines = append(lines, hint)
+		return renderModalFrame(cw, "API key", strings.Join(lines, "\n"))
 
 	case 2:
-		lines = append(lines, "  "+acc.Render("model"), "")
 		if m.cwCustom {
-			lines = append(lines, "  "+m.cwInput.View())
+			lines = append(lines, m.cwInput.View())
 			lines = append(lines, "")
-			hint := key("Enter") + dim.Render(" confirm   ") + key("Esc") + dim.Render(" back")
-			lines = append(lines, "  "+hint)
-		} else {
-			const maxVis = 7
-			start := m.cwScroll
-			end := start + maxVis
-			if end > len(m.cwModels) {
-				end = len(m.cwModels)
-			}
-			for i := start; i < end; i++ {
-				name := m.cwModels[i]
-				if i == m.cwPickIdx {
-					lines = append(lines, "  "+acc.Render("→ "+name))
-				} else {
-					lines = append(lines, "  "+dim.Render("  "+name))
-				}
-			}
-			lines = append(lines, "")
-			hint := key("←→") + dim.Render(" navigate   ") + key("Enter") + dim.Render(" select   ") + key("Esc") + dim.Render(" back")
-			lines = append(lines, "  "+hint)
+			hint := renderKeyHintRow([2]string{"enter", "confirm"}, [2]string{"esc", "back"})
+			lines = append(lines, hint)
+			return renderModalFrame(cw, "Custom model", strings.Join(lines, "\n"))
 		}
+
+		lines = append(lines, m.cwSearch.View())
+		lines = append(lines, "")
+		const maxVis = 8
+		start := m.cwScroll
+		end := start + maxVis
+		if end > len(m.cwModels) {
+			end = len(m.cwModels)
+		}
+		if len(m.cwModels) == 0 {
+			lines = append(lines, dim.Render("  no matches"))
+		}
+		for i := start; i < end; i++ {
+			name := m.cwModels[i]
+			if i == m.cwPickIdx {
+				lines = append(lines, acc.Render("→ "+name))
+			} else {
+				lines = append(lines, dim.Render("  "+name))
+			}
+		}
+		lines = append(lines, "")
+		hint := renderKeyHintRow([2]string{"↑↓", "navigate"}, [2]string{"enter", "select"}, [2]string{"esc", "back"})
+		lines = append(lines, hint)
+		return renderModalFrame(cw, "Select a model", strings.Join(lines, "\n"))
 	}
 
-	return strings.Join(lines, "\n")
+	return ""
 }
