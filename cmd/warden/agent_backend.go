@@ -190,7 +190,7 @@ func (b *AgentBackend) LoadSkill(name string) (string, error) {
 
 func (b *AgentBackend) Connect(provider, apiURL, apiKey, modelName string) error {
 	var llm agent.LLMClient
-	if provider == "openrouter" {
+	if provider == "openrouter" || provider == "opencode" {
 		llm = agent.NewOpenAIClient(apiURL, apiKey)
 	} else if provider == "ollama" {
 		llm = agent.NewOllamaClient("")

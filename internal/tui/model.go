@@ -15,6 +15,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// cwProviders lists the connect-wizard provider choices in display order.
+var cwProviders = []string{"openrouter", "opencode", "ollama"}
+
 type model struct {
 	viewport  viewport.Model
 	textinput textarea.Model
@@ -105,7 +108,7 @@ type model struct {
 	// connect wizard
 	cwOpen      bool
 	cwStep      int    // 0=provider 1=apikey 2=model
-	cwProvider  string // "openrouter" | "ollama"
+	cwProvider  string // "openrouter" | "opencode" | "ollama"
 	cwInput     textinput.Model
 	cwModels    []string
 	cwPickIdx   int
