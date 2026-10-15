@@ -37,7 +37,7 @@ func toTeaMsg(ev client.Event) tea.Msg {
 			questions: e.Questions,
 		}
 	case client.EventDone:
-		return doneMsg{tokenCount: e.TokenCount, tokenLimit: e.TokenLimit}
+		return doneMsg{}
 	case client.EventError:
 		return tokenMsg{text: e.Text}
 	default:

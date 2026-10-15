@@ -216,7 +216,7 @@ func indentLines(text string, prefix string) string {
 }
 
 // userBg is the background of the user message block.
-const userBg = lipgloss.Color("#191919")
+const userBg = lipgloss.Color("#141414")
 
 // renderUserMsg renders a user message as an accent-barred block, the same width
 // as the input box and centered with equal side margins. Inside the block the

@@ -506,6 +506,16 @@ func executeToolCall(
 		name = "file_move"
 	case "copy":
 		name = "file_copy"
+	case "open":
+		name = "browser_open"
+	case "search":
+		name = "google_search"
+	case "fetch", "get":
+		name = "webfetch"
+	case "click":
+		name = "browser_click"
+	case "fill", "type_text":
+		name = "browser_fill"
 	}
 	toolCallID := tc.ID
 

@@ -42,16 +42,11 @@ func TestHandleModeMsgError(t *testing.T) {
 func TestHandleStatusResult(t *testing.T) {
 	m := newTestModel()
 	m2, _ := m.handleStatusResult(statusResultMsg{
-		model:      "new-model",
-		tokenCount: 50,
-		tokenLimit: 100,
+		model: "new-model",
 	})
 
 	if m2.modelName != "new-model" {
 		t.Errorf("expected modelName to be 'new-model', got %q", m2.modelName)
-	}
-	if m2.tokenCount != 50 || m2.tokenLimit != 100 {
-		t.Errorf("expected token counts to update, got %d/%d", m2.tokenCount, m2.tokenLimit)
 	}
 }
 
@@ -70,23 +65,18 @@ func TestHandleClipboardDone(t *testing.T) {
 func TestHandleCompactResult(t *testing.T) {
 	m := newTestModel()
 	m.loading = true
-	m.tokenCount = 100
 
 	m2, _ := m.handleCompactResult(compactResultMsg{tokensAfter: 20})
 	if m2.loading {
 		t.Errorf("expected loading to be false")
 	}
-	if m2.tokenCount != 20 {
-		t.Errorf("expected tokenCount to be 20, got %d", m2.tokenCount)
-	}
 
 	// Error case
 	m = newTestModel()
 	m.loading = true
-	m.tokenCount = 100
 	m2, _ = m.handleCompactResult(compactResultMsg{err: "failed", tokensAfter: 20})
-	if m2.tokenCount != 100 {
-		t.Errorf("expected tokenCount to remain 100 on error, got %d", m2.tokenCount)
+	if m2.loading {
+		t.Errorf("expected loading to be false on error")
 	}
 }
 
@@ -158,14 +148,10 @@ func TestHandleBackendReady(t *testing.T) {
 	m := newTestModel()
 	m.autoMode = false
 	m.loading = true
-	m.tokenCount = 100
 
 	m2, cmd := m.handleBackendReady(backendReadyMsg{})
 	if m2.loading {
 		t.Errorf("expected loading to be false")
-	}
-	if m2.tokenCount != 0 {
-		t.Errorf("expected tokenCount to be reset to 0")
 	}
 	if cmd != nil {
 		t.Errorf("expected no command returned by default when not in autoMode")

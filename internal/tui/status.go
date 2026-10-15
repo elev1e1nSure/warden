@@ -193,8 +193,8 @@ func (m *model) renderStatusContent(width int, bg lipgloss.Color) string {
 		keyColor = Blue
 	}
 
-	mode := fg(modeColor, true).Render(modeLabel)
-	dot := fg(Faint, false).Render(" · ")
+	mode := fg(modeColor, false).Render(modeLabel)
+	dot := fg(Dim, false).Render(" · ")
 	modelPart := fg(White, false).Render(m.modelName)
 
 	var hint string
@@ -210,7 +210,7 @@ func (m *model) renderStatusContent(width int, bg lipgloss.Color) string {
 	case m.streaming:
 		hint = fg(keyColor, true).Render("Esc") + dim(" interrupt")
 	default:
-		key := fg(keyColor, true).Render("Shift Tab")
+		key := fg(keyColor, false).Render("Shift Tab")
 		if m.autoMode {
 			hint = key + dim("  to Ask mode")
 		} else {
@@ -251,7 +251,7 @@ func (m *model) renderInput() string {
 		PaddingRight(1).
 		PaddingTop(1).
 		PaddingBottom(1).
-		Width(cw)
+		Width(cw + 3)
 
 	// Measure the box's actual content-text width so the status line fills it
 	// exactly (right edge lines up regardless of how lipgloss treats padding).

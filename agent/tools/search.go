@@ -2,8 +2,10 @@ package tools
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -16,7 +18,87 @@ type GoogleSearchTool struct{}
 func (t *GoogleSearchTool) Name() string { return "google_search" }
 
 func (t *GoogleSearchTool) Execute(args map[string]any) Result {
-	return R("error: google_search requires duckduckgo-search Python package — not available in Go")
+	query := strings.TrimSpace(getStr(args, "query"))
+	if query == "" {
+		return R("error: query is required")
+	}
+	numResults := clampInt(getInt(args, "num_results", 8), 1, 20)
+	timeout := clampInt(getInt(args, "timeout", 15), 5, 60)
+
+	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
+	data := url.Values{"q": {query}}
+
+	resp, err := client.PostForm("https://lite.duckduckgo.com/lite/", data)
+	if err != nil {
+		return R("error: search request failed: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 500_000))
+	body := string(raw)
+
+	results := parseDuckDuckGoResults(body, numResults)
+	if len(results) == 0 {
+		return R("no results")
+	}
+
+	lines := make([]string, 0, len(results)+1)
+	lines = append(lines, fmt.Sprintf("search results for \"%s\":", query))
+	for i, r := range results {
+		lines = append(lines, fmt.Sprintf("\n%d. %s", i+1, r.title))
+		if r.snippet != "" {
+			lines = append(lines, "   "+r.snippet)
+		}
+		lines = append(lines, "   "+r.url)
+	}
+
+	return R(strings.Join(lines, ""))
+}
+
+type ddgResult struct {
+	title   string
+	url     string
+	snippet string
+}
+
+func parseDuckDuckGoResults(html string, limit int) []ddgResult {
+	var results []ddgResult
+	// DuckDuckGo Lite returns tables: class="result-link" for links, class="result-snippet" for snippets
+	linkRe := regexp.MustCompile(`<a[^>]+class="result-link"[^>]*href="([^"]*)"[^>]*>(.*?)</a>`)
+	snippetRe := regexp.MustCompile(`<td[^>]+class="result-snippet"[^>]*>(.*?)</td>`)
+
+	linkMatches := linkRe.FindAllStringSubmatch(html, -1)
+	snippetMatches := snippetRe.FindAllStringSubmatch(html, -1)
+
+	for i, m := range linkMatches {
+		if len(m) < 3 || i >= limit {
+			break
+		}
+		r := ddgResult{
+			url:   htmlUnescape(m[1]),
+			title: htmlUnescape(stripTags(m[2])),
+		}
+		if i < len(snippetMatches) {
+			r.snippet = htmlUnescape(stripTags(snippetMatches[i][1]))
+		}
+		results = append(results, r)
+	}
+	return results
+}
+
+func htmlUnescape(s string) string {
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = strings.ReplaceAll(s, "&lt;", "<")
+	s = strings.ReplaceAll(s, "&gt;", ">")
+	s = strings.ReplaceAll(s, "&quot;", "\"")
+	s = strings.ReplaceAll(s, "&#x27;", "'")
+	s = strings.ReplaceAll(s, "&#39;", "'")
+	return s
+}
+
+func stripTags(s string) string {
+	tagRe := regexp.MustCompile(`<[^>]+>`)
+	return strings.TrimSpace(tagRe.ReplaceAllString(s, ""))
 }
 
 // --- WebFetchTool ---

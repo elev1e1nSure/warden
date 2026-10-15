@@ -13,10 +13,6 @@ func (m *model) handleModeMsg(msg modeMsg) (*model, tea.Cmd) {
 }
 
 func (m *model) handleStatusResult(msg statusResultMsg) (*model, tea.Cmd) {
-	if msg.tokenLimit > 0 {
-		m.tokenCount = msg.tokenCount
-		m.tokenLimit = msg.tokenLimit
-	}
 	if msg.model != "" {
 		m.modelName = msg.model
 	}
@@ -31,9 +27,6 @@ func (m *model) handleClipboardDone(msg clipboardDoneMsg) (*model, tea.Cmd) {
 
 func (m *model) handleCompactResult(msg compactResultMsg) (*model, tea.Cmd) {
 	m.loading = false
-	if msg.err == "" {
-		m.tokenCount = msg.tokensAfter
-	}
 	m.syncViewport()
 	return m, nil
 }
@@ -65,7 +58,6 @@ func (m *model) handleUpdateResult(msg updateResultMsg) (*model, tea.Cmd) {
 
 func (m *model) handleBackendReady(msg backendReadyMsg) (*model, tea.Cmd) {
 	m.loading = false
-	m.tokenCount = 0
 	m.backend.ResetSession()
 	m.syncViewport()
 	if m.autoMode {

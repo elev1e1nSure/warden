@@ -7,6 +7,7 @@ import (
 	"strings"
 	"github.com/elev1e1nSure/warden/internal/client"
 
+	"github.com/charmbracelet/x/ansi"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -142,12 +143,12 @@ func (m *model) inputLineCount() int {
 	lines := strings.Split(val, "\n")
 	total := 0
 	for _, line := range lines {
-		runes := []rune(line)
-		if len(runes) == 0 {
+		if line == "" {
 			total++
 			continue
 		}
-		wrapped := (len(runes) + contentW - 1) / contentW
+		w := ansi.StringWidth(line)
+		wrapped := (w + contentW - 1) / contentW
 		total += wrapped
 	}
 	if total < 1 {

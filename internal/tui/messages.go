@@ -34,9 +34,7 @@ type modeMsg struct {
 	err  error
 }
 type doneMsg struct {
-	tokenCount int
-	tokenLimit int
-	gen        int
+	gen int
 }
 type compactResultMsg struct {
 	tokensBefore int
@@ -70,12 +68,10 @@ type questionMsg struct {
 }
 
 type statusResultMsg struct {
-	model      string
-	mode       string
-	cwd        string
-	brief      bool
-	tokenCount int
-	tokenLimit int
+	model string
+	mode  string
+	cwd   string
+	brief bool
 }
 type clipboardDoneMsg struct{ err error }
 type modelsResultMsg struct {

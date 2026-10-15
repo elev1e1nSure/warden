@@ -227,11 +227,17 @@ func diskUsage(path string, free, total *int64) {
 }
 
 func getStr(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
 	v, _ := m[key].(string)
 	return v
 }
 
 func getInt(m map[string]any, key string, defaultVal int) int {
+	if m == nil {
+		return defaultVal
+	}
 	switch v := m[key].(type) {
 	case float64:
 		return int(v)
@@ -244,6 +250,9 @@ func getInt(m map[string]any, key string, defaultVal int) int {
 }
 
 func getFloat(m map[string]any, key string) float64 {
+	if m == nil {
+		return 0
+	}
 	switch v := m[key].(type) {
 	case float64:
 		return v

@@ -71,9 +71,6 @@ type model struct {
 	chainPendingClearAt time.Time
 	// viewport scroll: user manually scrolled up during streaming
 	userScrolled bool
-	// token tracking
-	tokenCount int
-	tokenLimit int
 	// viewport line → messages slice index (-1 = no entry)
 	lineMap []int
 	// index of message currently under the mouse cursor (-1 = none)
@@ -322,7 +319,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	isInteractive := m.confirming || m.questioning || m.modelPicking
-	if (!m.streaming && !m.loading) || isInteractive {
+	isActive := m.streaming || m.loading || m.toolRunning
+	if !isActive || isInteractive {
 		cmds = append(cmds, m.focusInput())
 	} else {
 		m.textinput.Blur()
@@ -439,9 +437,8 @@ func (m *model) beginSkillStream(name, args string) tea.Cmd {
 	return tea.Batch(m.sendSkill(name, args, m.streamGen), m.tick())
 }
 
-// finishStream resets streaming state at turn end; returns a compact command
-// when the context is close to the token limit.
-func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
+// finishStream resets streaming state at turn end.
+func (m *model) finishStream() tea.Cmd {
 	m.streaming = false
 	m.loading = false
 	m.toolRunning = false
@@ -454,14 +451,6 @@ func (m *model) finishStream(tokenCount, tokenLimit int) tea.Cmd {
 	m.thinkDone = false
 
 	m.appendText("")
-	if tokenLimit > 0 {
-		m.tokenCount = tokenCount
-		m.tokenLimit = tokenLimit
-	}
 	m.syncViewport()
-	if m.tokenLimit > 0 && m.tokenCount > int(float64(m.tokenLimit)*0.85) {
-		m.loading = true
-		return tea.Batch(m.runCompact(), m.tick())
-	}
 	return nil
 }

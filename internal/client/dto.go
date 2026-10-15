@@ -1,11 +1,9 @@
 package client
 
 type StatusResult struct {
-	Model      string `json:"model"`
-	Mode       string `json:"mode"`
-	CWD        string `json:"cwd"`
-	TokenCount int    `json:"token_count"`
-	TokenLimit int    `json:"token_limit"`
+	Model string `json:"model"`
+	Mode  string `json:"mode"`
+	CWD   string `json:"cwd"`
 }
 
 type CompactResult struct {

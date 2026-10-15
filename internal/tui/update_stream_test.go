@@ -181,7 +181,7 @@ func TestHandleDoneMsg_StaleGenIgnored(t *testing.T) {
 	m.streaming = true
 	m.loading = true
 	m.streamGen = 2
-	msg := doneMsg{tokenCount: 10, tokenLimit: 100, gen: 1}
+	msg := doneMsg{gen: 1}
 	m2, _ := m.handleDoneMsg(msg)
 	if !m2.streaming || !m2.loading {
 		t.Errorf("expected streaming/loading to remain for stale doneMsg")

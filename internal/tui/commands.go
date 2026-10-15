@@ -96,12 +96,10 @@ func (m *model) fetchStatus(brief bool) tea.Cmd {
 			return statusResultMsg{model: "error: " + err.Error(), brief: brief}
 		}
 		return statusResultMsg{
-			model:      s.Model,
-			mode:       s.Mode,
-			cwd:        s.CWD,
-			brief:      brief,
-			tokenCount: s.TokenCount,
-			tokenLimit: s.TokenLimit,
+			model: s.Model,
+			mode:  s.Mode,
+			cwd:   s.CWD,
+			brief: brief,
 		}
 	}
 }

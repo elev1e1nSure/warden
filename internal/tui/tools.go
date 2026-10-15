@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-
-	"github.com/charmbracelet/x/ansi"
 )
 
 var toolDisplayNames = map[string]string{
@@ -334,20 +332,9 @@ func (m *model) renderToolActivityEntry(entry messageEntry, hovered bool) string
 	if entry.expanded {
 		toggle = "-"
 	}
-	var summaryLine string
-	if hovered {
-		plain := strings.Replace(ansi.Strip(entry.text), contentIndent+"→ ", contentIndent+toggle+" ", 1)
-		prefix, stats := renderDiffStats(plain)
-		if stats != "" {
-			summaryLine = HoverStyle().Render(prefix) + "  " + stats
-		} else {
-			summaryLine = HoverStyle().Render(plain)
-		}
-	} else {
-		arrow := ToolStyle().Render(contentIndent + "→ ")
-		indicator := ToolStyle().Render(contentIndent + toggle + " ")
-		summaryLine = strings.Replace(entry.text, arrow, indicator, 1)
-	}
+	arrow := ToolStyle().Render(contentIndent + "→ ")
+	indicator := ToolStyle().Render(contentIndent + toggle + " ")
+	summaryLine := strings.Replace(entry.text, arrow, indicator, 1)
 
 	if !entry.expanded {
 		return summaryLine

@@ -105,7 +105,7 @@ func (m *model) layoutViewportHeight() int {
 
 	hintHeight := 0
 	if m.hintVisible {
-		hintHeight = lipgloss.Height(m.renderHint())
+		hintHeight = lipgloss.Height(m.renderHint()) + 1
 	}
 
 	confirmHeight := 0
@@ -185,7 +185,7 @@ func (m *model) View() string {
 	}
 
 	if m.hintVisible {
-		layers = append(layers, indentLines(m.renderHint(), gutter))
+		layers = append(layers, "", indentLines(m.renderHint(), gutter))
 	}
 
 	layers = append(layers, "", m.renderFullWave(), m.renderInput(), "")

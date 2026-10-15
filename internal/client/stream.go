@@ -47,10 +47,7 @@ type QuestionItem struct {
 	Multiple bool
 }
 
-type EventDone struct {
-	TokenCount int
-	TokenLimit int
-}
+type EventDone struct{}
 
 type EventError struct{ Text string }
 

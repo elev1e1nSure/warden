@@ -105,10 +105,7 @@ func (m *model) handleNextMsg(msg nextMsg) (*model, tea.Cmd) {
 		return m, nil
 
 	case doneMsg:
-		if cmd := m.finishStream(inner.tokenCount, inner.tokenLimit); cmd != nil {
-			return m, cmd
-		}
-		return m, nil
+		return m, readNext(msg.ch, m.streamGen)
 	}
 
 	return m, nil
@@ -126,9 +123,7 @@ func (m *model) handleDoneMsg(msg doneMsg) (*model, tea.Cmd) {
 		return m, nil
 	}
 	if m.streaming {
-		if cmd := m.finishStream(msg.tokenCount, msg.tokenLimit); cmd != nil {
-			return m, cmd
-		}
+		m.finishStream()
 	}
 	return m, nil
 }

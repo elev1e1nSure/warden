@@ -97,18 +97,10 @@ func (b *AgentBackend) SetMode(auto bool) error {
 
 func (b *AgentBackend) GetStatus() (*client.StatusResult, error) {
 	cwd, _ := os.Getwd()
-	count := 0
-	limit := 0
-	if b.chat != nil {
-		count = b.chat.TokenCount
-		limit = b.chat.TokenLimit
-	}
 	return &client.StatusResult{
-		Model:      b.model,
-		Mode:       b.modeStr(),
-		CWD:        cwd,
-		TokenCount: count,
-		TokenLimit: limit,
+		Model: b.model,
+		Mode:  b.modeStr(),
+		CWD:   cwd,
 	}, nil
 }
 
